@@ -29,7 +29,7 @@ Rename goexpenses.dev.ini to goexpenses.ini, and enter settings.
 Start binary
 
 Database would be automatically created. EUR and RSD currency exchange rates would be automatically updated on start, and then once a day.
-User must register with valid E-Mail, and click to link in E-Mail to activate account.
+User must register with valid E-Mail. When reseting password, activation link is sent to E-Mail.
 
 Credits to
 
