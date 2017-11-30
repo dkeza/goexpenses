@@ -1,0 +1,52 @@
+{{ define "expensesshow" }}
+
+  {{ template "header" . }}
+
+  {{ template "navbar" . }}
+
+	<h1>{{ GetLangText "Update expense" .Lang }}</h1>
+
+	{{ with .Expenses}}
+	{{ range . }}
+	{{ $eid := .ExpensesPid }}
+	<form class="form-inline" action="/expenses/update" method="post">
+	  <input type="hidden" name="_CSRF" value="{{ $.Csrf }}">
+	  <div class="form-group">
+	    <label for="description">{{ GetLangText "Description" $.Lang }}</label>
+	    <input type="hidden" name="id" value="{{ .Pid }}">
+	    <input type="text" class="form-control" id="description" name="description" placeholder="{{ GetLangText "Description" $.Lang }}" value="{{ .Description }}">
+	  </div>
+	  <div class="form-group">
+	    <label class="sr-only" for="expense_id">{{ GetLangText "Expense type" $.Lang }}</label>
+		<select name="expense_id" class="form-control">
+		{{ with $.ExpensesAdd }}
+			{{ range . }}
+				<option value="{{ .Pid }}" {{ if eq .Pid $eid }}selected{{ end }}>{{ .Description }}</option>
+			{{ end }}
+		{{ end }}
+		</select>
+	  </div>
+	  <div class="form-group">
+	    <label for="amount">{{ GetLangText "Amount" $.Lang }}</label>
+	    <input type="number" min="0" step="any" class="form-control" id="amount" name="amount" placeholder="{{ GetLangText "Amount" $.Lang }}" value="{{ .Amount }}">
+	  </div>
+	  <div class="form-group">
+	    <label for="amounte">{{ GetLangText "Amount" $.Lang }} €</label>
+	    <input type="number" min="0" step="any" class="form-control" id="amounte" name="amounte" placeholder="{{ GetLangText "Amounte" $.Lang }} €">
+	  </div>
+	  <button type="submit" class="btn btn-default">{{ GetLangText "Save" $.Lang }}</button>
+	  <button type="button" class="btn btn-warning" onClick="onCancelExpensesShow()">{{ GetLangText "Cancel" $.Lang }}</button>
+	</form>
+
+	<script>
+		function onCancelExpensesShow() {
+			window.location = "/expenses";
+		}
+	</script>
+
+	{{ end }}
+	{{ end }}
+
+	{{ template "footer" . }}
+
+{{ end }}

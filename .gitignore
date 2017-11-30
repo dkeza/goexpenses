@@ -1,0 +1,6 @@
+*.exe
+*.EXE
+/db/database.db
+.idea
+goexpenses.ini
+database.db

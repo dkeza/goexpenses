@@ -1,0 +1,23 @@
+{{ define "reset" }}
+
+  {{ template "header" . }}
+
+  {{ template "navbar" . }}
+
+	<h1>{{ GetLangText "Reset password" .Lang }}</h1>
+
+	<p>{{ GetLangText "Reset link would be sent to Your E-Mail. Please click on received link to proceed." .Lang }}</p>
+
+
+	<form action="/reset" method="post">
+		<input type="hidden" name="_CSRF" value="{{ .Csrf }}">
+	    <div class="form-group">
+	    	<label class="sr-only" for="email">{{ GetLangText "E-Mail" .Lang }}</label>
+	    	<input type="email" class="form-control" name="email" placeholder="{{ GetLangText "E-Mail" .Lang }}">
+	  	</div>
+		<button type="submit" class="btn btn-success">{{ GetLangText "Reset" .Lang }}</button>
+	</form>
+
+	{{ template "footer" . }}
+
+{{ end }}

@@ -1,0 +1,15 @@
+{{ define "index" }}
+
+  {{ template "header" . }}
+
+  {{ template "navbar" . }}
+
+    <div class="starter-template">
+      <h1>{{ GetLangText "Simple Expenses App" .Lang }}</h1>
+      <p class="lead">{{ GetLangText "Register, and create unlimited accounts." .Lang }}<br>{{ GetLangText "Track Your incomes and expenses." .Lang }}</p>
+    </div>
+
+
+  {{ template "footer" . }}
+
+{{ end }}

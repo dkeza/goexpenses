@@ -1,0 +1,58 @@
+{{ define "incomes" }}
+
+  {{ template "header" . }}
+
+  {{ template "navbar" . }}
+
+  {{ template "account" . }}
+
+	<h1>{{ GetLangText "Incomes" .Lang }}</h1>
+
+	<form class="form-inline" action="incomes/save" method="post">
+	  <input type="hidden" name="_CSRF" value="{{ .Csrf }}">
+	<div class="form-group">
+	    <label class="sr-only" for="description">{{ GetLangText "Description" .Lang }}</label>
+	    <input type="text" class="form-control" id="description" name="description" placeholder="{{ GetLangText "Description" .Lang }}">
+	  </div>
+	  <button type="submit" class="btn btn-default">{{ GetLangText "Save" .Lang }}</button>
+	</form>
+
+	<div class="table-responsive">
+
+		<table class="table">
+		   	<thead>
+				<th>#</th>
+				<th>{{ GetLangText "Description" .Lang }}</th>
+				<th></th>
+				<th></th>
+			</thead>
+			<tbody>
+				{{ with .Incomes}}
+				{{ range . }}
+					<tr>
+						<td>{{ FormatVisibleId .Pid }}</td>
+						<td>{{ .Description }}</td>
+						<td>
+							<form class="form-inline" action="/incomes/delete" method="post">
+								<input type="hidden" name="_CSRF" value="{{ $.Csrf }}">
+								<input type="hidden" name="id" value="{{ .Pid }}">
+								<button type="submit" class="btn btn-danger">{{ GetLangText "Delete" $.Lang }}</button>
+							</form>
+						</td>
+						<td>
+							<form class="form-inline" action="/incomes/show" method="get">
+								<input type="hidden" name="_CSRF" value="{{ $.Csrf }}">
+								<input type="hidden" name="id" value="{{ .Pid }}">
+								<button type="submit" class="btn btn-success">{{ GetLangText "Edit" $.Lang }}</button>
+							</form>
+						</td>
+					</tr>
+					{{ end }}
+				{{ end }}
+			</tbody>
+		</table>
+	</div>
+
+	{{ template "footer" . }}
+
+{{ end }}

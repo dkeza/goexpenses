@@ -1,0 +1,82 @@
+{{ define "expenses" }}
+
+  {{ template "header" . }}
+
+  {{ template "navbar" . }}
+
+  {{ template "account" . }}
+
+	<h1>{{ GetLangText "Expenses" .Lang }}</h1>
+
+	<form class="form-inline" action="expenses/save" method="post">
+	  <input type="hidden" name="_CSRF" value="{{ .Csrf }}">
+	<div class="form-group">
+	    <label class="sr-only" for="description">{{ GetLangText "Description" .Lang }}</label>
+	    <input type="text" class="form-control" id="description" name="description" placeholder="{{ GetLangText "Description" .Lang }}">
+	  </div>
+	  <div class="form-group">
+	    <label class="sr-only" for="expense_id">{{ GetLangText "Expense type" .Lang }}</label>
+		<select name="expense_id" class="form-control">
+		{{ with .ExpensesAdd}}
+			{{ range . }}
+				<option value="{{ .Pid }}" {{ if eq .Pid $.Expenses_id }}selected{{ end }}>{{ .Description }}</option>
+			{{ end }}
+		{{ end }}
+		</select>
+	  </div>
+	  <div class="form-group">
+	    <label class="sr-only" for="amount">{{ GetLangText "Amount" .Lang }}</label>
+	    <input type="number" min="0.01" step="any" class="form-control" id="amount" name="amount" placeholder="{{ GetLangText "Amount" .Lang }}">
+	  </div>
+	  <div class="form-group">
+	    <label class="sr-only" for="amounte">{{ GetLangText "Amount" .Lang }} €</label>
+	    <input type="number" min="0.01" step="any" class="form-control" id="amounte" name="amounte" placeholder="{{ GetLangText "Amount" .Lang }} €">
+	  </div>
+	  <button type="submit" class="btn btn-default">{{ GetLangText "Save" .Lang }}</button>
+	</form>
+
+	<div class="table-responsive">
+
+		<table class="table">
+		   	<thead>
+				<th>#</th>
+				<th>{{ GetLangText "Description" .Lang }}</th>
+				<th>{{ GetLangText "Amount" .Lang }}</th>
+				<th>{{ GetLangText "Amount" .Lang }} €</th>
+				<th>{{ GetLangText "Fee"    .Lang }}</th>
+				<th></th>
+				<th></th>
+			</thead>
+			<tbody>
+				{{ with .Expenses}}
+				{{ range . }}
+					<tr>
+						<td>{{ FormatVisibleId .Pid }}</td>
+						<td>{{ .Description }}</td>
+						<td>{{ printf "%.2f" .Amount }}</td>
+						<td>{{ printf "%.2f" .Amounte }}</td>
+						<td>{{ .ExpenseDescription }}</td>
+						<td>
+							<form class="form-inline" action="/expenses/delete" method="post">
+								<input type="hidden" name="_CSRF" value="{{ $.Csrf }}">
+								<input type="hidden" name="id" value="{{ .Pid }}">
+								<button type="submit" class="btn btn-danger">{{ GetLangText "Delete" $.Lang }}</button>
+							</form>
+						</td>
+						<td>
+							<form class="form-inline" action="/expenses/show" method="get">
+								<input type="hidden" name="_CSRF" value="{{ $.Csrf }}">
+								<input type="hidden" name="id" value="{{ .Pid }}">
+								<button type="submit" class="btn btn-success">{{ GetLangText "Edit" $.Lang }}</button>
+							</form>
+						</td>
+					</tr>
+					{{ end }}
+				{{ end }}
+			</tbody>
+		</table>
+	</div>
+
+	{{ template "footer" . }}
+
+{{ end }}

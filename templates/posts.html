@@ -1,0 +1,243 @@
+{{ define "posts" }}
+
+  {{ template "header" . }}
+
+  {{ template "navbar" . }}
+
+  {{ template "account" . }}
+
+	<h1>{{ GetLangText "Posts" .Lang }}</h1>
+	{{ if ne .Filter "" }}<h6><span class="glyphicon glyphicon-filter" aria-hidden="true"></span> {{ .Filter }}</h6>{{ end }}
+	<p>{{ GetLangText "Saldo" .Lang }}: {{ .Saldo }} ({{.Saldoe}} €) {{ GetLangText "Expenses" .Lang }}: {{ .Expensesum }} ({{.Expensesume }} €) {{ GetLangText "Incomes" .Lang }}: {{ .Incomesum }} ({{.Incomesume}} €)</p>
+	
+	<div class="row">
+		<div class="col-md-11">
+	
+			<form class="form-inline" action="posts/save" method="post">
+				<input type="hidden" name="_CSRF" value="{{ .Csrf }}">
+				<input type="hidden" name="income_id" value="">
+			  <div class="form-group">
+			    <label class="sr-only" for="description">{{ GetLangText "Description" .Lang }}</label>
+			    <input type="text" class="form-control" id="description" name="description" placeholder="{{ GetLangText "Description" .Lang }}" value="{{ .Last_post_description }}">
+			  </div>
+			  <div class="form-group">
+			    <label class="sr-only" for="expense_id">{{ GetLangText "Expense type" .Lang }}</label>
+				<select name="expense_id" class="form-control">
+				{{ with .Expenses}}
+					{{ range . }}
+						<option value="{{ .Pid }}" {{ if eq .Pid $.Expenses_id }}selected{{ end }}>{{ .Description }}</option>
+					{{ end }}
+				{{ end }}
+				</select>
+			  </div>
+			  <div class="form-group">
+			    <label class="sr-only" for="amount">{{ GetLangText "Amount" .Lang }}</label>
+			    <input type="number" min="0.01" step="any" class="form-control" id="amount" name="amount" placeholder="{{ GetLangText "Amount" .Lang }}">
+			  </div>
+			  <div class="form-group">
+			    <label class="sr-only" for="amounte">{{ GetLangText "Amount" .Lang }} €</label>
+			    <input type="number" min="0.01" step="any" class="form-control" id="amounte" name="amounte" placeholder="{{ GetLangText "Amount" .Lang }} €">
+			  </div>
+			  <button type="submit" class="btn btn-success">{{ GetLangText "Save" .Lang }}</button>
+			  <button type="button" class="btn btn-warning" onClick="onFilterPostings()"><span class="glyphicon glyphicon-filter" aria-hidden="true"></span></button>
+			</form>
+	
+		</div>
+		<div class="col-md-1">
+
+			<form class="form-inline" action="posts/newincomepost" method="get">
+			  <input type="hidden" name="_CSRF" value="{{ .Csrf }}">
+			  <button type="submit" class="btn btn-info">{{ GetLangText "New income" .Lang }}</button>
+			</form>
+	
+		</div>
+	</div>
+	
+	<div class="table-responsive">
+
+		<table class="table table-condensed .table-bordered">
+		   	<thead>
+				<th>#</th>
+				<th>{{ GetLangText "Description" .Lang }}</th>
+				<th>{{ GetLangText "Expense" .Lang }}</th>
+				<th>{{ GetLangText "Income" .Lang }}</th>
+				<th>{{ GetLangText "Date" .Lang }}</th>
+				<th class="text-right">{{ GetLangText "Amount" .Lang }}</th>
+				<th class="text-right">{{ GetLangText "Amount" .Lang }} €</th>
+				<th></th>
+				<th></th>
+			</thead>
+			<tbody>
+				{{ with .Posts}}
+					{{ range . }}
+					<tr {{if lt .Amount 0.00 }} class="warning"{{end}} >
+						<td>{{ FormatVisibleId .Pid }}</td>
+						<td>{{ .Description }}</td>
+						<td>{{ .Expense }}</td>
+						<td>{{ .Income }}</td>
+						<td>{{ FormatDateTime .Date }}</td>
+						<td class="text-right">{{ printf "%.2f" .Amount }}</td>
+						<td class="text-right">{{ printf "%.2f" .Amounte }}</td>
+						<td>
+						
+							<button type="button" class="btn btn-danger btn-xs" onClick="postsDelete({{.Pid}}, {{ .Description }}, {{ $.Csrf }})">{{ GetLangText "Delete" $.Lang }}</button>
+						</td>
+						<td>
+							<form class="form-inline" action="/posts/show" method="get">
+								<input type="hidden" name="id" value="{{ .Pid }}">
+								<button type="submit" class="btn btn-success btn-xs">{{ GetLangText "Edit" $.Lang }}</button>
+							</form>
+						</td>
+					</tr>
+					{{ end }}
+				{{ end }}
+			</tbody>
+		</table>
+	</div>
+
+	<script>
+		function postsDelete(id, description, csrf) {
+			bootbox.confirm({
+			    message: "{{ GetLangText "Do You really want delete this record?" $.Lang }}" + "<br><br>" + description  + "<br><br>ID: " + id,
+			    buttons: {
+			        confirm: {
+			            label: {{ GetLangText "Yes" $.Lang }},
+			            className: 'btn-success'
+			        },
+			        cancel: {
+			            label: {{ GetLangText "No" $.Lang }},
+			            className: 'btn-danger'
+			        }
+			    },
+			    callback: function (result) {
+			        if (result) {
+				        $.post("/posts/delete", { _CSRF:csrf,id:id },  function(data){
+							setTimeout(function () {
+							        location.reload()
+							    }, 100);
+        				});	
+					}
+			    }
+			});
+			return false;
+		}
+		
+		function onFilterPostings() {
+
+              bootbox.confirm({
+                title: '{{ GetLangText `Filter` .Lang }}',
+                buttons: {
+                  confirm: {
+                    label: 'OK',
+                    className: 'btn-success'
+                  },
+                  cancel: {
+                    label: '{{ GetLangText `Cancel` .Lang }}',
+                    className: 'btn-danger'
+                  }
+                },
+                message: `
+                <form id='filter' action='posts' method='get'>
+                  <div class="form-group">
+                    <label for="at_acttyp">{{ GetLangText `From` .Lang }}</label>
+                    <input type="date" class="form-control" name="from" id="from" data-value="">
+                  </div>
+                   <div class="form-group">
+                    <label for="at_acttyp">{{ GetLangText `To` .Lang }}</label>
+                    <input type="date" class="form-control" name="to" id="to" data-value="">
+                  </div>
+				  <div class="checkbox">
+    			  	<label>
+                      <input type="checkbox" name="reset">{{ GetLangText `Reset filter` .Lang }}
+                    </label>
+                  </div>
+               </form>
+                `,
+                callback: function(result) {
+        			if(result) {
+            			$('#filter').submit();
+					}
+                  }
+              }).init(function(){
+				var cJanuary = '{{ GetLangText `January` .Lang }}',
+					cFebruary = '{{ GetLangText `February` .Lang }}',
+					cMarch = '{{ GetLangText `March` .Lang }}',
+					cApril = '{{ GetLangText `April` .Lang }}',
+					cMay = '{{ GetLangText `May` .Lang }}',
+					cJune = '{{ GetLangText `June` .Lang }}',
+					cJuly = '{{ GetLangText `July` .Lang }}',
+					cAugust = '{{ GetLangText `August` .Lang }}',
+					cSeptember = '{{ GetLangText `September` .Lang }}',
+					cOctober = '{{ GetLangText `October` .Lang }}',
+					cNovember = '{{ GetLangText `November` .Lang }}',
+					cDecember = '{{ GetLangText `December` .Lang }}',
+					cJan = '{{ GetLangText `Jan` .Lang }}',
+					cFeb = '{{ GetLangText `Feb` .Lang }}',
+					cMar = '{{ GetLangText `Mar` .Lang }}',
+					cApr = '{{ GetLangText `Apr` .Lang }}',
+					cMay = '{{ GetLangText `May` .Lang }}',
+					cJune = '{{ GetLangText `June` .Lang }}',
+					cJuly = '{{ GetLangText `July` .Lang }}',
+					cAugust = '{{ GetLangText `August` .Lang }}',
+					cSeptember = '{{ GetLangText `September` .Lang }}',
+					cOctober = '{{ GetLangText `October` .Lang }}',
+					cNovember = '{{ GetLangText `November` .Lang }}',
+					cDecember = '{{ GetLangText `December` .Lang }}',
+					cJan = '{{ GetLangText `Jan` .Lang }}',
+					cFeb = '{{ GetLangText `Feb` .Lang }}',
+					cMar = '{{ GetLangText `Mar` .Lang }}',
+					cApr = '{{ GetLangText `Apr` .Lang }}',
+					cMay = '{{ GetLangText `May` .Lang }}',
+					cJun = '{{ GetLangText `Jun` .Lang }}',
+					cJul = '{{ GetLangText `Jul` .Lang }}',
+					cAug = '{{ GetLangText `Aug` .Lang }}',
+					cSep = '{{ GetLangText `Sep` .Lang }}',
+					cOct = '{{ GetLangText `Oct` .Lang }}',
+					cNov = '{{ GetLangText `Nov` .Lang }}',
+					cDec = '{{ GetLangText `Dec` .Lang }}',
+					cMonday = '{{ GetLangText `Monday` .Lang }}',
+					cTuesday = '{{ GetLangText `Tuesday` .Lang }}',
+					cWednesday = '{{ GetLangText `Wednesday` .Lang }}',
+					cThursday = '{{ GetLangText `Thursday` .Lang }}',
+					cFriday = '{{ GetLangText `Friday` .Lang }}',
+					cSaturday = '{{ GetLangText `Saturday` .Lang }}',
+					cSunday = '{{ GetLangText `Sunday` .Lang }}',
+					cMo = '{{ GetLangText `Mo` .Lang }}',
+					cTu = '{{ GetLangText `Tu` .Lang }}',
+					cWe = '{{ GetLangText `We` .Lang }}',
+					cTh = '{{ GetLangText `Th` .Lang }}',
+					cFr = '{{ GetLangText `Fr` .Lang }}',
+					cSa = '{{ GetLangText `Sa` .Lang }}',
+					cSu = '{{ GetLangText `Su` .Lang }}'
+					
+                $('#from').pickadate({
+                    monthsFull: [cJanuary, cFebruary, cMarch, cApril, cMay, cJune, cJuly, cAugust, cSeptember, cOctober, cNovember, cDecember],
+                    monthsShort: [ cJan, cFeb, cMar, cApr, cMay, cJun, cJul, cAug, cSep, cOct, cNov, cDec ],
+                    weekdaysFull: [ cMonday, cTuesday, cWednesday, cThursday, cFriday, cSaturday, cSunday ],
+                    weekdaysShort: [ cMo, cTu, cWe, cTh, cFr, cSa, cSu ],
+                    today: '{{ GetLangText `Today` .Lang }}',
+                    clear: '{{ GetLangText `Clear` .Lang }}',
+                    close: '{{ GetLangText `Close` .Lang }}',
+                    firstDay: 1,
+                    format: 'dd.mm.yyyy'
+                });
+                $('#to').pickadate({
+                    monthsFull: [cJanuary, cFebruary, cMarch, cApril, cMay, cJune, cJuly, cAugust, cSeptember, cOctober, cNovember, cDecember],
+                    monthsShort: [ cJan, cFeb, cMar, cApr, cMay, cJun, cJul, cAug, cSep, cOct, cNov, cDec ],
+                    weekdaysFull: [ cMonday, cTuesday, cWednesday, cThursday, cFriday, cSaturday, cSunday ],
+                    weekdaysShort: [ cMo, cTu, cWe, cTh, cFr, cSa, cSu ],
+                    today: '{{ GetLangText `Today` .Lang }}',
+                    clear: '{{ GetLangText `Clear` .Lang }}',
+                    close: '{{ GetLangText `Close` .Lang }}',
+                    firstDay: 1,
+                    format: 'dd.mm.yyyy'
+                });
+              });
+
+			return false;
+		}
+	</script>
+
+	{{ template "footer" . }}
+
+{{ end }}

@@ -1,0 +1,32 @@
+{{ define "register" }}
+
+  {{ template "header" . }}
+
+  {{ template "navbar" . }}
+
+	<h1>{{ GetLangText "Register" .Lang }}</h1>
+
+	<form action="/register" method="post">
+	  <input type="hidden" name="_CSRF" value="{{ .Csrf }}">
+	<div class="form-group">
+	    <label class="sr-only" for="name">{{ GetLangText "Name" .Lang }}</label>
+	    <input type="text" class="form-control" name="name" placeholder="{{ GetLangText "Name" .Lang }}">
+	  </div>
+	  <div class="form-group">
+	    <label class="sr-only" for="email">{{ GetLangText "E-Mail" .Lang }}</label>
+	    <input type="email" class="form-control" name="email" placeholder="{{ GetLangText "E-Mail" .Lang }}">
+	  </div>
+	  <div class="form-group">
+	    <label class="sr-only" for="username">{{ GetLangText "User name" .Lang }}</label>
+	    <input type="text" class="form-control" name="username" placeholder="{{ GetLangText "User name" .Lang }}">
+	  </div>
+	  <div class="form-group">
+	    <label class="sr-only" for="password">{{ GetLangText "Password" .Lang }}</label>
+	    <input type="password" class="form-control" name="password" placeholder="{{ GetLangText "Password" .Lang }}">
+	  </div>
+	  <button type="submit" class="btn btn-success">{{ GetLangText "Register" .Lang }}</button>
+	</form>
+
+	{{ template "footer" . }}
+
+{{ end }}

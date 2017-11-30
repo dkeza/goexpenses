@@ -1,0 +1,32 @@
+{{ define "account" }}
+
+{{ $accountid := .User.Default_accounts_id }}
+
+<div class="row">
+	<div class="col-md-8">
+
+		<div class="account_section">
+			<form class="form-inline" action="accounts/show" method="post">
+			 <input type="hidden" name="_CSRF" value="{{ .Csrf }}">
+			<div class="form-group">
+			    <label class="sr-only" for="default_accounts_id">{{ GetLangText "Account" .Lang }}</label>
+				<select name="accounts_id" id="default_accounts_id" class="form-control">
+				{{ with .Accounts}}
+					{{ range . }}
+						<option {{ if eq .Id $accountid }}  selected="selected" {{end}} value="{{ .Id }}"> {{ .Description }}</option>
+					{{ end }}
+				{{ end }}
+				</select>
+			  </div>
+			  <button type="submit" class="btn btn-warning">{{ GetLangText "New account" .Lang }}</button>
+			</form>
+		</div>
+	</div>
+
+	<div class="col-md-4 pull-right">
+		<span>1 € = {{ .Eur }} RSD ({{ FormatDateTime .Eurdate }})</span>
+	</div>
+
+</div>
+
+{{ end }}
