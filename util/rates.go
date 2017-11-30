@@ -1,9 +1,10 @@
 package util
 
 import (
-	"goexpenses/database"
 	"math"
 	"net/http"
+
+	"github.com/dkeza/goexpenses/database"
 
 	"github.com/buger/jsonparser"
 

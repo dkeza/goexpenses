@@ -1,7 +1,7 @@
 package util
 
 import (
-	"goexpenses/database"
+	"github.com/dkeza/goexpenses/database"
 )
 
 func Flash(message string, data *Data, success int, description string, expense_id int) {

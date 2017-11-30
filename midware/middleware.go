@@ -2,11 +2,12 @@ package midware
 
 import (
 	"fmt"
-	"goexpenses/database"
-	"goexpenses/routes"
-	"goexpenses/util"
 	"net/http"
 	"time"
+
+	"github.com/dkeza/goexpenses/database"
+	"github.com/dkeza/goexpenses/routes"
+	"github.com/dkeza/goexpenses/util"
 
 	"github.com/labstack/echo"
 	"github.com/labstack/echo/middleware"

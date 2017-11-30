@@ -7,10 +7,10 @@ import (
 
 	"io/ioutil"
 
-	"goexpenses/database"
-	"goexpenses/midware"
-	"goexpenses/routes"
-	"goexpenses/util"
+	"github.com/dkeza/goexpenses/database"
+	"github.com/dkeza/goexpenses/midware"
+	"github.com/dkeza/goexpenses/routes"
+	"github.com/dkeza/goexpenses/util"
 
 	"github.com/jasonlvhit/gocron"
 	"github.com/labstack/echo"
