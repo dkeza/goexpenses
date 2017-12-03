@@ -1,5 +1,8 @@
 # goexpenses
-Simple expenses web application written in Go, using Echo and SQLite
+Simple expenses web application written in Go, using Echo and SQLite.
+You can define expenses and incomes, and then enter posts.
+It is possible to enter amounts in RSD or EUR currency.
+
 
 Build and installation
 
