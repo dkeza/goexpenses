@@ -31,7 +31,6 @@ func DefineExpenses() {
 		`, data.User.Default_accounts_id)
 		fmt.Println("expenses", err)
 		//database.Db.Select(&expenses, "SELECT id, description FROM expenses WHERE accounts_id = ? AND deleted = 0 ORDER BY description ASC", data.User.Default_accounts_id)
-		fmt.Println(expenses)
 		data.Expenses = expenses
 
 		expensesadd := []util.Expense{}

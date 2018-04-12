@@ -74,7 +74,6 @@ func CheckCookie(next echo.HandlerFunc) echo.HandlerFunc {
 						WHERE id = ? 
 						ORDER BY description ASC
 						`, session.Expenses_id)
-				fmt.Println("expenses:", expenses)
 				if expenses[0].Pid != "" {
 					data.Expenses_id = expenses[0].Pid
 				}
