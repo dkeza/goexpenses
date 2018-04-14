@@ -29,7 +29,7 @@ func DefineExpenses() {
 			WHERE e1.accounts_id = ? AND e1.deleted = 0 
 			ORDER BY 2 ASC
 		`, data.User.Default_accounts_id)
-		fmt.Println("expenses", err)
+
 		//database.Db.Select(&expenses, "SELECT id, description FROM expenses WHERE accounts_id = ? AND deleted = 0 ORDER BY description ASC", data.User.Default_accounts_id)
 		data.Expenses = expenses
 
@@ -45,7 +45,6 @@ func DefineExpenses() {
 			FROM expenses
 			ORDER BY 2 ASC
 		`, data.User.Default_accounts_id)
-		fmt.Println("expensesadd", err)
 		//database.Db.Select(&expenses, "SELECT id, description FROM expenses WHERE accounts_id = ? AND deleted = 0 ORDER BY description ASC", data.User.Default_accounts_id)
 
 		data.ExpensesAdd = expensesadd
@@ -60,7 +59,6 @@ func DefineExpenses() {
 		data.Active = "expenses"
 
 		id := c.QueryParam("id")
-		fmt.Println("expenses/show", id)
 		expenses := []util.Expense{}
 		errsql := database.Db.Select(&expenses, `
 			SELECT id, description, amount, 
