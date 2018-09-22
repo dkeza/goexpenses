@@ -1,6 +1,7 @@
 package util
 
 import (
+	"os"
 	"strconv"
 
 	"github.com/vaughan0/go-ini"
@@ -63,5 +64,13 @@ func ReadSettings() {
 		if ok {
 			Settings.OpenExchangeRatesId = value
 		}
+	} else {
+		Settings.Host = os.Getenv("HOST")
+		Settings.Port = os.Getenv("PORT")
+		Settings.MailFrom = os.Getenv("MAIL_FROM")
+		Settings.MailHost = os.Getenv("MAIL_HOST")
+		Settings.MailHostPort, _ = strconv.Atoi(os.Getenv("MAIL_PORT"))
+		Settings.MailPassword = os.Getenv("MAIL_PASSWORD")
+		Settings.OpenExchangeRatesId = os.Getenv("EXCHANGE_ID")
 	}
 }
