@@ -1,10 +1,20 @@
 package util
 
 import (
+	"strconv"
+
 	"github.com/dkeza/goexpenses/database"
 )
 
 func Flash(message string, data *Data, success int, description string, expense_id int) {
 	sql := `UPDATE sessions SET message = ?, message_success = ?, last_post_description = ?, expenses_id = ? WHERE uuid = ?`
 	_ = database.Db.MustExec(sql, GetLangText(message, data.Lang), success, description, expense_id, data.CookieId)
+}
+
+func SqlParam(param int) string {
+	if Settings.DatabaseType == "sqlite" {
+		return "?"
+	} else {
+		return "$" + strconv.Itoa(param)
+	}
 }

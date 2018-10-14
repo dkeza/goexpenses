@@ -32,11 +32,11 @@ func MainRoute() {
 
 			if data.Lang != l {
 				data.Lang = l
-				sql := `UPDATE sessions SET lang = ? WHERE uuid = ?`
+				sql := fmt.Sprintf(`UPDATE sessions SET lang = %v WHERE uuid = %v`, util.SqlParam(1), util.SqlParam(2))
 				_ = database.Db.MustExec(sql, l, data.CookieId)
 
 				if data.Username != "" {
-					sql := `UPDATE users SET lang = ? WHERE id = ?`
+					sql := fmt.Sprintf(`UPDATE users SET lang = %v WHERE id = %v`, util.SqlParam(1), util.SqlParam(2))
 					_ = database.Db.MustExec(sql, l, data.User.Id)
 					data.User.Lang = l
 				}
@@ -56,7 +56,8 @@ func DefineRoutes() {
 			uuid := c.Get("_id").(string)
 
 			session := util.Session{}
-			database.Db.Get(&session, "SELECT id, uuid, user_id FROM sessions WHERE uuid = ?", uuid)
+			sql := fmt.Sprintf(`SELECT id, uuid, user_id FROM sessions WHERE uuid = %v`, util.SqlParam(1))
+			database.Db.Get(&session, sql, uuid)
 
 			if session.User_id == 0 {
 				return c.Redirect(http.StatusSeeOther, "/login")
@@ -86,7 +87,7 @@ func DefineRoutes() {
 
 	e.GET("/logout", func(c echo.Context) error {
 		uuid := c.Get("_id").(string)
-		sql := `DELETE FROM sessions WHERE uuid = ?`
+		sql := fmt.Sprintf(`DELETE FROM sessions WHERE uuid = %v`, util.SqlParam(1))
 		err := database.Db.MustExec(sql, uuid)
 		fmt.Println("logout", err)
 		return c.Redirect(http.StatusSeeOther, "/")
@@ -110,8 +111,7 @@ func DefineRoutes() {
 			password = util.Encrypt(password)
 			tx, err := database.Db.Begin()
 			fmt.Println(err)
-
-			sql := `INSERT INTO accounts (description) VALUES (?)`
+			sql := fmt.Sprintf(`INSERT INTO accounts (description) VALUES (%v)`, util.SqlParam(1))
 			_, err = tx.Exec(sql, util.GetLangText(`My account`, data.Lang))
 			fmt.Println(err)
 
@@ -120,7 +120,7 @@ func DefineRoutes() {
 			row := tx.QueryRow("select last_insert_rowid()") // SQLite specific
 			err = row.Scan(&accountid)
 
-			sql = `INSERT INTO users (name, email, username, password, default_accounts_id, lang) VALUES (?, ?, ?, ?, ?, ?)`
+			sql = fmt.Sprintf(`INSERT INTO users (name, email, username, password, default_accounts_id, lang) VALUES (%v, %v, %v, %v, %v, %v)`, util.SqlParam(1), util.SqlParam(2), util.SqlParam(3), util.SqlParam(4), util.SqlParam(5), util.SqlParam(6))
 			_, err = tx.Exec(sql, name, email, username, password, accountid, data.Lang)
 			fmt.Println(err)
 
@@ -129,7 +129,7 @@ func DefineRoutes() {
 			row = tx.QueryRow("select last_insert_rowid()") // SQLite specific
 			err = row.Scan(&userid)
 
-			sql = `INSERT INTO accountsusers (accounts_id, users_id) VALUES (?, ?)`
+			sql = fmt.Sprintf(`INSERT INTO accountsusers (accounts_id, users_id) VALUES (%v, %v)`, util.SqlParam(1), util.SqlParam(2))
 			_, err = tx.Exec(sql, accountid, userid)
 			fmt.Println(err)
 
@@ -161,10 +161,12 @@ func DefineRoutes() {
 				filterdate = time.Now().Add(-2 * time.Hour)
 
 				pr := util.PasswordReset{}
-				database.Db.Get(&pr, "SELECT id, email, token, created_at FROM passwordresets WHERE token  = ? AND created_at >= ? AND done = 0", token, filterdate)
+				sql := fmt.Sprintf(`SELECT id, email, token, created_at FROM passwordresets WHERE token  = %v AND created_at >= %v AND done = 0`, util.SqlParam(1), util.SqlParam(2))
+				database.Db.Get(&pr, sql, token, filterdate)
 				if pr.Email != "" {
 					user := util.User{}
-					database.Db.Get(&user, "SELECT id, name, username, email, password, default_accounts_id, lang FROM users WHERE email = ?", pr.Email)
+					sql := fmt.Sprintf(`SELECT id, name, username, email, password, default_accounts_id, lang FROM users WHERE email = %v`, util.SqlParam(1))
+					database.Db.Get(&user, sql, pr.Email)
 					if user.Id != 0 {
 						userid = user.Id
 					}
@@ -175,11 +177,12 @@ func DefineRoutes() {
 
 			tx, err := database.Db.Begin()
 			fmt.Println(err)
-			sql := `UPDATE users SET password = ? WHERE id = ?`
+			sql := fmt.Sprintf(`UPDATE users SET password = %v WHERE id = %v`, util.SqlParam(1), util.SqlParam(2))
 			_, err = tx.Exec(sql, password, userid)
 			fmt.Println(err)
 			if token != "" {
-				_, err = tx.Exec(`UPDATE passwordresets SET done = 1 WHERE token = ?`, token)
+				sql := fmt.Sprintf(`UPDATE passwordresets SET done = 1 WHERE token = %v`, util.SqlParam(1))
+				_, err = tx.Exec(sql, token)
 				fmt.Println(err)
 			}
 			err = tx.Commit()
@@ -202,17 +205,19 @@ func DefineRoutes() {
 		uuid := c.Get("_id").(string)
 
 		session := util.Session{}
-		database.Db.Get(&session, "SELECT id, uuid, user_id FROM sessions WHERE uuid = ?", uuid)
+		sql := fmt.Sprintf(`SELECT id, uuid, user_id FROM sessions WHERE uuid = %v`, util.SqlParam(1))
+		database.Db.Get(&session, sql, uuid)
 
 		user := util.User{}
-		database.Db.Get(&user, "SELECT id, name, username, email, password FROM users WHERE username = ? AND password = ?", username, cpassword)
+		sql = fmt.Sprintf(`SELECT id, name, username, email, password FROM users WHERE username = %v AND password = %v`, util.SqlParam(1), util.SqlParam(2))
+		database.Db.Get(&user, sql, username, cpassword)
 
 		fmt.Println("Entered password: " + cpassword + " | Stored password: " + user.Password)
 		if user.Username == username && user.Password == cpassword {
 
 			fmt.Println("User OK")
 
-			sql := `UPDATE sessions SET user_id = ? WHERE uuid = ?`
+			sql := fmt.Sprintf(`UPDATE sessions SET user_id = %v WHERE uuid = %v`, util.SqlParam(1), util.SqlParam(2))
 			err := database.Db.MustExec(sql, user.Id, uuid)
 
 			if err == nil {
@@ -248,14 +253,16 @@ func DefineRoutes() {
 		}
 
 		user := util.User{}
-		database.Db.Get(&user, "SELECT id, name, username, email, password FROM users WHERE email  = ?", email)
+		sql := fmt.Sprintf(`SELECT id, name, username, email, password FROM users WHERE email  = %v`, util.SqlParam(1))
+		database.Db.Get(&user, sql, email)
 		if user.Id == 0 {
 			util.Flash(`Unknown E-Mail!`, data, 0, "", 0)
 			return c.Redirect(http.StatusSeeOther, "/reset")
 		}
 
 		token := util.Encrypt(util.CreateUUID())
-		sqlresult := database.Db.MustExec(`INSERT INTO passwordresets (email, token) VALUES (?,?)`, user.Email, token)
+		sql = fmt.Sprintf(`INSERT INTO passwordresets (email, token) VALUES (%v,%v)`, util.SqlParam(1), util.SqlParam(2))
+		sqlresult := database.Db.MustExec(sql, user.Email, token)
 		_, errsql := sqlresult.LastInsertId()
 		if errsql != nil {
 			util.Flash(`Error when accesing to database!`, data, 0, "", 0)
@@ -293,7 +300,8 @@ func DefineRoutes() {
 		filterdate = time.Now().Add(-2 * time.Hour)
 		fmt.Println("filterdate:", filterdate)
 		pr := util.PasswordReset{}
-		database.Db.Get(&pr, "SELECT id, email, token, created_at FROM passwordresets WHERE token  = ? AND created_at >= ? AND done = 0", token, filterdate)
+		sql := fmt.Sprintf(`SELECT id, email, token, created_at FROM passwordresets WHERE token  = %v AND created_at >= %v AND done = 0`, util.SqlParam(1), util.SqlParam(2))
+		database.Db.Get(&pr, sql, token, filterdate)
 		if pr.Id == 0 {
 			util.Flash(`Invalid token!`, data, 0, "", 0)
 			return c.Redirect(http.StatusSeeOther, "/reset")
@@ -320,7 +328,7 @@ func DefineRoutes() {
 			return c.Redirect(http.StatusSeeOther, "/posts")
 		}
 
-		sql := `UPDATE users SET default_accounts_id = ? WHERE id = ?`
+		sql := fmt.Sprintf(`UPDATE users SET default_accounts_id = %v WHERE id = %v`, util.SqlParam(1), util.SqlParam(2))
 		err1 := database.Db.MustExec(sql, accounts_id, data.User.Id)
 		fmt.Println(err1)
 		return c.Redirect(http.StatusSeeOther, "/posts")
@@ -350,8 +358,7 @@ func DefineRoutes() {
 
 		tx, err := database.Db.Begin()
 		fmt.Println(err)
-
-		sql := `INSERT INTO accounts (description) VALUES (?)`
+		sql := fmt.Sprintf(`INSERT INTO accounts (description) VALUES (%v)`, util.SqlParam(1))
 		_, err = tx.Exec(sql, description)
 		fmt.Println(err)
 
@@ -361,8 +368,7 @@ func DefineRoutes() {
 		err = row.Scan(&accountid)
 
 		userid := data.User.Id
-
-		sql = `INSERT INTO accountsusers (accounts_id, users_id) VALUES (?, ?)`
+		sql = fmt.Sprintf(`INSERT INTO accountsusers (accounts_id, users_id) VALUES (%v, %v)`, util.SqlParam(1), util.SqlParam(2))
 		_, err = tx.Exec(sql, accountid, userid)
 		fmt.Println(err)
 
@@ -377,7 +383,8 @@ func DefineRoutes() {
 		data.Active = "incomes"
 
 		incomes := []util.Income{}
-		database.Db.Select(&incomes, "SELECT id, description, p_id FROM incomes WHERE accounts_id = ? AND deleted = 0 ORDER BY description ASC", data.User.Default_accounts_id)
+		sql := fmt.Sprintf(`SELECT id, description, p_id FROM incomes WHERE accounts_id = %v AND deleted = 0 ORDER BY description ASC`, util.SqlParam(1))
+		database.Db.Select(&incomes, sql, data.User.Default_accounts_id)
 		data.Incomes = incomes
 		return c.Render(http.StatusOK, "incomes", data)
 	}, auth)
@@ -386,8 +393,7 @@ func DefineRoutes() {
 		data := c.Get("data").(*util.Data)
 
 		description := c.FormValue("description")
-
-		sql := `INSERT INTO incomes (description, accounts_id, p_id) VALUES (?, ?, ?)`
+		sql := fmt.Sprintf(`INSERT INTO incomes (description, accounts_id, p_id) VALUES (%v, %v, %v)`, util.SqlParam(1), util.SqlParam(2), util.SqlParam(3))
 		database.Db.MustExec(sql, description, data.User.Default_accounts_id, util.Encrypt(util.CreateUUID()))
 
 		return c.Redirect(http.StatusSeeOther, "/incomes")
@@ -399,8 +405,7 @@ func DefineRoutes() {
 		description := c.FormValue("description")
 
 		fmt.Println("incomes/update", id, description)
-
-		sql := `UPDATE incomes SET description = ? WHERE p_id = ? AND accounts_id = ? AND deleted = 0`
+		sql := fmt.Sprintf(`UPDATE incomes SET description = %v WHERE p_id = %v AND accounts_id = %v AND deleted = 0`, util.SqlParam(1), util.SqlParam(2), util.SqlParam(3))
 		database.Db.MustExec(sql, description, id, data.User.Default_accounts_id)
 
 		return c.Redirect(http.StatusSeeOther, "/incomes")
@@ -411,8 +416,7 @@ func DefineRoutes() {
 		id := c.FormValue("id")
 
 		fmt.Println("incomes/delete", id)
-
-		sql := `UPDATE incomes SET deleted = 1 WHERE p_id = ? AND accounts_id = ?`
+		sql := fmt.Sprintf(`UPDATE incomes SET deleted = 1 WHERE p_id = %v AND accounts_id = %v`, util.SqlParam(1), util.SqlParam(2))
 		database.Db.MustExec(sql, id, data.User.Default_accounts_id)
 
 		return c.Redirect(http.StatusSeeOther, "/incomes")
@@ -425,7 +429,8 @@ func DefineRoutes() {
 		id := c.QueryParam("id")
 		fmt.Println("incomes/show", id)
 		incomes := []util.Income{}
-		database.Db.Select(&incomes, "SELECT id, description, p_id FROM incomes WHERE p_id = ? AND accounts_id = ? AND deleted = 0", id, data.User.Default_accounts_id)
+		sql := fmt.Sprintf(`SELECT id, description, p_id FROM incomes WHERE p_id = %v AND accounts_id = %v AND deleted = 0`, util.SqlParam(1), util.SqlParam(2))
+		database.Db.Select(&incomes, sql, id, data.User.Default_accounts_id)
 		data.Incomes = incomes
 		fmt.Println("incomes/show", data.Incomes)
 		return c.Render(http.StatusOK, "incomesshow", data)

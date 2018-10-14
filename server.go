@@ -117,7 +117,7 @@ func DatabaseUpdate() {
 	database.Db.Get(&param, "SELECT id, build FROM params WHERE id=1")
 
 	if param.Id != 1 {
-		database.Db.MustExec(`INSERT INTO params (id, build) VALUES (?,?)`, 1, 0)
+		database.Db.MustExec(fmt.Sprintf(`INSERT INTO params (id, build) VALUES (%v, %v)`, util.SqlParam(1), util.SqlParam(2)), 1, 0)
 	}
 
 	// BEGIN Here add build revision specific changes for database
@@ -133,7 +133,7 @@ func DatabaseUpdate() {
 		for _, post := range posts {
 			fmt.Println("Updating post.p_id for id ", post.Id)
 			if post.Pid == "" {
-				sql := `UPDATE posts SET p_id = ? WHERE id = ?`
+				sql := fmt.Sprintf(`UPDATE posts SET p_id = %v WHERE id = %v`, util.SqlParam(1), util.SqlParam(2))
 				database.Db.MustExec(sql, util.Encrypt(util.CreateUUID()), post.Id)
 			}
 		}
@@ -147,7 +147,7 @@ func DatabaseUpdate() {
 		for _, record := range expenses {
 			fmt.Println("Updating expenses.p_id for id ", record.Id)
 			if record.Pid == "" {
-				sql := `UPDATE expenses SET p_id = ? WHERE id = ?`
+				sql := fmt.Sprintf(`UPDATE expenses SET p_id = %v WHERE id = %v`, util.SqlParam(1), util.SqlParam(2))
 				database.Db.MustExec(sql, util.Encrypt(util.CreateUUID()), record.Id)
 			}
 		}
@@ -161,7 +161,7 @@ func DatabaseUpdate() {
 		for _, record := range incomes {
 			fmt.Println("Updating incomes.p_id for id ", record.Id)
 			if record.Pid == "" {
-				sql := `UPDATE incomes SET p_id = ? WHERE id = ?`
+				sql := fmt.Sprintf(`UPDATE incomes SET p_id = %v WHERE id = %v`, util.SqlParam(1), util.SqlParam(2))
 				database.Db.MustExec(sql, util.Encrypt(util.CreateUUID()), record.Id)
 			}
 		}
@@ -172,6 +172,7 @@ func DatabaseUpdate() {
 	if param.Build != util.Settings.Build {
 		// Update to leatest database version
 		fmt.Println("Update build version to ", util.Settings.Build)
-		database.Db.MustExec(`UPDATE params SET build = ?`, util.Settings.Build)
+		sql := fmt.Sprintf(`UPDATE params SET build = %v`, util.SqlParam(1))
+		database.Db.MustExec(sql, util.Settings.Build)
 	}
 }
