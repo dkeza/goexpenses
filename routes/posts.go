@@ -30,15 +30,17 @@ func DefinePosts() {
 		ldatefilter := false
 
 		if creset != "" {
-			database.Db.MustExec(`UPDATE accounts SET fromdate = ?, todate = ? WHERE id = ?`, "", "", data.User.Default_accounts_id)
+			sql := fmt.Sprintf(`UPDATE accounts SET fromdate = %v, todate = %v WHERE id = %v`, util.SqlParam(1), util.SqlParam(2), util.SqlParam(3))
+			database.Db.MustExec(sql, "", "", data.User.Default_accounts_id)
 		} else {
 			if cfrom == "" {
 				account := util.Account{}
-				database.Db.Get(&account, `
-					SELECT fromdate, todate, id, description, deleted 
+				sql := fmt.Sprintf(`
+				SELECT fromdate, todate, id, description, deleted 
 					FROM accounts 
-					WHERE id = ?
-					`, data.User.Default_accounts_id)
+					WHERE id = %v
+				`, util.SqlParam(1))
+				database.Db.Get(&account, sql, data.User.Default_accounts_id)
 				if account.Fromdate != "" {
 					cfrom = account.Fromdate
 					cto = account.Todate
@@ -57,7 +59,8 @@ func DefinePosts() {
 						filterdatefrom = tfrom
 						filterdateto = tto
 						data.Filter = filterdatefrom.Format("02-01-2006") + " - " + filterdateto.Format("02-01-2006")
-						database.Db.MustExec(`UPDATE accounts SET fromdate = ?, todate = ? WHERE id = ?`, cfrom, cto, data.User.Default_accounts_id)
+						sql := fmt.Sprintf(`UPDATE accounts SET fromdate = %v, todate = %v WHERE id = %v`, util.SqlParam(1), util.SqlParam(2), util.SqlParam(3))
+						database.Db.MustExec(sql, cfrom, cto, data.User.Default_accounts_id)
 					}
 				}
 
@@ -66,94 +69,131 @@ func DefinePosts() {
 
 		postsum := util.Postsum{}
 		if ldatefilter {
-			database.Db.Get(&postsum, `
-				SELECT CAST(SUM(amount) AS Numeric(12,2)) AS saldo, 
+			sql := fmt.Sprintf(`
+			SELECT CAST(SUM(amount) AS Numeric(12,2)) AS saldo, 
 				CAST(SUM(amount/exchange) AS Numeric(12,2)) AS saldoe 
 				FROM posts 
-				WHERE accounts_id = ? AND deleted = 0 AND created_at 
-				BETWEEN ? AND ?
-				`, data.User.Default_accounts_id, filterdatefrom, filterdateto)
+				WHERE accounts_id = %v AND deleted = 0 AND created_at 
+				BETWEEN %v AND %v
+			`, util.SqlParam(1), util.SqlParam(2), util.SqlParam(3))
+			database.Db.Get(&postsum, sql, data.User.Default_accounts_id, filterdatefrom, filterdateto)
 		} else {
-			database.Db.Get(&postsum, `
-				SELECT CAST(SUM(amount) AS Numeric(12,2)) AS saldo, 
-					CAST(SUM(amount/exchange) AS Numeric(12,2)) AS saldoe 
-					FROM posts 
-					WHERE accounts_id = ? AND deleted = 0
-					`, data.User.Default_accounts_id)
+			sql := fmt.Sprintf(`
+			SELECT CAST(SUM(amount) AS Numeric(12,2)) AS saldo, 
+				CAST(SUM(amount/exchange) AS Numeric(12,2)) AS saldoe 
+				FROM posts 
+				WHERE accounts_id = %v AND deleted = 0
+			`, util.SqlParam(1))
+			database.Db.Get(&postsum, sql, data.User.Default_accounts_id)
 		}
 		data.Saldo = fmt.Sprintf("%.2f", postsum.Saldo)
 		data.Saldoe = fmt.Sprintf("%.2f", postsum.Saldoe)
 
 		incomesum := util.Incomessum{}
 		if ldatefilter {
-			database.Db.Get(&incomesum, `
-				SELECT CAST(SUM(amount) AS Numeric(12,2)) AS saldo, 
-					CAST(SUM(amount/exchange) AS Numeric(12,2)) AS saldoe 
-					FROM posts 
-					WHERE incomes_id > 0 AND accounts_id = ? AND deleted = 0 AND created_at BETWEEN ? AND ?
-					`, data.User.Default_accounts_id, filterdatefrom, filterdateto)
+			sql := fmt.Sprintf(`
+			SELECT CAST(SUM(amount) AS Numeric(12,2)) AS saldo, 
+				CAST(SUM(amount/exchange) AS Numeric(12,2)) AS saldoe 
+				FROM posts 
+				WHERE incomes_id > 0 AND accounts_id = %v AND deleted = 0 AND created_at BETWEEN %v AND %v
+			`, util.SqlParam(1), util.SqlParam(2), util.SqlParam(3))
+			database.Db.Get(&incomesum, sql, data.User.Default_accounts_id, filterdatefrom, filterdateto)
 		} else {
-			database.Db.Get(&incomesum, `
-				SELECT CAST(SUM(amount) AS Numeric(12,2)) AS saldo, 
-					CAST(SUM(amount/exchange) AS Numeric(12,2)) AS saldoe 
-					FROM posts 
-					WHERE incomes_id > 0 AND accounts_id = ? AND deleted = 0
-					`, data.User.Default_accounts_id)
+			sql := fmt.Sprintf(`
+			SELECT CAST(SUM(amount) AS Numeric(12,2)) AS saldo, 
+				CAST(SUM(amount/exchange) AS Numeric(12,2)) AS saldoe 
+				FROM posts 
+				WHERE incomes_id > 0 AND accounts_id = %v AND deleted = 0
+			`, util.SqlParam(1))
+			database.Db.Get(&incomesum, sql, data.User.Default_accounts_id)
 		}
 		data.Incomesum = fmt.Sprintf("%.2f", incomesum.Saldo)
 		data.Incomesume = fmt.Sprintf("%.2f", incomesum.Saldoe)
 
 		expensesum := util.Expensessum{}
 		if ldatefilter {
-			database.Db.Get(&expensesum, `
-				SELECT CAST(SUM(amount) AS Numeric(12,2)) AS saldo, 
-					CAST(SUM(amount/exchange) AS Numeric(12,2)) AS saldoe 
-					FROM posts 
-					WHERE expenses_id > 0 AND accounts_id = ? AND deleted = 0 AND created_at BETWEEN ? AND ?
-					`, data.User.Default_accounts_id, filterdatefrom, filterdateto)
+			sql := fmt.Sprintf(`
+			SELECT CAST(SUM(amount) AS Numeric(12,2)) AS saldo, 
+				CAST(SUM(amount/exchange) AS Numeric(12,2)) AS saldoe 
+				FROM posts 
+				WHERE expenses_id > 0 AND accounts_id = %v AND deleted = 0 AND created_at BETWEEN %v AND %v
+			`, util.SqlParam(1), util.SqlParam(2), util.SqlParam(3))
+			database.Db.Get(&expensesum, sql, data.User.Default_accounts_id, filterdatefrom, filterdateto)
 		} else {
-			database.Db.Get(&expensesum, `
-				SELECT CAST(SUM(amount) AS Numeric(12,2)) AS saldo, 
-					CAST(SUM(amount/exchange) AS Numeric(12,2)) AS saldoe 
-					FROM posts WHERE expenses_id > 0 AND accounts_id = ? AND deleted = 0
-					`, data.User.Default_accounts_id)
+			sql := fmt.Sprintf(`
+			SELECT CAST(SUM(amount) AS Numeric(12,2)) AS saldo, 
+				CAST(SUM(amount/exchange) AS Numeric(12,2)) AS saldoe 
+				FROM posts WHERE expenses_id > 0 AND accounts_id = %v AND deleted = 0
+			`, util.SqlParam(1))
+			database.Db.Get(&expensesum, sql, data.User.Default_accounts_id)
 		}
 		data.Expensesum = fmt.Sprintf("%.2f", expensesum.Saldo)
 		data.Expensesume = fmt.Sprintf("%.2f", expensesum.Saldoe)
 
 		expenses := []util.Expense{}
-		database.Db.Select(&expenses, `
-			SELECT p_id, description 
-				FROM expenses 
-				WHERE accounts_id = ? AND deleted = 0 
-				ORDER BY description ASC
-				`, data.User.Default_accounts_id)
+		sql := fmt.Sprintf(`
+		SELECT p_id, description 
+			FROM expenses 
+			WHERE accounts_id = %v AND deleted = 0 
+			ORDER BY description ASC
+		`, util.SqlParam(1))
+		database.Db.Select(&expenses, sql, data.User.Default_accounts_id)
 		data.Expenses = expenses
 
 		posts := []util.Post{}
 		var errsql error
 		if ldatefilter {
-			errsql = database.Db.Select(&posts, `
+			sql := ""
+			if util.Settings.DatabaseType == "sqlite" {
+				sql = fmt.Sprintf(`
 				SELECT p.id, p.description, ifnull(e.description,'') AS expense, 
 					ifnull(i.description,'') AS income, created_at AS date, p.amount, 
 					CAST(p.amount/p.exchange AS Numeric(12,2)) AS amounte, p.p_id 
 					FROM posts p 
 					LEFT JOIN expenses e ON p.expenses_id = e.id 
 					LEFT JOIN incomes i ON p.incomes_id = i.id 
-					WHERE p.accounts_id = ? AND p.deleted = 0 AND created_at BETWEEN ? AND ? 
+					WHERE p.accounts_id = %v AND p.deleted = 0 AND created_at BETWEEN %v AND %v 
 					ORDER BY created_at DESC
-					`, data.User.Default_accounts_id, filterdatefrom, filterdateto)
+				`, util.SqlParam(1), util.SqlParam(2), util.SqlParam(3))
+			} else {
+				sql = fmt.Sprintf(`
+				SELECT p.id, p.description, COALESCE(e.description,'') AS expense, 
+					COALESCE(i.description,'') AS income, created_at AS date, p.amount, 
+					CAST(p.amount/p.exchange AS Numeric(12,2)) AS amounte, p.p_id 
+					FROM posts p 
+					LEFT JOIN expenses e ON p.expenses_id = e.id 
+					LEFT JOIN incomes i ON p.incomes_id = i.id 
+					WHERE p.accounts_id = %v AND p.deleted = 0 AND created_at BETWEEN %v AND %v 
+					ORDER BY created_at DESC
+				`, util.SqlParam(1), util.SqlParam(2), util.SqlParam(3))
+			}
+			errsql = database.Db.Select(&posts, sql, data.User.Default_accounts_id, filterdatefrom, filterdateto)
 		} else {
-			errsql = database.Db.Select(&posts, `
+			sql := ""
+			if util.Settings.DatabaseType == "sqlite" {
+				sql = fmt.Sprintf(`
 				SELECT p.id, p.description, ifnull(e.description,'') AS expense, 
 					ifnull(i.description,'') AS income, created_at AS date, p.amount, 
 					CAST(p.amount/p.exchange AS Numeric(12,2)) AS amounte, p.p_id 
 					FROM posts p 
 					LEFT JOIN expenses e ON p.expenses_id = e.id 
 					LEFT JOIN incomes i ON p.incomes_id = i.id 
-					WHERE p.accounts_id = ? AND p.deleted = 0 
+					WHERE p.accounts_id = %v AND p.deleted = 0 
 					ORDER BY created_at DESC
-					`, data.User.Default_accounts_id)
+				`, util.SqlParam(1))
+			} else {
+				sql = fmt.Sprintf(`
+				SELECT p.id, p.description, COALESCE(e.description,'') AS expense, 
+					COALESCE(i.description,'') AS income, created_at AS date, p.amount, 
+					CAST(p.amount/p.exchange AS Numeric(12,2)) AS amounte, p.p_id 
+					FROM posts p 
+					LEFT JOIN expenses e ON p.expenses_id = e.id 
+					LEFT JOIN incomes i ON p.incomes_id = i.id 
+					WHERE p.accounts_id = %v AND p.deleted = 0 
+					ORDER BY created_at DESC
+				`, util.SqlParam(1))
+			}
+			errsql = database.Db.Select(&posts, sql, data.User.Default_accounts_id)
 		}
 
 		if errsql != nil {
@@ -200,13 +240,13 @@ func DefinePosts() {
 			}
 		} else {
 			// Check if valid expense is selected
-
-			errExpenses := database.Db.Select(&expenses, `
+			sql := fmt.Sprintf(`
 				SELECT id, description, amount, expenses_id 
-					FROM expenses 
-					WHERE accounts_id = ? AND p_id = ? 
-					ORDER BY description ASC
-					`, data.User.Default_accounts_id, expenses_pid)
+				FROM expenses 
+				WHERE accounts_id = %v AND p_id = %v 
+				ORDER BY description ASC
+			`, util.SqlParam(1), util.SqlParam(2))
+			errExpenses := database.Db.Select(&expenses, sql, data.User.Default_accounts_id, expenses_pid)
 			if errExpenses != nil || len(expenses) == 0 {
 				util.Flash(`Changes not saved, because of invalid input data!`, data, 0, "", 0)
 				return c.Redirect(http.StatusSeeOther, "/posts")
@@ -233,8 +273,8 @@ func DefinePosts() {
 		fmt.Println("incomes_pid:", incomes_pid)
 		if incomes_pid != "" {
 			// Check if valid income is selected
-
-			errIncomes := database.Db.Select(&incomes, "SELECT id, description FROM incomes WHERE accounts_id = ? AND p_id = ? ORDER BY description ASC", data.User.Default_accounts_id, incomes_pid)
+			sql := fmt.Sprintf(`SELECT id, description FROM incomes WHERE accounts_id = %v AND p_id = %v ORDER BY description ASC`, util.SqlParam(1), util.SqlParam(2))
+			errIncomes := database.Db.Select(&incomes, sql, data.User.Default_accounts_id, incomes_pid)
 			fmt.Println("errIncomes", errIncomes)
 			fmt.Println("incomes", incomes)
 			if errIncomes != nil || len(incomes) == 0 {
@@ -246,16 +286,15 @@ func DefinePosts() {
 			}
 		}
 
-		sql := `INSERT INTO posts (description, expenses_id, incomes_id, amount, exchange, accounts_id, p_id) VALUES (?,?,?,?,?,?,?)`
+		sql := fmt.Sprintf(`INSERT INTO posts (description, expenses_id, incomes_id, amount, exchange, accounts_id, p_id) VALUES (%v,%v,%v,%v,%v,%v,%v)`, util.SqlParam(1), util.SqlParam(2), util.SqlParam(3), util.SqlParam(4), util.SqlParam(5), util.SqlParam(6), util.SqlParam(7))
 		err := database.Db.MustExec(sql, description, expenses_idnum, incomes_idnum, amountnum, data.Eur, data.User.Default_accounts_id, util.Encrypt(util.CreateUUID()))
 
 		fmt.Println("/posts SQL Error:", err, "expenses_idnum:", expenses_idnum)
 
 		if expenses_idnum > 0 && expenses[0].ExpensesId > 0 {
 			expensesadd := []util.Expense{}
-			errsql2 := database.Db.Select(&expensesadd, `
-				SELECT e1.id, e1.amount FROM expenses e1 WHERE e1.id = ? ORDER BY 2 ASC
-			`, expenses[0].ExpensesId)
+			sql := fmt.Sprintf(`SELECT e1.id, e1.amount FROM expenses e1 WHERE e1.id = %v ORDER BY 2 ASC`, util.SqlParam(1))
+			errsql2 := database.Db.Select(&expensesadd, sql, expenses[0].ExpensesId)
 
 			if errsql2 != nil {
 				fmt.Println("/posts SQL Error errsql2: ", errsql2)
@@ -265,7 +304,7 @@ func DefinePosts() {
 			addamount := expensesadd[0].Amount
 
 			if addexp != 0 {
-				sql = `INSERT INTO posts (description, expenses_id, incomes_id, amount, exchange, accounts_id, p_id) VALUES (?,?,?,?,?,?,?)`
+				sql := fmt.Sprintf(`INSERT INTO posts (description, expenses_id, incomes_id, amount, exchange, accounts_id, p_id) VALUES (%v,%v,%v,%v,%v,%v,%v)`, util.SqlParam(1), util.SqlParam(2), util.SqlParam(3), util.SqlParam(4), util.SqlParam(5), util.SqlParam(6), util.SqlParam(7))
 				err = database.Db.MustExec(sql, description, addexp, 0, addamount, data.Eur, data.User.Default_accounts_id, util.Encrypt(util.CreateUUID()))
 			}
 		}
@@ -278,7 +317,7 @@ func DefinePosts() {
 		data := c.Get("data").(*util.Data)
 		id := c.FormValue("id")
 
-		sql := `UPDATE posts SET deleted = 1 WHERE p_id = ? AND accounts_id = ?`
+		sql := fmt.Sprintf(`UPDATE posts SET deleted = 1 WHERE p_id = %v AND accounts_id = %v`, util.SqlParam(1), util.SqlParam(2))
 		database.Db.MustExec(sql, id, data.User.Default_accounts_id)
 
 		return c.Redirect(http.StatusSeeOther, "/posts")
@@ -290,14 +329,27 @@ func DefinePosts() {
 
 		id := c.QueryParam("id")
 		posts := []util.Post{}
-		errsql := database.Db.Select(&posts, `
+		sql := ""
+		if util.Settings.DatabaseType == "sqlite" {
+			sql = fmt.Sprintf(`
 			SELECT p.id, p.p_id, p.description, ifnull(e.description,'') AS expense, 
 				ifnull(i.description,'') AS income, created_at AS date, p.amount 
 				FROM posts p 
 				LEFT JOIN expenses e ON p.expenses_id = e.id 
 				LEFT JOIN incomes i ON p.incomes_id = i.id 
-				WHERE p.p_id = ? AND p.accounts_id = ? AND p.deleted = 0
-				`, id, data.User.Default_accounts_id)
+				WHERE p.p_id = %v AND p.accounts_id = %v AND p.deleted = 0
+			`, util.SqlParam(1), util.SqlParam(2))
+		} else {
+			sql = fmt.Sprintf(`
+			SELECT p.id, p.p_id, p.description, COALESCE(e.description,'') AS expense, 
+				COALESCE(i.description,'') AS income, created_at AS date, p.amount 
+				FROM posts p 
+				LEFT JOIN expenses e ON p.expenses_id = e.id 
+				LEFT JOIN incomes i ON p.incomes_id = i.id 
+				WHERE p.p_id = %v AND p.accounts_id = %v AND p.deleted = 0
+			`, util.SqlParam(1), util.SqlParam(2))
+		}
+		errsql := database.Db.Select(&posts, sql, id, data.User.Default_accounts_id)
 		if errsql != nil {
 			fmt.Println("/posts/show errsql:", errsql)
 		}
@@ -314,8 +366,7 @@ func DefinePosts() {
 		id := c.FormValue("id")
 		description := c.FormValue("description")
 		amount := c.FormValue("amount")
-
-		sql := `UPDATE posts SET description = ?, amount = ? WHERE p_id = ? AND accounts_id = ?`
+		sql := fmt.Sprintf(`UPDATE posts SET description = %v, amount = %v WHERE p_id = %v AND accounts_id = %v`, util.SqlParam(1), util.SqlParam(2), util.SqlParam(3), util.SqlParam(4))
 		database.Db.MustExec(sql, description, amount, id, data.User.Default_accounts_id)
 
 		return c.Redirect(http.StatusSeeOther, "/posts")
@@ -326,12 +377,13 @@ func DefinePosts() {
 		data.Active = "posts"
 
 		incomes := []util.Income{}
-		database.Db.Select(&incomes, `
-			SELECT id, p_id, description 
-				FROM incomes 
-				WHERE accounts_id = ? AND deleted = 0 
-				ORDER BY description ASC
-				`, data.User.Default_accounts_id)
+		sql := fmt.Sprintf(`
+		SELECT id, p_id, description 
+			FROM incomes 
+			WHERE accounts_id = %v AND deleted = 0 
+			ORDER BY description ASC
+		`, util.SqlParam(1))
+		database.Db.Select(&incomes, sql, data.User.Default_accounts_id)
 		data.Incomes = incomes
 
 		return c.Render(http.StatusOK, "newincomepostshow", data)

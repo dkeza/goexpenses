@@ -1,13 +1,14 @@
 package util
 
 import (
+	"fmt"
 	"strconv"
 
 	"github.com/dkeza/goexpenses/database"
 )
 
 func Flash(message string, data *Data, success int, description string, expense_id int) {
-	sql := `UPDATE sessions SET message = ?, message_success = ?, last_post_description = ?, expenses_id = ? WHERE uuid = ?`
+	sql := fmt.Sprintf(`UPDATE sessions SET message = %v, message_success = %v, last_post_description = %v, expenses_id = %v WHERE uuid = %v`, SqlParam(1), SqlParam(2), SqlParam(3), SqlParam(4), SqlParam(5))
 	_ = database.Db.MustExec(sql, GetLangText(message, data.Lang), success, description, expense_id, data.CookieId)
 }
 

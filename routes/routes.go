@@ -111,25 +111,34 @@ func DefineRoutes() {
 			password = util.Encrypt(password)
 			tx, err := database.Db.Begin()
 			fmt.Println(err)
-			sql := fmt.Sprintf(`INSERT INTO accounts (description) VALUES (%v)`, util.SqlParam(1))
-			_, err = tx.Exec(sql, util.GetLangText(`My account`, data.Lang))
-			fmt.Println(err)
 
 			accountid := 0
-
-			row := tx.QueryRow("select last_insert_rowid()") // SQLite specific
-			err = row.Scan(&accountid)
-
-			sql = fmt.Sprintf(`INSERT INTO users (name, email, username, password, default_accounts_id, lang) VALUES (%v, %v, %v, %v, %v, %v)`, util.SqlParam(1), util.SqlParam(2), util.SqlParam(3), util.SqlParam(4), util.SqlParam(5), util.SqlParam(6))
-			_, err = tx.Exec(sql, name, email, username, password, accountid, data.Lang)
+			if database.DatabaseType == "sqlite" {
+				sql := fmt.Sprintf(`INSERT INTO accounts (description) VALUES (%v)`, util.SqlParam(1))
+				_, err = tx.Exec(sql, util.GetLangText(`My account`, data.Lang))
+				row := tx.QueryRow("select last_insert_rowid()") // SQLite specific
+				err = row.Scan(&accountid)
+			} else {
+				sql := fmt.Sprintf(`INSERT INTO accounts (description) VALUES (%v) RETURNING id`, util.SqlParam(1))
+				row := tx.QueryRow(sql, util.GetLangText(`My account`, data.Lang))
+				err = row.Scan(&accountid)
+			}
 			fmt.Println(err)
 
 			userid := 0
+			if database.DatabaseType == "sqlite" {
+				sql := fmt.Sprintf(`INSERT INTO users (name, email, username, password, default_accounts_id, lang) VALUES (%v, %v, %v, %v, %v, %v)`, util.SqlParam(1), util.SqlParam(2), util.SqlParam(3), util.SqlParam(4), util.SqlParam(5), util.SqlParam(6))
+				_, err = tx.Exec(sql, name, email, username, password, accountid, data.Lang)
+				row := tx.QueryRow("select last_insert_rowid()") // SQLite specific
+				err = row.Scan(&userid)
+			} else {
+				sql := fmt.Sprintf(`INSERT INTO users (name, email, username, password, default_accounts_id, lang) VALUES (%v, %v, %v, %v, %v, %v) RETURNING id`, util.SqlParam(1), util.SqlParam(2), util.SqlParam(3), util.SqlParam(4), util.SqlParam(5), util.SqlParam(6))
+				row := tx.QueryRow(sql, name, email, username, password, accountid, data.Lang)
+				err = row.Scan(&userid)
+			}
+			fmt.Println(err)
 
-			row = tx.QueryRow("select last_insert_rowid()") // SQLite specific
-			err = row.Scan(&userid)
-
-			sql = fmt.Sprintf(`INSERT INTO accountsusers (accounts_id, users_id) VALUES (%v, %v)`, util.SqlParam(1), util.SqlParam(2))
+			sql := fmt.Sprintf(`INSERT INTO accountsusers (accounts_id, users_id) VALUES (%v, %v)`, util.SqlParam(1), util.SqlParam(2))
 			_, err = tx.Exec(sql, accountid, userid)
 			fmt.Println(err)
 
@@ -358,17 +367,23 @@ func DefineRoutes() {
 
 		tx, err := database.Db.Begin()
 		fmt.Println(err)
-		sql := fmt.Sprintf(`INSERT INTO accounts (description) VALUES (%v)`, util.SqlParam(1))
-		_, err = tx.Exec(sql, description)
-		fmt.Println(err)
 
 		accountid := 0
-
-		row := tx.QueryRow("select last_insert_rowid()") // SQLite specific
-		err = row.Scan(&accountid)
+		if database.DatabaseType == "sqlite" {
+			sql := fmt.Sprintf(`INSERT INTO accounts (description) VALUES (%v)`, util.SqlParam(1))
+			_, err = tx.Exec(sql, description)
+			fmt.Println(err)
+			row := tx.QueryRow("select last_insert_rowid()") // SQLite specific
+			err = row.Scan(&accountid)
+		} else {
+			sql := fmt.Sprintf(`INSERT INTO accounts (description) VALUES (%v) RETURNING id`, util.SqlParam(1))
+			row := tx.QueryRow(sql, description)
+			err = row.Scan(&accountid)
+		}
+		fmt.Println(err)
 
 		userid := data.User.Id
-		sql = fmt.Sprintf(`INSERT INTO accountsusers (accounts_id, users_id) VALUES (%v, %v)`, util.SqlParam(1), util.SqlParam(2))
+		sql := fmt.Sprintf(`INSERT INTO accountsusers (accounts_id, users_id) VALUES (%v, %v)`, util.SqlParam(1), util.SqlParam(2))
 		_, err = tx.Exec(sql, accountid, userid)
 		fmt.Println(err)
 

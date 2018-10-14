@@ -39,11 +39,11 @@ func GetExchangeRates() (float64, string) {
 			database.Db.Get(&count, "SELECT COUNT(*) FROM currencies WHERE code = 'EUR'")
 			if count == 0 {
 				fmt.Println("Insert EUR record")
-				sql := `INSERT INTO currencies (code) VALUES (?)`
+				sql := fmt.Sprintf(`INSERT INTO currencies (code) VALUES (%v)`, SqlParam(1))
 				database.Db.MustExec(sql, `EUR`)
 			}
 
-			sql := `UPDATE currencies SET rate = ?, date = ? WHERE code = ?`
+			sql := fmt.Sprintf(`UPDATE currencies SET rate = %v, date = %v WHERE code = %v`, SqlParam(1), SqlParam(2), SqlParam(3))
 			err1 := database.Db.MustExec(sql, kurs, date, `EUR`)
 			fmt.Println(err1)
 		}

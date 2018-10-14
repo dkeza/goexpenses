@@ -6,7 +6,7 @@ CREATE TABLE public.accounts
 (
   id SERIAL PRIMARY KEY,
   description character varying NOT NULL DEFAULT ''::character varying,
-  deleted boolean NOT NULL DEFAULT false,
+  deleted integer NOT NULL DEFAULT 0,
   fromdate character varying NOT NULL DEFAULT ''::character varying,
   todate character varying NOT NULL DEFAULT ''::character varying
 );
@@ -58,7 +58,7 @@ CREATE TABLE public.posts
   amount decimal(12,2) NOT NULL DEFAULT 0,
   accounts_id integer NOT NULL DEFAULT 0,
   exchange decimal(12,4) NOT NULL DEFAULT 0,
-  deleted boolean NOT NULL DEFAULT false,
+  deleted integer NOT NULL DEFAULT 0,
   p_id character varying NOT NULL DEFAULT ''::character varying
   );
 
@@ -85,7 +85,7 @@ CREATE TABLE public.expenses
   accounts_id integer NOT NULL DEFAULT 0,
   amount decimal(12,2) NOT NULL DEFAULT 0,
   exchange decimal(12,4) NOT NULL DEFAULT 0,
-  deleted boolean NOT NULL DEFAULT false,
+  deleted integer NOT NULL DEFAULT 0,
   expenses_id integer NOT NULL DEFAULT 0,
   p_id character varying NOT NULL DEFAULT ''::character varying
 );
@@ -99,7 +99,7 @@ CREATE TABLE public.incomes
   id SERIAL PRIMARY KEY,
   description character varying NOT NULL DEFAULT ''::character varying,
   accounts_id integer NOT NULL DEFAULT 0,
-  deleted boolean NOT NULL DEFAULT false,
+  deleted integer NOT NULL DEFAULT 0,
   p_id character varying NOT NULL DEFAULT ''::character varying
 );
 
@@ -124,7 +124,7 @@ CREATE TABLE public.passwordresets
   email character varying NOT NULL DEFAULT ''::character varying,
   token character varying UNIQUE NOT NULL DEFAULT ''::character varying,
   created_at timestamp NOT NULL DEFAULT NOW(),
-  done boolean NOT NULL DEFAULT false
+  done integer NOT NULL DEFAULT 0
   );
 
 -- Table: public.accountsusers
