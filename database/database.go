@@ -4,8 +4,16 @@ import (
 	"github.com/jmoiron/sqlx"
 )
 
-var Db *sqlx.DB
+var (
+	Db                       *sqlx.DB
+	DatabaseType             string
+	DatabaseConnectionString string
+)
 
 func Connect() {
-	Db = sqlx.MustConnect("sqlite3", "./db/database.db")
+	if DatabaseType == "postgres" {
+		Db = sqlx.MustConnect("postgres", DatabaseConnectionString)
+	} else {
+		Db = sqlx.MustConnect("sqlite3", DatabaseConnectionString)
+	}
 }

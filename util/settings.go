@@ -4,6 +4,7 @@ import (
 	"os"
 	"strconv"
 
+	"github.com/dkeza/goexpenses/database"
 	"github.com/vaughan0/go-ini"
 )
 
@@ -11,14 +12,16 @@ var Settings AppSettings
 
 // Application settings
 type AppSettings struct {
-	Build               int
-	Host                string
-	Port                string
-	MailHost            string
-	MailHostPort        int
-	MailFrom            string
-	MailPassword        string
-	OpenExchangeRatesId string
+	Build                    int
+	Host                     string
+	Port                     string
+	MailHost                 string
+	MailHostPort             int
+	MailFrom                 string
+	MailPassword             string
+	OpenExchangeRatesId      string
+	DatabaseType             string
+	DatabaseConnectionString string
 }
 
 func ReadSettings() {
@@ -33,6 +36,8 @@ func ReadSettings() {
 	Settings.MailHostPort = 0
 	Settings.MailPassword = ""
 	Settings.OpenExchangeRatesId = ""
+	Settings.DatabaseType = ""
+	Settings.DatabaseConnectionString = ""
 
 	file, errf := ini.LoadFile("goexpenses.ini")
 	if errf == nil {
@@ -64,6 +69,14 @@ func ReadSettings() {
 		if ok {
 			Settings.OpenExchangeRatesId = value
 		}
+		value, ok = file.Get("settings", "databasetype")
+		if ok {
+			Settings.DatabaseType = value
+		}
+		value, ok = file.Get("settings", "databaseconnectionstring")
+		if ok {
+			Settings.DatabaseConnectionString = value
+		}
 	} else {
 		Settings.Host = os.Getenv("HOST")
 		Settings.Port = os.Getenv("PORT")
@@ -72,5 +85,19 @@ func ReadSettings() {
 		Settings.MailHostPort, _ = strconv.Atoi(os.Getenv("MAIL_PORT"))
 		Settings.MailPassword = os.Getenv("MAIL_PASSWORD")
 		Settings.OpenExchangeRatesId = os.Getenv("EXCHANGE_ID")
+		Settings.DatabaseType = os.Getenv("DATABASE_TYPE")
+		Settings.DatabaseConnectionString = os.Getenv("DATABASE_CONNECTION_STRING")
 	}
+
+	if len(Settings.DatabaseType) == 0 {
+		Settings.DatabaseType = "sqlite"
+	}
+
+	if len(Settings.DatabaseConnectionString) == 0 {
+		Settings.DatabaseConnectionString = "./db/database.db"
+	}
+
+	database.DatabaseType = Settings.DatabaseType
+	database.DatabaseConnectionString = Settings.DatabaseConnectionString
+
 }
