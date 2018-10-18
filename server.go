@@ -27,7 +27,7 @@ func (t *Template) Render(w io.Writer, name string, data interface{}, c echo.Con
 }
 
 func init() {
-
+	fmt.Println("Starting...")
 	util.ReadSettings()
 
 	database.Connect()
@@ -35,11 +35,28 @@ func init() {
 	// Check if database exists
 	session := util.Session{}
 	err := database.Db.Get(&session, "SELECT id, uuid, user_id, lang, message FROM sessions WHERE 1=0")
-	if err.Error() == "no such table: sessions" {
+	expectedErrorMsg := ""
+	fmt.Println("Check if database exists", err)
+	if util.Settings.DatabaseType == "sqlite" {
+		expectedErrorMsg = "no such table: sessions"
+	} else {
+		expectedErrorMsg = `pq: relation "sessions" does not exist`
+	}
+	if err.Error() == expectedErrorMsg {
 		fmt.Println("Create database")
 		// Create database
-		sql, _ := ioutil.ReadFile("./db/structure.sql")
-		database.Db.MustExec(string(sql))
+		sqlScript := ""
+		if util.Settings.DatabaseType == "sqlite" {
+			sqlScript = "./db/structure.sql"
+		} else {
+			sqlScript = "./db/pg_structure.sql"
+		}
+		sql, err := ioutil.ReadFile(sqlScript)
+		fmt.Println("After readfile", err)
+		s := string(sql)
+		fmt.Println("SQL SCRIPT:", s)
+		r := database.Db.MustExec(s)
+		fmt.Println("MustExec:", r)
 	}
 
 }
