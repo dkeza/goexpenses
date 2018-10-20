@@ -73,7 +73,7 @@ func ReadSettings() {
 		if ok {
 			Settings.DatabaseType = value
 		}
-		value, ok = file.Get("settings", "databaseconnectionstring")
+		value, ok = file.Get("settings", "DATABASE_URL")
 		if ok {
 			Settings.DatabaseConnectionString = value
 		}
@@ -86,7 +86,7 @@ func ReadSettings() {
 		Settings.MailPassword = os.Getenv("MAIL_PASSWORD")
 		Settings.OpenExchangeRatesId = os.Getenv("EXCHANGE_ID")
 		Settings.DatabaseType = os.Getenv("DATABASE_TYPE")
-		Settings.DatabaseConnectionString = os.Getenv("DATABASE_CONNECTION_STRING")
+		Settings.DatabaseConnectionString = os.Getenv("DATABASE_URL")
 	}
 
 	if len(Settings.DatabaseType) == 0 {
