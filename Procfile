@@ -1,1 +1,1 @@
-web: keza-goexpenses -port=$PORT
+web: keza-goexpenses
