@@ -4,18 +4,15 @@ import (
 	"fmt"
 	"html/template"
 	"io"
-
 	"io/ioutil"
 
 	"github.com/dkeza/goexpenses/database"
 	"github.com/dkeza/goexpenses/midware"
 	"github.com/dkeza/goexpenses/routes"
 	"github.com/dkeza/goexpenses/util"
-
 	"github.com/jasonlvhit/gocron"
 	"github.com/labstack/echo"
 	_ "github.com/lib/pq"
-	_ "github.com/mattn/go-sqlite3"
 )
 
 type Template struct {
