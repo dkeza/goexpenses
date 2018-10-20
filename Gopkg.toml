@@ -62,7 +62,7 @@
   version = "1.0.0"
 
 [metadata.heroku]
-  root-package = "goexpenses"
+  root-package = "github.com/dkeza/goexpenses"
   go-version = "go1.11"
   ensure = "false"
   install = [ "./..." ]
