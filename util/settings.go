@@ -1,6 +1,7 @@
 package util
 
 import (
+	"fmt"
 	"os"
 	"strconv"
 
@@ -96,7 +97,7 @@ func ReadSettings() {
 	if len(Settings.DatabaseConnectionString) == 0 {
 		Settings.DatabaseConnectionString = "./db/database.db"
 	}
-
+	fmt.Printf("Settings: %v", Settings)
 	database.DatabaseType = Settings.DatabaseType
 	database.DatabaseConnectionString = Settings.DatabaseConnectionString
 
