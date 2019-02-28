@@ -11,7 +11,7 @@ import (
 	"github.com/dkeza/goexpenses/util"
 
 	"github.com/labstack/echo"
-	"gopkg.in/gomail.v2"
+	gomail "gopkg.in/gomail.v2"
 )
 
 var E *echo.Echo
@@ -271,12 +271,12 @@ func DefineRoutes() {
 
 		token := util.Encrypt(util.CreateUUID())
 		sql = fmt.Sprintf(`INSERT INTO passwordresets (email, token) VALUES (%v,%v)`, util.SqlParam(1), util.SqlParam(2))
-		sqlresult := database.Db.MustExec(sql, user.Email, token)
-		_, errsql := sqlresult.LastInsertId()
-		if errsql != nil {
-			util.Flash(`Error when accesing to database!`, data, 0, "", 0)
-			return c.Redirect(http.StatusSeeOther, "/reset")
-		}
+		_ = database.Db.MustExec(sql, user.Email, token)
+		// _, errsql := sqlresult.LastInsertId()
+		// if errsql != nil {
+		// 	util.Flash(`Error when accesing to database!`, data, 0, "", 0)
+		// 	return c.Redirect(http.StatusSeeOther, "/reset")
+		// }
 
 		m := gomail.NewMessage()
 		m.SetHeader("From", util.Settings.MailFrom)
