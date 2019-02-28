@@ -63,6 +63,8 @@ func main() {
 	DatabaseUpdate()
 
 	//gocron.Every(1).Minute().Do(util.GetExchangeRates)
+	// Do it on every restart
+	util.GetExchangeRates()
 	gocron.Every(1).Day().At("07:00").Do(util.GetExchangeRates)
 	e := routes.E
 
