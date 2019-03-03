@@ -1,6 +1,7 @@
 package util
 
 import (
+	"log"
 	"math"
 	"net/http"
 
@@ -17,7 +18,7 @@ import (
 func GetExchangeRates() (float64, string) {
 	var kurs float64
 	date := time.Now().Format("2006-01-02 15:04:05")
-	fmt.Println("Getting exchange rates from internet")
+	log.Println("Getting exchange rates from internet")
 	r, err := http.Get("https://openexchangerates.org/api/latest.json?app_id=" + Settings.OpenExchangeRatesId)
 	if err == nil {
 
@@ -31,21 +32,21 @@ func GetExchangeRates() (float64, string) {
 		eur, _ := strconv.ParseFloat(x, 32)
 		rsd, _ := strconv.ParseFloat(y, 32)
 		kurs = ToFixed(rsd/eur, 4)
-		fmt.Println(kurs, dataType, offset, err)
-		fmt.Println("Kurs:", kurs)
+		log.Println(kurs, dataType, offset, err)
+		log.Println("Kurs:", kurs)
 		if kurs > 0.00 {
 
 			count := 0
 			database.Db.Get(&count, "SELECT COUNT(*) FROM currencies WHERE code = 'EUR'")
 			if count == 0 {
-				fmt.Println("Insert EUR record")
+				log.Println("Insert EUR record")
 				sql := fmt.Sprintf(`INSERT INTO currencies (code) VALUES (%v)`, SqlParam(1))
 				database.Db.MustExec(sql, `EUR`)
 			}
 
 			sql := fmt.Sprintf(`UPDATE currencies SET rate = %v, date = %v WHERE code = %v`, SqlParam(1), SqlParam(2), SqlParam(3))
 			err1 := database.Db.MustExec(sql, kurs, date, `EUR`)
-			fmt.Println(err1)
+			log.Println(err1)
 		}
 
 	}

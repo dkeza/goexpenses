@@ -2,6 +2,7 @@ package midware
 
 import (
 	"fmt"
+	"log"
 	"net/http"
 	"time"
 
@@ -54,10 +55,10 @@ func CheckCookie(next echo.HandlerFunc) echo.HandlerFunc {
 		database.Db.Get(&session, sql, uuid)
 
 		if session.Id == 0 {
-			fmt.Println("No session in table!")
+			log.Println("No session in table!")
 			sql := fmt.Sprintf(`INSERT INTO sessions (uuid) VALUES (%v)`, util.SqlParam(1))
 			err := database.Db.MustExec(sql, uuid)
-			fmt.Println(err)
+			log.Println(err)
 			data.Lang = "EN"
 		} else {
 			if session.Message != "" {

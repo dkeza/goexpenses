@@ -1,12 +1,12 @@
 package util
 
 import (
-	"fmt"
+	"log"
 	"os"
 	"strconv"
 
 	"github.com/dkeza/goexpenses/database"
-	"github.com/vaughan0/go-ini"
+	ini "github.com/vaughan0/go-ini"
 )
 
 var Settings AppSettings
@@ -97,7 +97,7 @@ func ReadSettings() {
 	if len(Settings.DatabaseConnectionString) == 0 {
 		Settings.DatabaseConnectionString = "./db/database.db"
 	}
-	fmt.Printf("Settings: %v", Settings)
+	log.Printf("Settings: %v", Settings)
 	database.DatabaseType = Settings.DatabaseType
 	database.DatabaseConnectionString = Settings.DatabaseConnectionString
 

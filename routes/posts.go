@@ -2,6 +2,7 @@ package routes
 
 import (
 	"fmt"
+	"log"
 	"net/http"
 	"strconv"
 	"time"
@@ -197,14 +198,14 @@ func DefinePosts() {
 		}
 
 		if errsql != nil {
-			fmt.Println("/posts SQL Error: ", errsql.Error())
+			log.Println("/posts SQL Error: ", errsql.Error())
 		}
 
 		data.Posts = posts
 
 		rerr := c.Render(http.StatusOK, "posts", data)
 		if rerr != nil {
-			fmt.Println("/posts Rendering Error: ", rerr.Error())
+			log.Println("/posts Rendering Error: ", rerr.Error())
 		}
 
 		return rerr
@@ -221,7 +222,7 @@ func DefinePosts() {
 
 		expenses_pid := expenses_id
 		incomes_pid := incomes_id
-		fmt.Println(incomes_pid)
+		log.Println(incomes_pid)
 
 		amountnum, _ := strconv.ParseFloat(amount, 64)
 		if amountnum == 0.00 {
@@ -270,13 +271,13 @@ func DefinePosts() {
 
 		incomes_idnum := 0
 		incomes := []util.Income{}
-		fmt.Println("incomes_pid:", incomes_pid)
+		log.Println("incomes_pid:", incomes_pid)
 		if incomes_pid != "" {
 			// Check if valid income is selected
 			sql := fmt.Sprintf(`SELECT id, description FROM incomes WHERE accounts_id = %v AND p_id = %v ORDER BY description ASC`, util.SqlParam(1), util.SqlParam(2))
 			errIncomes := database.Db.Select(&incomes, sql, data.User.Default_accounts_id, incomes_pid)
-			fmt.Println("errIncomes", errIncomes)
-			fmt.Println("incomes", incomes)
+			log.Println("errIncomes", errIncomes)
+			log.Println("incomes", incomes)
 			if errIncomes != nil || len(incomes) == 0 {
 				util.Flash(`Changes not saved, because of invalid input data!`, data, 0, "", 0)
 				return c.Redirect(http.StatusSeeOther, "/posts")
@@ -289,7 +290,7 @@ func DefinePosts() {
 		sql := fmt.Sprintf(`INSERT INTO posts (description, expenses_id, incomes_id, amount, exchange, accounts_id, p_id) VALUES (%v,%v,%v,%v,%v,%v,%v)`, util.SqlParam(1), util.SqlParam(2), util.SqlParam(3), util.SqlParam(4), util.SqlParam(5), util.SqlParam(6), util.SqlParam(7))
 		err := database.Db.MustExec(sql, description, expenses_idnum, incomes_idnum, amountnum, data.Eur, data.User.Default_accounts_id, util.Encrypt(util.CreateUUID()))
 
-		fmt.Println("/posts SQL Error:", err, "expenses_idnum:", expenses_idnum)
+		log.Println("/posts SQL Error:", err, "expenses_idnum:", expenses_idnum)
 
 		if expenses_idnum > 0 && expenses[0].ExpensesId > 0 {
 			expensesadd := []util.Expense{}
@@ -297,7 +298,7 @@ func DefinePosts() {
 			errsql2 := database.Db.Select(&expensesadd, sql, expenses[0].ExpensesId)
 
 			if errsql2 != nil {
-				fmt.Println("/posts SQL Error errsql2: ", errsql2)
+				log.Println("/posts SQL Error errsql2: ", errsql2)
 			}
 
 			addexp := expenses[0].ExpensesId
@@ -351,12 +352,12 @@ func DefinePosts() {
 		}
 		errsql := database.Db.Select(&posts, sql, id, data.User.Default_accounts_id)
 		if errsql != nil {
-			fmt.Println("/posts/show errsql:", errsql)
+			log.Println("/posts/show errsql:", errsql)
 		}
 		data.Posts = posts
 		errrender := c.Render(http.StatusOK, "postsshow", data)
 		if errrender != nil {
-			fmt.Println("/posts/show Rendering error:", errrender)
+			log.Println("/posts/show Rendering error:", errrender)
 		}
 		return errrender
 	}, auth)
