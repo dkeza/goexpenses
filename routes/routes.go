@@ -282,7 +282,7 @@ func DefineRoutes() {
 		m.SetHeader("From", util.Settings.MailFrom)
 		m.SetHeader("To", user.Email)
 		m.SetHeader("Subject", "Goexpenses "+util.GetLangText("reset password", data.Lang))
-		m.SetBody("text/html", util.GetLangText(`Click to this link to reset password:`, data.Lang)+` <a href="http://`+util.Settings.Host+`/resetpassword?t=`+token+`">Reset</a>`)
+		m.SetBody("text/html", util.GetLangText(`Click to this link to reset password:`, data.Lang)+` <a href="`+util.Settings.Host+`/resetpassword?t=`+token+`">Reset</a>`)
 		d := gomail.NewDialer(util.Settings.MailHost, util.Settings.MailHostPort, util.Settings.MailFrom, util.Settings.MailPassword)
 		d.TLSConfig = &tls.Config{InsecureSkipVerify: true}
 

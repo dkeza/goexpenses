@@ -37,8 +37,8 @@ User must register with valid E-Mail. When reseting password, activation link is
 
 This example can be deployed to Heroku.
 
-Working example on Heroku:
-https://keza-goexpenses.herokuapp.com/
+Working example:
+https://goexpenses.kezic.net/
 
 Credits to
 
