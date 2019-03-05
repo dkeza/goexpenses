@@ -75,7 +75,8 @@ func main() {
 		},
 		"GetLangText": util.GetLangText,
 		"FormatDateTime": func(dt string) string {
-			return dt[8:10] + "." + dt[5:7] + "." + dt[0:4] + dt[10:]
+			return dt[8:10] + "." + dt[5:7] + "." + dt[0:4] + " " + dt[11:19]
+			//2019-03-05T00:00:00Z
 		},
 		"FormatVisibleId": func(vid string) string {
 			x := ""
