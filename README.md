@@ -4,6 +4,7 @@ You must manualy execute script pg_structure.sql on Postgres databse first.
 You can define expenses and incomes, and then enter posts.
 It is possible to enter amounts in RSD or EUR currency.
 
+Project is using modules for dependency management.
 
 Build and installation
 
