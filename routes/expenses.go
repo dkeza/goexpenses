@@ -5,8 +5,8 @@ import (
 	"net/http"
 	"strconv"
 
-	"github.com/dkeza/goexpenses/database"
-	"github.com/dkeza/goexpenses/util"
+	"goexpenses/database"
+	"goexpenses/util"
 
 	"github.com/labstack/echo"
 )

@@ -5,7 +5,8 @@ import (
 	"os"
 	"strconv"
 
-	"github.com/dkeza/goexpenses/database"
+	"goexpenses/database"
+
 	ini "github.com/vaughan0/go-ini"
 )
 
@@ -28,7 +29,7 @@ type AppSettings struct {
 func ReadSettings() {
 
 	// Here set build version for every release
-	Settings.Build = 3
+	Settings.Build = 4
 
 	Settings.Host = ""
 	Settings.Port = ""
