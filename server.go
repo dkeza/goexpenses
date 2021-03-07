@@ -6,10 +6,11 @@ import (
 	"io"
 	"io/ioutil"
 
-	"github.com/dkeza/goexpenses/database"
-	"github.com/dkeza/goexpenses/midware"
-	"github.com/dkeza/goexpenses/routes"
-	"github.com/dkeza/goexpenses/util"
+	"goexpenses/database"
+	"goexpenses/midware"
+	"goexpenses/routes"
+	"goexpenses/util"
+
 	"github.com/jasonlvhit/gocron"
 	"github.com/labstack/echo"
 	_ "github.com/lib/pq"

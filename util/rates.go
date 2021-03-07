@@ -5,7 +5,7 @@ import (
 	"math"
 	"net/http"
 
-	"github.com/dkeza/goexpenses/database"
+	"goexpenses/database"
 
 	"github.com/buger/jsonparser"
 

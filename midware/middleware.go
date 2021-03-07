@@ -6,9 +6,9 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/dkeza/goexpenses/database"
-	"github.com/dkeza/goexpenses/routes"
-	"github.com/dkeza/goexpenses/util"
+	"goexpenses/database"
+	"goexpenses/routes"
+	"goexpenses/util"
 
 	"github.com/labstack/echo"
 	"github.com/labstack/echo/middleware"

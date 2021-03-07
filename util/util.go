@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strconv"
 
-	"github.com/dkeza/goexpenses/database"
+	"goexpenses/database"
 )
 
 func Flash(message string, data *Data, success int, description string, expense_id int) {
