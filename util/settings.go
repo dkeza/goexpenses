@@ -29,7 +29,7 @@ type AppSettings struct {
 func ReadSettings() {
 
 	// Here set build version for every release
-	Settings.Build = 5
+	Settings.Build = 6
 
 	Settings.Host = ""
 	Settings.Port = ""
