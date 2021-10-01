@@ -41,7 +41,8 @@ CREATE TABLE public.sessions
   message character varying NOT NULL DEFAULT ''::character varying,
   expenses_id integer NOT NULL DEFAULT 0,
   last_post_description character varying NOT NULL DEFAULT ''::character varying,
-  message_success integer NOT NULL DEFAULT 0
+  message_success integer NOT NULL DEFAULT 0,
+  created_at timestamp NOT NULL DEFAULT NOW()
 );
 
 -- Table: public.posts
