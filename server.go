@@ -186,7 +186,7 @@ func DatabaseUpdate() {
 	}
 
 	if param.Build < 7 {
-		ALTER TABLE sessions ADD COLUMN created_at timestamp NOT NULL DEFAULT NOW();
+		// ALTER TABLE sessions ADD COLUMN created_at timestamp NOT NULL DEFAULT NOW();
 	}
 	// END
 
