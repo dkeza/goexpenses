@@ -101,6 +101,7 @@ func main() {
 
 	e.Static("/static", "static")
 	e.File("/favicon.ico", "static/favicon.ico")
+	e.File("/ads.txt", "static/ads.txt")
 
 	routes.DefineRoutes()
 
