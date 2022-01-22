@@ -3,6 +3,7 @@ package util
 import (
 	"fmt"
 	"strconv"
+	"time"
 
 	"goexpenses/database"
 )
@@ -17,5 +18,19 @@ func SqlParam(param int) string {
 		return "?"
 	} else {
 		return "$" + strconv.Itoa(param)
+	}
+}
+
+func DeleteOldSessions() {
+	currentTime := time.Now()
+	oneMonthBefore := currentTime.AddDate(0, -1, 0)
+	sessions := []Session{}
+	sql := fmt.Sprintf(`SELECT id FROM sessions WHERE created_at < %v`, SqlParam(1))
+	database.Db.Select(&sessions, sql, oneMonthBefore)
+	fmt.Printf("Deleting session record older then %v \n", oneMonthBefore)
+	for _, one := range sessions {
+		sql := fmt.Sprintf(`DELETE FROM sessions WHERE id = %v`, SqlParam(1))
+		_ = database.Db.MustExec(sql, one.Id)
+		fmt.Printf("Deleting session record with id %v \n", one.Id)
 	}
 }

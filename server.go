@@ -66,7 +66,10 @@ func main() {
 	//gocron.Every(1).Minute().Do(util.GetExchangeRates)
 	// Do it on every restart
 	util.GetExchangeRates()
+	util.DeleteOldSessions()
 	gocron.Every(1).Day().At("07:00").Do(util.GetExchangeRates)
+	gocron.Every(1).Day().At("05:00").Do(util.DeleteOldSessions)
+
 	e := routes.E
 
 	// Example how we can use some custom function in template
@@ -186,10 +189,11 @@ func DatabaseUpdate() {
 		}
 	}
 
-	if param.Build < 7 {
-		// ALTER TABLE sessions ADD COLUMN created_at timestamp NOT NULL DEFAULT NOW();
+	if param.Build < 8 {
+		fmt.Println("Add created_at to sessions table")
+		database.Db.MustExec(`DELETE FROM sessions`)
+		database.Db.MustExec(`ALTER TABLE sessions ADD COLUMN created_at timestamp NOT NULL DEFAULT NOW()`)
 	}
-	// END
 
 	if param.Build != util.Settings.Build {
 		// Update to leatest database version

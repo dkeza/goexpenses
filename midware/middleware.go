@@ -51,7 +51,7 @@ func CheckCookie(next echo.HandlerFunc) echo.HandlerFunc {
 		uuid, _ := util.DecryptString(cookie.Value)
 
 		session := util.Session{}
-		sql := fmt.Sprintf(`SELECT id, uuid, user_id, lang, message, expenses_id, last_post_description, message_success FROM sessions WHERE uuid = %v`, util.SqlParam(1))
+		sql := fmt.Sprintf(`SELECT id, uuid, user_id, lang, message, expenses_id, last_post_description, message_success, created_at FROM sessions WHERE uuid = %v`, util.SqlParam(1))
 		database.Db.Get(&session, sql, uuid)
 
 		if session.Id == 0 {

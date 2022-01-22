@@ -77,6 +77,7 @@ type Session struct {
 	Expenses_id           int    `db:"expenses_id"`
 	Last_post_description string `db:"last_post_description"`
 	Message_success       int    `db:"message_success"`
+	CreatedAt             string `db:"created_at"`
 }
 
 type Param struct {
