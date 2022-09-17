@@ -8,7 +8,7 @@ import (
 	"goexpenses/database"
 	"goexpenses/util"
 
-	"github.com/labstack/echo"
+	"github.com/labstack/echo/v4"
 )
 
 func DefineExpenses() {
