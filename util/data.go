@@ -21,6 +21,7 @@ type Data struct {
 	Expenses_id           string
 	Last_post_description string
 	Message_success       int
+	Date                  string
 	Accounts              []Account
 	Posts                 []Post
 	Expenses              []Expense

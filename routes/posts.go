@@ -202,6 +202,7 @@ func DefinePosts() {
 		}
 
 		data.Posts = posts
+		data.Date = time.Now().Format("2006-01-02")
 
 		rerr := c.Render(http.StatusOK, "posts", data)
 		if rerr != nil {
@@ -219,6 +220,14 @@ func DefinePosts() {
 		incomes_id := c.FormValue("income_id")
 		amount := c.FormValue("amount")
 		amounte := c.FormValue("amounte")
+		date := c.FormValue("date")
+
+		createdAt := time.Now()
+		currentDate, errDate := time.Parse("2006-01-02", date)
+		if errDate == nil {
+			now := time.Now()
+			createdAt = time.Date(currentDate.Year(), currentDate.Month(), currentDate.Day(), now.Hour(), now.Minute(), now.Second(), now.Nanosecond(), now.Location())
+		}
 
 		expenses_pid := expenses_id
 		incomes_pid := incomes_id
@@ -287,8 +296,8 @@ func DefinePosts() {
 			}
 		}
 
-		sql := fmt.Sprintf(`INSERT INTO posts (description, expenses_id, incomes_id, amount, exchange, accounts_id, p_id) VALUES (%v,%v,%v,%v,%v,%v,%v)`, util.SqlParam(1), util.SqlParam(2), util.SqlParam(3), util.SqlParam(4), util.SqlParam(5), util.SqlParam(6), util.SqlParam(7))
-		err := database.Db.MustExec(sql, description, expenses_idnum, incomes_idnum, amountnum, data.Eur, data.User.Default_accounts_id, util.Encrypt(util.CreateUUID()))
+		sql := fmt.Sprintf(`INSERT INTO posts (description, expenses_id, incomes_id, amount, exchange, accounts_id, p_id, created_at) VALUES (%v,%v,%v,%v,%v,%v,%v,%v)`, util.SqlParam(1), util.SqlParam(2), util.SqlParam(3), util.SqlParam(4), util.SqlParam(5), util.SqlParam(6), util.SqlParam(7), util.SqlParam((8)))
+		err := database.Db.MustExec(sql, description, expenses_idnum, incomes_idnum, amountnum, data.Eur, data.User.Default_accounts_id, util.Encrypt(util.CreateUUID()), createdAt)
 
 		log.Println("/posts SQL Error:", err, "expenses_idnum:", expenses_idnum)
 
