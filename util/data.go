@@ -1,5 +1,7 @@
 package util
 
+import "time"
+
 type Data struct {
 	User                  User
 	Active                string
@@ -58,15 +60,18 @@ type Income struct {
 }
 
 type Post struct {
-	Id          int     `db:"id"`
-	Pid         string  `db:"p_id"`
-	Description string  `db:"description"`
-	Expense     string  `db:"expense"`
-	Income      string  `db:"income"`
-	Date        string  `db:"date"`
-	Amount      float64 `db:"amount"`
-	Amounte     float64 `db:"amounte"`
-	Exchange    float64 `db:"exchange"`
+	Id          int       `db:"id"`
+	Pid         string    `db:"p_id"`
+	Description string    `db:"description"`
+	Expense     string    `db:"expense"`
+	Income      string    `db:"income"`
+	Date        string    `db:"date"`
+	DateTime    time.Time `db:"datetime"`
+	DateOnly    string    `db:"dateonly"`
+	TimeOnly    string    `db:"timeonly"`
+	Amount      float64   `db:"amount"`
+	Amounte     float64   `db:"amounte"`
+	Exchange    float64   `db:"exchange"`
 }
 
 type Session struct {

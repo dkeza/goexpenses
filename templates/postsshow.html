@@ -24,15 +24,40 @@
 			<label class="sr-only" for="income">{{ GetLangText "Income" $.Lang }}</label>
 			<input type="text" class="form-control" id="income" placeholder="" value="{{ .Income }}" readonly>
 		</div>
+
 		<div class="form-group">
-			<label class="sr-only" for="date">{{ GetLangText "Date" $.Lang }}</label>
-			<input type="text" class="form-control" id="date" placeholder="" value="{{ .Date }}" readonly>
+			<label class="sr-only" for="dateonly"
+				>{{ GetLangText "Date" $.Lang }}</label
+			>
+			<input
+				type="date"
+				class="form-control"
+				id="dateonly"
+				name="dateonly"
+				placeholder=""
+				value="{{ .DateOnly }}"
+			/>
 		</div>
+
+		<div class="form-group">
+			<label class="sr-only" for="timeonly"
+				>{{ GetLangText "Time" $.Lang }}</label
+			>
+			<input
+				type="string"
+				class="form-control"
+				id="timeonly"
+				placeholder=""
+				value="{{ .TimeOnly }}"
+				readonly
+			/>
+		</div>
+
 		<div class="form-group">
 			<label class="sr-only" for="amount">{{ GetLangText "Amount" $.Lang }}</label>
 			<input type="number" step="any" class="form-control" id="amount" name="amount" placeholder="{{ GetLangText "Amount" $.Lang }}" value="{{ .Amount }}">
 		</div>
-		<button type="submit" class="btn btn-default">{{ GetLangText "Save" $.Lang }}</button>
+		<button type="submit" class="btn btn-success">{{ GetLangText "Save" $.Lang }}</button>
 		<button type="button" class="btn btn-warning" onClick="onCancelPostsShow()">{{ GetLangText "Cancel" $.Lang }}</button>
 	</form>
 

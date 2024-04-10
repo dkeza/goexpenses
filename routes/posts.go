@@ -343,7 +343,7 @@ func DefinePosts() {
 		if util.Settings.DatabaseType == "sqlite" {
 			sql = fmt.Sprintf(`
 			SELECT p.id, p.p_id, p.description, ifnull(e.description,'') AS expense, 
-				ifnull(i.description,'') AS income, created_at AS date, p.amount 
+				ifnull(i.description,'') AS income, created_at AS date, created_at AS datetime, p.amount 
 				FROM posts p 
 				LEFT JOIN expenses e ON p.expenses_id = e.id 
 				LEFT JOIN incomes i ON p.incomes_id = i.id 
@@ -352,7 +352,7 @@ func DefinePosts() {
 		} else {
 			sql = fmt.Sprintf(`
 			SELECT p.id, p.p_id, p.description, COALESCE(e.description,'') AS expense, 
-				COALESCE(i.description,'') AS income, created_at AS date, p.amount 
+				COALESCE(i.description,'') AS income, created_at AS date, created_at AS datetime, p.amount 
 				FROM posts p 
 				LEFT JOIN expenses e ON p.expenses_id = e.id 
 				LEFT JOIN incomes i ON p.incomes_id = i.id 
@@ -363,7 +363,12 @@ func DefinePosts() {
 		if errsql != nil {
 			log.Println("/posts/show errsql:", errsql)
 		}
-		data.Posts = posts
+		for _, post := range posts {
+			post.DateOnly = post.DateTime.Format("2006-01-02")
+			post.TimeOnly = post.DateTime.Format("15:04")
+			data.Posts = append(data.Posts, post)
+		}
+
 		errrender := c.Render(http.StatusOK, "postsshow", data)
 		if errrender != nil {
 			log.Println("/posts/show Rendering error:", errrender)
@@ -376,8 +381,50 @@ func DefinePosts() {
 		id := c.FormValue("id")
 		description := c.FormValue("description")
 		amount := c.FormValue("amount")
-		sql := fmt.Sprintf(`UPDATE posts SET description = %v, amount = %v WHERE p_id = %v AND accounts_id = %v`, util.SqlParam(1), util.SqlParam(2), util.SqlParam(3), util.SqlParam(4))
-		database.Db.MustExec(sql, description, amount, id, data.User.Default_accounts_id)
+		dateOnly := c.FormValue("dateonly")
+
+		storedDate := time.Now()
+
+		posts := []util.Post{}
+		sql := ""
+		if util.Settings.DatabaseType == "sqlite" {
+			sql = fmt.Sprintf(`
+			SELECT created_at AS datetime 
+				FROM posts p 
+				LEFT JOIN expenses e ON p.expenses_id = e.id 
+				LEFT JOIN incomes i ON p.incomes_id = i.id 
+				WHERE p.p_id = %v AND p.accounts_id = %v AND p.deleted = 0
+			`, util.SqlParam(1), util.SqlParam(2))
+		} else {
+			sql = fmt.Sprintf(`
+			SELECT created_at AS datetime 
+				FROM posts p 
+				LEFT JOIN expenses e ON p.expenses_id = e.id 
+				LEFT JOIN incomes i ON p.incomes_id = i.id 
+				WHERE p.p_id = %v AND p.accounts_id = %v AND p.deleted = 0
+			`, util.SqlParam(1), util.SqlParam(2))
+		}
+		errsql1 := database.Db.Select(&posts, sql, id, data.User.Default_accounts_id)
+		if errsql1 != nil {
+			log.Println("/posts/update errsql1:", errsql1)
+		}
+		for _, post := range posts {
+			storedDate = post.DateTime
+			break
+		}
+
+		createdAt := storedDate
+		enteredDate, errDate := time.Parse("2006-01-02", dateOnly)
+		if errDate == nil {
+			createdAt = time.Date(enteredDate.Year(), enteredDate.Month(), enteredDate.Day(), storedDate.Hour(), storedDate.Minute(), storedDate.Second(), storedDate.Nanosecond(), storedDate.Location())
+		}
+
+		sql = fmt.Sprintf(`UPDATE posts SET description = %v, amount = %v, created_at = %v WHERE p_id = %v AND accounts_id = %v`, util.SqlParam(1), util.SqlParam(2), util.SqlParam(3), util.SqlParam(4), util.SqlParam(5))
+
+		errsql2 := database.Db.MustExec(sql, description, amount, createdAt, id, data.User.Default_accounts_id)
+		if errsql2 != nil {
+			log.Println("/posts/update errsql2:", errsql2)
+		}
 
 		return c.Redirect(http.StatusSeeOther, "/posts")
 	}, auth)
