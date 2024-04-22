@@ -69,6 +69,7 @@ type Post struct {
 	DateTime    time.Time `db:"datetime"`
 	DateOnly    string    `db:"dateonly"`
 	TimeOnly    string    `db:"timeonly"`
+	Timestamp   string    `db:"created_ts"`
 	Amount      float64   `db:"amount"`
 	Amounte     float64   `db:"amounte"`
 	Exchange    float64   `db:"exchange"`

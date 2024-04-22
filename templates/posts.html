@@ -105,6 +105,7 @@ template "account" . }}
       <th>{{ GetLangText "Expense" .Lang }}</th>
       <th>{{ GetLangText "Income" .Lang }}</th>
       <th>{{ GetLangText "Date" .Lang }}</th>
+      <th>{{ GetLangText "Timestamp" .Lang }}</th>
       <th class="text-right">{{ GetLangText "Amount" .Lang }}</th>
       <th class="text-right">{{ GetLangText "Amount" .Lang }} €</th>
       <th></th>
@@ -117,7 +118,8 @@ template "account" . }}
         <td>{{ .Description }}</td>
         <td>{{ .Expense }}</td>
         <td>{{ .Income }}</td>
-        <td>{{ FormatDateTime .Date }}</td>
+        <td>{{ FormatDate .Date }}</td>
+        <td>{{ FormatDateTime .Timestamp }}</td>
         <td class="text-right">{{ printf "%.2f" .Amount }}</td>
         <td class="text-right">{{ printf "%.2f" .Amounte }}</td>
         <td>

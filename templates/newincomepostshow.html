@@ -23,6 +23,16 @@
 		{{ end }}
 		</select>
 	  </div>
+      <div class="form-group">
+        <label class="sr-only" for="date">{{ GetLangText "Date" .Lang }}</label>
+        <input
+          type="date"
+          class="form-control"
+          id="date"
+          name="date"
+          value="{{ .Date }}"
+        />
+      </div>
 	  <div class="form-group">
 	    <label class="sr-only" for="amount">{{ GetLangText "Amount" .Lang }}</label>
 	    <input type="number" min="1" step="any" class="form-control" id="amount" name="amount" placeholder="{{ GetLangText "Amount" .Lang }}">

@@ -82,6 +82,9 @@ func main() {
 			return dt[8:10] + "." + dt[5:7] + "." + dt[0:4] + " " + dt[11:19]
 			//2019-03-05T00:00:00Z
 		},
+		"FormatDate": func(dt string) string {
+			return dt[8:10] + "." + dt[5:7] + "." + dt[0:4]
+		},
 		"FormatVisibleId": func(vid string) string {
 			x := ""
 			if len(vid) > 0 {
@@ -193,6 +196,12 @@ func DatabaseUpdate() {
 		fmt.Println("Add created_at to sessions table")
 		database.Db.MustExec(`DELETE FROM sessions`)
 		database.Db.MustExec(`ALTER TABLE sessions ADD COLUMN created_at timestamp NOT NULL DEFAULT NOW()`)
+	}
+
+	if param.Build < 11 {
+		fmt.Println("Add created_ts to posts table")
+		database.Db.MustExec(`ALTER TABLE posts ADD COLUMN created_ts timestamp NOT NULL DEFAULT NOW()`)
+		database.Db.MustExec(`UPDATE posts SET created_ts = created_at;`)
 	}
 
 	if param.Build != util.Settings.Build {

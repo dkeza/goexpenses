@@ -135,4 +135,5 @@ func init() {
 	AppLang["Changes not saved, because of invalid input data!"] = LangText{"Promene nisu zapamćene zbog neispravnih ulaznih podataka!", "Промене нису запамћене због несиправних улазних података!", "Änderungen sind nicht gespeichert, weil es ungültigen eingang Daten gibt!"}
 	AppLang["Invalid expense!"] = LangText{"Neispravan trošak!", "Неисправан трошак!", "Ungültiger Kosten!"}
 	AppLang["Invalid income!"] = LangText{"Neispravan prihod!", "Неисправан приход!", "Ungültiger Einkommen!"}
+	AppLang["Timestamp"] = LangText{"Kreiran", "Креиран", "Zeitstempel"}
 }

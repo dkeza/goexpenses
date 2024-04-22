@@ -148,7 +148,7 @@ func DefinePosts() {
 			if util.Settings.DatabaseType == "sqlite" {
 				sql = fmt.Sprintf(`
 				SELECT p.id, p.description, ifnull(e.description,'') AS expense, 
-					ifnull(i.description,'') AS income, created_at AS date, p.amount, 
+					ifnull(i.description,'') AS income, created_at AS date, created_ts, p.amount, 
 					CAST(p.amount/p.exchange AS Numeric(12,2)) AS amounte, p.p_id 
 					FROM posts p 
 					LEFT JOIN expenses e ON p.expenses_id = e.id 
@@ -159,7 +159,7 @@ func DefinePosts() {
 			} else {
 				sql = fmt.Sprintf(`
 				SELECT p.id, p.description, COALESCE(e.description,'') AS expense, 
-					COALESCE(i.description,'') AS income, created_at AS date, p.amount, 
+					COALESCE(i.description,'') AS income, created_at AS date, created_ts, p.amount, 
 					CAST(p.amount/p.exchange AS Numeric(12,2)) AS amounte, p.p_id 
 					FROM posts p 
 					LEFT JOIN expenses e ON p.expenses_id = e.id 
@@ -174,7 +174,7 @@ func DefinePosts() {
 			if util.Settings.DatabaseType == "sqlite" {
 				sql = fmt.Sprintf(`
 				SELECT p.id, p.description, ifnull(e.description,'') AS expense, 
-					ifnull(i.description,'') AS income, created_at AS date, p.amount, 
+					ifnull(i.description,'') AS income, created_at AS date, created_ts, p.amount, 
 					CAST(p.amount/p.exchange AS Numeric(12,2)) AS amounte, p.p_id 
 					FROM posts p 
 					LEFT JOIN expenses e ON p.expenses_id = e.id 
@@ -185,7 +185,7 @@ func DefinePosts() {
 			} else {
 				sql = fmt.Sprintf(`
 				SELECT p.id, p.description, COALESCE(e.description,'') AS expense, 
-					COALESCE(i.description,'') AS income, created_at AS date, p.amount, 
+					COALESCE(i.description,'') AS income, created_at AS date, created_ts, p.amount, 
 					CAST(p.amount/p.exchange AS Numeric(12,2)) AS amounte, p.p_id 
 					FROM posts p 
 					LEFT JOIN expenses e ON p.expenses_id = e.id 
@@ -343,7 +343,7 @@ func DefinePosts() {
 		if util.Settings.DatabaseType == "sqlite" {
 			sql = fmt.Sprintf(`
 			SELECT p.id, p.p_id, p.description, ifnull(e.description,'') AS expense, 
-				ifnull(i.description,'') AS income, created_at AS date, created_at AS datetime, p.amount 
+				ifnull(i.description,'') AS income, created_at AS date, created_at AS datetime, created_ts, p.amount 
 				FROM posts p 
 				LEFT JOIN expenses e ON p.expenses_id = e.id 
 				LEFT JOIN incomes i ON p.incomes_id = i.id 
@@ -352,7 +352,7 @@ func DefinePosts() {
 		} else {
 			sql = fmt.Sprintf(`
 			SELECT p.id, p.p_id, p.description, COALESCE(e.description,'') AS expense, 
-				COALESCE(i.description,'') AS income, created_at AS date, created_at AS datetime, p.amount 
+				COALESCE(i.description,'') AS income, created_at AS date, created_at AS datetime, created_ts, p.amount 
 				FROM posts p 
 				LEFT JOIN expenses e ON p.expenses_id = e.id 
 				LEFT JOIN incomes i ON p.incomes_id = i.id 
@@ -423,7 +423,7 @@ func DefinePosts() {
 
 		errsql2 := database.Db.MustExec(sql, description, amount, createdAt, id, data.User.Default_accounts_id)
 		if errsql2 != nil {
-			log.Println("/posts/update errsql2:", errsql2)
+			log.Printf("/posts/update errsql2: %+v\n", errsql2)
 		}
 
 		return c.Redirect(http.StatusSeeOther, "/posts")
@@ -442,6 +442,7 @@ func DefinePosts() {
 		`, util.SqlParam(1))
 		database.Db.Select(&incomes, sql, data.User.Default_accounts_id)
 		data.Incomes = incomes
+		data.Date = time.Now().Format("2006-01-02")
 
 		return c.Render(http.StatusOK, "newincomepostshow", data)
 	}, auth)
