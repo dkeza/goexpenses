@@ -5,3 +5,5 @@
 goexpenses.ini
 database.db
 goexpenses
+/.vscode
+/startgoexpenses.bat
