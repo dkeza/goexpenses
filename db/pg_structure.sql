@@ -1,4 +1,4 @@
-﻿-- Table: public.accounts
+-- Table: public.accounts
 
 DROP TABLE IF EXISTS public.accounts;
 
