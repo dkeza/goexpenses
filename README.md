@@ -34,7 +34,7 @@ Rename goexpenses.dev.ini to goexpenses.ini, and enter settings.
 Alternative to ini file is use of enviroment variables.
 Look in startgoexpenses.dev.bat for use in Windows.
 
-Start binary
+Start binary exe
 
 Database would be automatically created. EUR and RSD currency exchange rates would be automatically updated on start, and then once a day.
 User must register with valid E-Mail. When reseting password, activation link is sent to E-Mail.
