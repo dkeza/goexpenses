@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"html/template"
 	"io"
-	"io/ioutil"
+	"os"
 
 	"goexpenses/database"
 	"goexpenses/midware"
@@ -49,7 +49,7 @@ func init() {
 		} else {
 			sqlScript = "./db/pg_structure.sql"
 		}
-		sql, err := ioutil.ReadFile(sqlScript)
+		sql, err := os.ReadFile(sqlScript)
 		fmt.Println("After readfile", err)
 		s := string(sql)
 		fmt.Println("SQL SCRIPT:", s)

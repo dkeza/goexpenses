@@ -10,7 +10,7 @@ import (
 	"github.com/buger/jsonparser"
 
 	"fmt"
-	"io/ioutil"
+	"io"
 	"strconv"
 	"time"
 )
@@ -23,7 +23,7 @@ func GetExchangeRates() (float64, string) {
 	if err == nil {
 
 		defer r.Body.Close()
-		body, _ := ioutil.ReadAll(r.Body)
+		body, _ := io.ReadAll(r.Body)
 
 		value, dataType, offset, err := jsonparser.Get(body, "rates", "EUR")
 		x := string(value)
