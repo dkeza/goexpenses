@@ -6,6 +6,8 @@ It is possible to enter amounts in RSD or EUR currency.
 
 Project is using modules for dependency management.
 
+Requires Go 1.27.1 or newer.
+
 Build and installation
 
 Get source with

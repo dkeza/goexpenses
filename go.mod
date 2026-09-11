@@ -1,6 +1,6 @@
 module goexpenses
 
-go 1.24
+go 1.27.1
 
 require (
 	github.com/buger/jsonparser v1.1.1
