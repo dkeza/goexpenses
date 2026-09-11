@@ -46,6 +46,46 @@ func MainRoute() {
 	})
 }
 
+func selectAccount(c echo.Context) error {
+	data, ok := c.Get("data").(*util.Data)
+	if !ok || data.User.Id == 0 {
+		return echo.NewHTTPError(http.StatusUnauthorized, "authentication required")
+	}
+
+	accountID, err := strconv.Atoi(c.FormValue("accounts_id"))
+	if err != nil || accountID <= 0 {
+		return echo.NewHTTPError(http.StatusBadRequest, "invalid account")
+	}
+
+	query := fmt.Sprintf(`
+		UPDATE users
+		SET default_accounts_id = %v
+		WHERE id = %v
+		  AND EXISTS (
+			SELECT 1
+			FROM accountsusers au
+			JOIN accounts a ON a.id = au.accounts_id
+			WHERE au.accounts_id = %v
+			  AND au.users_id = %v
+			  AND a.deleted = 0
+		)`, util.SqlParam(1), util.SqlParam(2), util.SqlParam(3), util.SqlParam(4))
+
+	result, err := database.Db.Exec(query, accountID, data.User.Id, accountID, data.User.Id)
+	if err != nil {
+		return echo.NewHTTPError(http.StatusInternalServerError, "could not select account").SetInternal(err)
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return echo.NewHTTPError(http.StatusInternalServerError, "could not verify account selection").SetInternal(err)
+	}
+	if rowsAffected != 1 {
+		return echo.NewHTTPError(http.StatusForbidden, "account is not available to this user")
+	}
+
+	return c.Redirect(http.StatusSeeOther, "/posts")
+}
+
 func DefineRoutes() {
 
 	// Middleware
@@ -321,27 +361,7 @@ func DefineRoutes() {
 		return c.Render(http.StatusOK, "changepassword", data)
 	})
 
-	e.GET("/accounts", func(c echo.Context) error {
-		accounts_id, err := strconv.Atoi(c.QueryParam("accounts_id"))
-		if err != nil {
-			return c.Redirect(http.StatusSeeOther, "/login")
-		}
-
-		data := c.Get("data").(*util.Data)
-
-		if !(data.CookieId != "" && data.Username != "") {
-			return c.Redirect(http.StatusSeeOther, "/login")
-		}
-
-		if data.User.Default_accounts_id == accounts_id {
-			return c.Redirect(http.StatusSeeOther, "/posts")
-		}
-
-		sql := fmt.Sprintf(`UPDATE users SET default_accounts_id = %v WHERE id = %v`, util.SqlParam(1), util.SqlParam(2))
-		err1 := database.Db.MustExec(sql, accounts_id, data.User.Id)
-		fmt.Println(err1)
-		return c.Redirect(http.StatusSeeOther, "/posts")
-	})
+	e.POST("/accounts/select", selectAccount, auth)
 
 	e.POST("/accounts/show", func(c echo.Context) error {
 		data := c.Get("data").(*util.Data)

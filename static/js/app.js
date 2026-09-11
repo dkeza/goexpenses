@@ -1,7 +1,7 @@
 (function($) {
-    $(document).ready( function() {
+	$(document).ready( function() {
 		$('#default_accounts_id').change(function() {
-		    window.location = "accounts?accounts_id=" + $(this).val();
+			$('#account-selector').submit();
 		});
 
 	    setTimeout(function() {
@@ -10,5 +10,4 @@
 
     });
 })(jQuery);
-
 
