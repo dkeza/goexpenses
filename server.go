@@ -6,6 +6,7 @@ import (
 	"html/template"
 	"io"
 	"io/fs"
+	"log"
 
 	"goexpenses/database"
 	"goexpenses/midware"
@@ -32,7 +33,9 @@ func (t *Template) Render(w io.Writer, name string, data interface{}, c echo.Con
 
 func init() {
 	fmt.Println("Starting...")
-	util.ReadSettings()
+	if err := util.ReadSettings(); err != nil {
+		log.Fatalf("cannot start: %v", err)
+	}
 
 	database.Connect()
 

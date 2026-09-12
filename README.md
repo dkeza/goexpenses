@@ -38,8 +38,20 @@ Alternatively, use environment variables without an INI file. Environment
 variables override values loaded from `goexpenses.ini`. Look in
 `startgoexpenses.dev.bat` for a Windows example.
 
-If SQLite is used, its database file must remain outside the executable so that
-application data persists between deployments.
+Configuration is loaded in this order:
+
+1. Application defaults (`PORT=8080` and secure cookies enabled).
+2. The optional `goexpenses.ini` file.
+3. Environment variables, which override both defaults and INI values.
+
+The application validates its configuration before connecting to external
+services. `HOST`, `DATABASE_URL`, `MAIL_HOST`, `MAIL_PORT`, `MAIL_FROM`, and
+`EXCHANGE_ID` are required. `HOST` must be an absolute HTTP(S) URL and
+`DATABASE_URL` must be a PostgreSQL URL. `MAIL_PASSWORD` is optional for SMTP
+servers which do not require authentication.
+
+PostgreSQL is currently the only enabled database driver. Invalid configuration
+is reported at startup without printing passwords, API keys, or database URLs.
 
 Session cookies are secure by default. Set `COOKIE_SECURE=false` (or
 `cookiesecure=false` in `goexpenses.ini`) only for local development over HTTP.
