@@ -98,7 +98,7 @@ func CheckCookie(next echo.HandlerFunc) echo.HandlerFunc {
 		data.CookieId = uuid
 		if session.User_id > 0 {
 			user := util.User{}
-			sql := fmt.Sprintf(`SELECT id, name, username, email, password, default_accounts_id, lang FROM users WHERE id = %v`, util.SqlParam(1))
+			sql := fmt.Sprintf(`SELECT id, name, username, email, default_accounts_id, lang FROM users WHERE id = %v`, util.SqlParam(1))
 			database.Db.Get(&user, sql, session.User_id)
 
 			c.Set("id", user.Id)
@@ -111,7 +111,6 @@ func CheckCookie(next echo.HandlerFunc) echo.HandlerFunc {
 			data.User.Name = user.Name
 			data.User.Email = user.Email
 			data.User.Username = user.Username
-			data.User.Password = user.Password
 			data.User.Default_accounts_id = user.Default_accounts_id
 			data.User.Lang = user.Lang
 			data.Lang = user.Lang

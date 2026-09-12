@@ -6,12 +6,15 @@ import (
 	"crypto/cipher"
 	"crypto/rand"
 	"crypto/sha1"
+	"crypto/subtle"
 	"encoding/base64"
 	"errors"
 	"fmt"
 	"io"
 	"log"
 	"strings"
+
+	"golang.org/x/crypto/bcrypt"
 )
 
 var masterkey = "F!hGtgGuUeqAccD56Hnnk76$7!gfdQ9%"
@@ -32,10 +35,35 @@ func CreateUUID() (uuid string) {
 	return
 }
 
-// hash plaintext with SHA-1
+// Encrypt returns a legacy SHA-1 identifier. It must not be used for passwords.
 func Encrypt(plaintext string) (cryptext string) {
 	cryptext = fmt.Sprintf("%x", sha1.Sum([]byte(plaintext)))
 	return
+}
+
+// HashPassword creates a salted, adaptive password hash.
+func HashPassword(password string) (string, error) {
+	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+	if err != nil {
+		return "", err
+	}
+	return string(hash), nil
+}
+
+// VerifyPassword accepts bcrypt hashes and legacy SHA-1 hashes. The second
+// return value reports whether a valid password should be rehashed.
+func VerifyPassword(storedHash, password string) (valid bool, needsRehash bool) {
+	if strings.HasPrefix(storedHash, "$2") {
+		if bcrypt.CompareHashAndPassword([]byte(storedHash), []byte(password)) != nil {
+			return false, false
+		}
+		cost, err := bcrypt.Cost([]byte(storedHash))
+		return true, err == nil && cost < bcrypt.DefaultCost
+	}
+
+	legacyHash := Encrypt(password)
+	valid = subtle.ConstantTimeCompare([]byte(storedHash), []byte(legacyHash)) == 1
+	return valid, valid
 }
 
 func addBase64Padding(value string) string {

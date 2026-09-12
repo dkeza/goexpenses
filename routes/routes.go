@@ -2,6 +2,8 @@ package routes
 
 import (
 	"crypto/tls"
+	stdsql "database/sql"
+	"errors"
 	"fmt"
 	"net/http"
 	"strconv"
@@ -17,6 +19,8 @@ import (
 var E *echo.Echo
 var Auth echo.MiddlewareFunc
 
+var errInvalidCredentials = errors.New("invalid credentials")
+
 func init() {
 	E = echo.New()
 }
@@ -26,7 +30,6 @@ func MainRoute() {
 		var data *util.Data
 		data = c.Get("data").(*util.Data)
 		data.Active = "home"
-		fmt.Println(data)
 		l := c.QueryParam("lang")
 		if l != "" {
 
@@ -44,6 +47,45 @@ func MainRoute() {
 		}
 		return c.Render(http.StatusOK, "index", data)
 	})
+}
+
+func authenticateUser(username, password string) (util.User, error) {
+	user := util.User{}
+	query := fmt.Sprintf(`SELECT id, name, username, email, password FROM users WHERE username = %v`, util.SqlParam(1))
+	if err := database.Db.Get(&user, query, username); err != nil {
+		if errors.Is(err, stdsql.ErrNoRows) {
+			return util.User{}, errInvalidCredentials
+		}
+		return util.User{}, err
+	}
+
+	valid, needsRehash := util.VerifyPassword(user.Password, password)
+	if !valid {
+		return util.User{}, errInvalidCredentials
+	}
+	if !needsRehash {
+		return user, nil
+	}
+
+	passwordHash, err := util.HashPassword(password)
+	if err != nil {
+		return util.User{}, err
+	}
+	query = fmt.Sprintf(`UPDATE users SET password = %v WHERE id = %v AND password = %v`, util.SqlParam(1), util.SqlParam(2), util.SqlParam(3))
+	result, err := database.Db.Exec(query, passwordHash, user.Id, user.Password)
+	if err != nil {
+		return util.User{}, err
+	}
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return util.User{}, err
+	}
+	if rowsAffected != 1 {
+		return util.User{}, errInvalidCredentials
+	}
+
+	user.Password = passwordHash
+	return user, nil
 }
 
 func selectAccount(c echo.Context) error {
@@ -148,7 +190,12 @@ func DefineRoutes() {
 		password := c.FormValue("password")
 
 		if name != "" && password != "" {
-			password = util.Encrypt(password)
+			passwordHash, err := util.HashPassword(password)
+			if err != nil {
+				util.Flash(`Invalid password!`, data, 0, ``, 0)
+				return c.Redirect(http.StatusSeeOther, "/register")
+			}
+			password = passwordHash
 			tx, err := database.Db.Begin()
 			fmt.Println(err)
 
@@ -202,7 +249,12 @@ func DefineRoutes() {
 		token := c.FormValue("_token")
 
 		if password != "" && repeatpassword != "" && password == repeatpassword {
-			password = util.Encrypt(password)
+			passwordHash, err := util.HashPassword(password)
+			if err != nil {
+				util.Flash(`Invalid password!`, data, 0, ``, 0)
+				return c.Redirect(http.StatusSeeOther, "/changepassword")
+			}
+			password = passwordHash
 			userid := 0
 			if token != "" && data.User.Id == 0 {
 
@@ -214,7 +266,7 @@ func DefineRoutes() {
 				database.Db.Get(&pr, sql, token, filterdate)
 				if pr.Email != "" {
 					user := util.User{}
-					sql := fmt.Sprintf(`SELECT id, name, username, email, password, default_accounts_id, lang FROM users WHERE email = %v`, util.SqlParam(1))
+					sql := fmt.Sprintf(`SELECT id FROM users WHERE email = %v`, util.SqlParam(1))
 					database.Db.Get(&user, sql, pr.Email)
 					if user.Id != 0 {
 						userid = user.Id
@@ -249,7 +301,6 @@ func DefineRoutes() {
 
 		username := c.FormValue("username")
 		password := c.FormValue("password")
-		cpassword := util.Encrypt(password)
 
 		uuid := c.Get("_id").(string)
 
@@ -257,14 +308,8 @@ func DefineRoutes() {
 		sql := fmt.Sprintf(`SELECT id, uuid, user_id FROM sessions WHERE uuid = %v`, util.SqlParam(1))
 		database.Db.Get(&session, sql, uuid)
 
-		user := util.User{}
-		sql = fmt.Sprintf(`SELECT id, name, username, email, password FROM users WHERE username = %v AND password = %v`, util.SqlParam(1), util.SqlParam(2))
-		database.Db.Get(&user, sql, username, cpassword)
-
-		fmt.Println("Entered password: " + cpassword + " | Stored password: " + user.Password)
-		if user.Username == username && user.Password == cpassword {
-
-			fmt.Println("User OK")
+		user, err := authenticateUser(username, password)
+		if err == nil {
 
 			sql := fmt.Sprintf(`UPDATE sessions SET user_id = %v WHERE uuid = %v`, util.SqlParam(1), util.SqlParam(2))
 			err := database.Db.MustExec(sql, user.Id, uuid)
@@ -278,9 +323,11 @@ func DefineRoutes() {
 				fmt.Println(err)
 			}
 
-		} else {
+		} else if errors.Is(err, errInvalidCredentials) {
 			util.Flash(`Unknown user or invalid password!`, data, 0, "", 0)
 			return c.Redirect(http.StatusSeeOther, "/login")
+		} else {
+			return echo.NewHTTPError(http.StatusInternalServerError, "could not authenticate user").SetInternal(err)
 		}
 
 		return c.Redirect(http.StatusSeeOther, "/posts")
@@ -302,7 +349,7 @@ func DefineRoutes() {
 		}
 
 		user := util.User{}
-		sql := fmt.Sprintf(`SELECT id, name, username, email, password FROM users WHERE email  = %v`, util.SqlParam(1))
+		sql := fmt.Sprintf(`SELECT id, email FROM users WHERE email = %v`, util.SqlParam(1))
 		database.Db.Get(&user, sql, email)
 		if user.Id == 0 {
 			util.Flash(`Unknown E-Mail!`, data, 0, "", 0)
@@ -340,7 +387,6 @@ func DefineRoutes() {
 		data := c.Get("data").(*util.Data)
 		data.Active = "login"
 		token := c.FormValue("t")
-		fmt.Println("token:", token)
 		if token == "" {
 			return c.Redirect(http.StatusSeeOther, "/")
 		}
