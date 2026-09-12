@@ -5,8 +5,11 @@ import (
 	stdsql "database/sql"
 	"errors"
 	"fmt"
+	"html"
 	"net/http"
+	"net/url"
 	"strconv"
+	"strings"
 	"time"
 
 	"goexpenses/database"
@@ -20,6 +23,12 @@ var E *echo.Echo
 var Auth echo.MiddlewareFunc
 
 var errInvalidCredentials = errors.New("invalid credentials")
+
+const (
+	passwordResetDuration        = 2 * time.Hour
+	passwordResetRequestInterval = 15 * time.Minute
+	passwordResetResponseMessage = "If the E-Mail exists, a reset link has been sent."
+)
 
 func init() {
 	E = echo.New()
@@ -173,6 +182,228 @@ func selectAccount(c echo.Context) error {
 	return c.Redirect(http.StatusSeeOther, "/posts")
 }
 
+func createPasswordReset(email string, now time.Time) (recipient string, token string, created bool, err error) {
+	tx, err := database.Db.Beginx()
+	if err != nil {
+		return "", "", false, err
+	}
+	defer tx.Rollback()
+
+	user := util.User{}
+	query := fmt.Sprintf(`SELECT id, email FROM users WHERE email = %v`, util.SqlParam(1))
+	if util.Settings.DatabaseType == "postgres" {
+		query += " FOR UPDATE"
+	}
+	if err = tx.Get(&user, query, strings.TrimSpace(email)); err != nil {
+		if errors.Is(err, stdsql.ErrNoRows) {
+			return "", "", false, nil
+		}
+		return "", "", false, err
+	}
+
+	requestCount := 0
+	query = fmt.Sprintf(`SELECT COUNT(*) FROM passwordresets WHERE email = %v AND created_at >= %v`, util.SqlParam(1), util.SqlParam(2))
+	if err = tx.Get(&requestCount, query, user.Email, now.Add(-passwordResetRequestInterval)); err != nil {
+		return "", "", false, err
+	}
+	if requestCount > 0 {
+		return "", "", false, nil
+	}
+
+	token, tokenHash, err := util.NewPasswordResetToken()
+	if err != nil {
+		return "", "", false, err
+	}
+
+	query = fmt.Sprintf(`UPDATE passwordresets SET done = 1 WHERE email = %v AND done = 0`, util.SqlParam(1))
+	if _, err = tx.Exec(query, user.Email); err != nil {
+		return "", "", false, err
+	}
+	query = fmt.Sprintf(`INSERT INTO passwordresets (email, token) VALUES (%v, %v)`, util.SqlParam(1), util.SqlParam(2))
+	if _, err = tx.Exec(query, user.Email, tokenHash); err != nil {
+		return "", "", false, err
+	}
+	if err = tx.Commit(); err != nil {
+		return "", "", false, err
+	}
+
+	return user.Email, token, true, nil
+}
+
+func passwordResetTokenValid(token string, now time.Time) (bool, error) {
+	tokenHash, err := util.HashPasswordResetToken(token)
+	if err != nil {
+		return false, nil
+	}
+
+	reset := util.PasswordReset{}
+	query := fmt.Sprintf(`SELECT id FROM passwordresets WHERE token = %v AND created_at >= %v AND done = 0`, util.SqlParam(1), util.SqlParam(2))
+	if err := database.Db.Get(&reset, query, tokenHash, now.Add(-passwordResetDuration)); err != nil {
+		if errors.Is(err, stdsql.ErrNoRows) {
+			return false, nil
+		}
+		return false, err
+	}
+	return reset.Id != 0, nil
+}
+
+func resetPasswordWithToken(token, passwordHash string, now time.Time) (bool, error) {
+	tokenHash, err := util.HashPasswordResetToken(token)
+	if err != nil {
+		return false, nil
+	}
+
+	tx, err := database.Db.Beginx()
+	if err != nil {
+		return false, err
+	}
+	defer tx.Rollback()
+
+	reset := util.PasswordReset{}
+	query := fmt.Sprintf(`SELECT id, email FROM passwordresets WHERE token = %v AND created_at >= %v AND done = 0`, util.SqlParam(1), util.SqlParam(2))
+	if util.Settings.DatabaseType == "postgres" {
+		query += " FOR UPDATE"
+	}
+	if err = tx.Get(&reset, query, tokenHash, now.Add(-passwordResetDuration)); err != nil {
+		if errors.Is(err, stdsql.ErrNoRows) {
+			return false, nil
+		}
+		return false, err
+	}
+
+	user := util.User{}
+	query = fmt.Sprintf(`SELECT id FROM users WHERE email = %v`, util.SqlParam(1))
+	if err = tx.Get(&user, query, reset.Email); err != nil {
+		if errors.Is(err, stdsql.ErrNoRows) {
+			return false, nil
+		}
+		return false, err
+	}
+
+	query = fmt.Sprintf(`UPDATE passwordresets SET done = 1 WHERE token = %v AND done = 0`, util.SqlParam(1))
+	result, err := tx.Exec(query, tokenHash)
+	if err != nil {
+		return false, err
+	}
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return false, err
+	}
+	if rowsAffected != 1 {
+		return false, nil
+	}
+
+	query = fmt.Sprintf(`UPDATE passwordresets SET done = 1 WHERE email = %v AND done = 0`, util.SqlParam(1))
+	if _, err = tx.Exec(query, reset.Email); err != nil {
+		return false, err
+	}
+	query = fmt.Sprintf(`UPDATE users SET password = %v WHERE id = %v`, util.SqlParam(1), util.SqlParam(2))
+	result, err = tx.Exec(query, passwordHash, user.Id)
+	if err != nil {
+		return false, err
+	}
+	rowsAffected, err = result.RowsAffected()
+	if err != nil {
+		return false, err
+	}
+	if rowsAffected != 1 {
+		return false, errors.New("password reset user no longer exists")
+	}
+
+	query = fmt.Sprintf(`DELETE FROM sessions WHERE user_id = %v`, util.SqlParam(1))
+	if _, err = tx.Exec(query, user.Id); err != nil {
+		return false, err
+	}
+	if err = tx.Commit(); err != nil {
+		return false, err
+	}
+
+	return true, nil
+}
+
+func newPasswordResetDialer() *gomail.Dialer {
+	dialer := gomail.NewDialer(util.Settings.MailHost, util.Settings.MailHostPort, util.Settings.MailFrom, util.Settings.MailPassword)
+	dialer.TLSConfig = &tls.Config{
+		MinVersion: tls.VersionTLS12,
+		ServerName: util.Settings.MailHost,
+	}
+	return dialer
+}
+
+func sendPasswordResetEmail(recipient, token, lang string) error {
+	resetURL := strings.TrimRight(util.Settings.Host, "/") + "/resetpassword?t=" + url.QueryEscape(token)
+
+	message := gomail.NewMessage()
+	message.SetHeader("From", util.Settings.MailFrom)
+	message.SetHeader("To", recipient)
+	message.SetHeader("Subject", "Goexpenses "+util.GetLangText("reset password", lang))
+	message.SetBody("text/html", util.GetLangText(`Click to this link to reset password:`, lang)+` <a href="`+html.EscapeString(resetURL)+`">Reset</a>`)
+
+	return newPasswordResetDialer().DialAndSend(message)
+}
+
+func changePassword(c echo.Context) error {
+	data := c.Get("data").(*util.Data)
+	password := c.FormValue("password")
+	repeatPassword := c.FormValue("repeatpassword")
+	token := c.FormValue("_token")
+
+	if password == "" || repeatPassword == "" || password != repeatPassword {
+		util.Flash(`Invalid password!`, data, 0, ``, 0)
+		return c.Redirect(http.StatusSeeOther, "/changepassword")
+	}
+
+	passwordHash, err := util.HashPassword(password)
+	if err != nil {
+		util.Flash(`Invalid password!`, data, 0, ``, 0)
+		return c.Redirect(http.StatusSeeOther, "/changepassword")
+	}
+
+	if token != "" {
+		if data.User.Id != 0 {
+			util.Flash(`Invalid token!`, data, 0, ``, 0)
+			return c.Redirect(http.StatusSeeOther, "/changepassword")
+		}
+		changed, err := resetPasswordWithToken(token, passwordHash, time.Now())
+		if err != nil {
+			return echo.NewHTTPError(http.StatusInternalServerError, "could not reset password").SetInternal(err)
+		}
+		if !changed {
+			util.Flash(`Invalid token!`, data, 0, ``, 0)
+			return c.Redirect(http.StatusSeeOther, "/reset")
+		}
+		if err := rotateSession(c, 0); err != nil {
+			return echo.NewHTTPError(http.StatusInternalServerError, "could not rotate session").SetInternal(err)
+		}
+		util.Flash(`Saved`, data, 1, ``, 0)
+		return c.Redirect(http.StatusSeeOther, "/login")
+	}
+
+	if data.User.Id == 0 {
+		util.Flash(`Invalid password!`, data, 0, ``, 0)
+		return c.Redirect(http.StatusSeeOther, "/changepassword")
+	}
+
+	tx, err := database.Db.Begin()
+	if err != nil {
+		return echo.NewHTTPError(http.StatusInternalServerError, "could not change password").SetInternal(err)
+	}
+	defer tx.Rollback()
+
+	query := fmt.Sprintf(`UPDATE users SET password = %v WHERE id = %v`, util.SqlParam(1), util.SqlParam(2))
+	if _, err = tx.Exec(query, passwordHash, data.User.Id); err != nil {
+		return echo.NewHTTPError(http.StatusInternalServerError, "could not change password").SetInternal(err)
+	}
+	if err = tx.Commit(); err != nil {
+		return echo.NewHTTPError(http.StatusInternalServerError, "could not change password").SetInternal(err)
+	}
+	if err := rotateSession(c, data.User.Id); err != nil {
+		return echo.NewHTTPError(http.StatusInternalServerError, "could not rotate session").SetInternal(err)
+	}
+	util.Flash(`Saved`, data, 1, ``, 0)
+	return c.Redirect(http.StatusSeeOther, "/posts")
+}
+
 func DefineRoutes() {
 
 	// Middleware
@@ -281,77 +512,7 @@ func DefineRoutes() {
 		return c.Render(http.StatusOK, "changepassword", data)
 	})
 
-	e.POST("/changepassword", func(c echo.Context) error {
-		data := c.Get("data").(*util.Data)
-		password := c.FormValue("password")
-		repeatpassword := c.FormValue("repeatpassword")
-		token := c.FormValue("_token")
-
-		if password != "" && repeatpassword != "" && password == repeatpassword {
-			passwordHash, err := util.HashPassword(password)
-			if err != nil {
-				util.Flash(`Invalid password!`, data, 0, ``, 0)
-				return c.Redirect(http.StatusSeeOther, "/changepassword")
-			}
-			password = passwordHash
-			userid := 0
-			if token != "" && data.User.Id == 0 {
-
-				var filterdate time.Time
-				filterdate = time.Now().Add(-2 * time.Hour)
-
-				pr := util.PasswordReset{}
-				sql := fmt.Sprintf(`SELECT id, email, token, created_at FROM passwordresets WHERE token  = %v AND created_at >= %v AND done = 0`, util.SqlParam(1), util.SqlParam(2))
-				database.Db.Get(&pr, sql, token, filterdate)
-				if pr.Email != "" {
-					user := util.User{}
-					sql := fmt.Sprintf(`SELECT id FROM users WHERE email = %v`, util.SqlParam(1))
-					database.Db.Get(&user, sql, pr.Email)
-					if user.Id != 0 {
-						userid = user.Id
-					}
-				}
-			} else {
-				userid = data.User.Id
-			}
-			if userid == 0 {
-				util.Flash(`Invalid password!`, data, 0, ``, 0)
-				return c.Redirect(http.StatusSeeOther, "/changepassword")
-			}
-
-			tx, err := database.Db.Begin()
-			if err != nil {
-				return echo.NewHTTPError(http.StatusInternalServerError, "could not change password").SetInternal(err)
-			}
-			defer tx.Rollback()
-
-			sql := fmt.Sprintf(`UPDATE users SET password = %v WHERE id = %v`, util.SqlParam(1), util.SqlParam(2))
-			if _, err = tx.Exec(sql, password, userid); err != nil {
-				return echo.NewHTTPError(http.StatusInternalServerError, "could not change password").SetInternal(err)
-			}
-			if token != "" {
-				sql := fmt.Sprintf(`UPDATE passwordresets SET done = 1 WHERE token = %v`, util.SqlParam(1))
-				if _, err = tx.Exec(sql, token); err != nil {
-					return echo.NewHTTPError(http.StatusInternalServerError, "could not complete password reset").SetInternal(err)
-				}
-			}
-			if err = tx.Commit(); err != nil {
-				return echo.NewHTTPError(http.StatusInternalServerError, "could not change password").SetInternal(err)
-			}
-			sessionUserID := 0
-			if data.User.Id != 0 {
-				sessionUserID = data.User.Id
-			}
-			if err := rotateSession(c, sessionUserID); err != nil {
-				return echo.NewHTTPError(http.StatusInternalServerError, "could not rotate session").SetInternal(err)
-			}
-			util.Flash(`Saved`, data, 1, ``, 0)
-		} else {
-			util.Flash(`Invalid password!`, data, 0, ``, 0)
-			return c.Redirect(http.StatusSeeOther, "/changepassword")
-		}
-		return c.Redirect(http.StatusSeeOther, "/posts")
-	})
+	e.POST("/changepassword", changePassword)
 
 	e.POST("/auth", func(c echo.Context) error {
 		data := c.Get("data").(*util.Data)
@@ -388,43 +549,16 @@ func DefineRoutes() {
 
 	e.POST("/reset", func(c echo.Context) error {
 		data := c.Get("data").(*util.Data)
-		email := c.FormValue("email")
-		if email == "" {
-			util.Flash(`Not allowed to reset password!`, data, 0, "", 0)
-			return c.Redirect(http.StatusSeeOther, "/reset")
+		recipient, token, created, err := createPasswordReset(c.FormValue("email"), time.Now())
+		if err != nil {
+			return echo.NewHTTPError(http.StatusInternalServerError, "could not request password reset").SetInternal(err)
 		}
-
-		user := util.User{}
-		sql := fmt.Sprintf(`SELECT id, email FROM users WHERE email = %v`, util.SqlParam(1))
-		database.Db.Get(&user, sql, email)
-		if user.Id == 0 {
-			util.Flash(`Unknown E-Mail!`, data, 0, "", 0)
-			return c.Redirect(http.StatusSeeOther, "/reset")
+		if created {
+			if err := sendPasswordResetEmail(recipient, token, data.Lang); err != nil {
+				c.Logger().Errorf("could not send password reset email: %v", err)
+			}
 		}
-
-		token := util.Encrypt(util.CreateUUID())
-		sql = fmt.Sprintf(`INSERT INTO passwordresets (email, token) VALUES (%v,%v)`, util.SqlParam(1), util.SqlParam(2))
-		_ = database.Db.MustExec(sql, user.Email, token)
-		// _, errsql := sqlresult.LastInsertId()
-		// if errsql != nil {
-		// 	util.Flash(`Error when accesing to database!`, data, 0, "", 0)
-		// 	return c.Redirect(http.StatusSeeOther, "/reset")
-		// }
-
-		m := gomail.NewMessage()
-		m.SetHeader("From", util.Settings.MailFrom)
-		m.SetHeader("To", user.Email)
-		m.SetHeader("Subject", "Goexpenses "+util.GetLangText("reset password", data.Lang))
-		m.SetBody("text/html", util.GetLangText(`Click to this link to reset password:`, data.Lang)+` <a href="`+util.Settings.Host+`/resetpassword?t=`+token+`">Reset</a>`)
-		d := gomail.NewDialer(util.Settings.MailHost, util.Settings.MailHostPort, util.Settings.MailFrom, util.Settings.MailPassword)
-		d.TLSConfig = &tls.Config{InsecureSkipVerify: true}
-
-		if errm := d.DialAndSend(m); errm != nil {
-			fmt.Println(errm)
-			util.Flash(`E-Mail not sent!`, data, 1, "", 0)
-		} else {
-			util.Flash(`E-Mail sent!`, data, 1, "", 0)
-		}
+		util.Flash(passwordResetResponseMessage, data, 1, "", 0)
 
 		return c.Redirect(http.StatusSeeOther, "/login")
 	})
@@ -437,13 +571,11 @@ func DefineRoutes() {
 			return c.Redirect(http.StatusSeeOther, "/")
 		}
 
-		var filterdate time.Time
-		filterdate = time.Now().Add(-2 * time.Hour)
-		fmt.Println("filterdate:", filterdate)
-		pr := util.PasswordReset{}
-		sql := fmt.Sprintf(`SELECT id, email, token, created_at FROM passwordresets WHERE token  = %v AND created_at >= %v AND done = 0`, util.SqlParam(1), util.SqlParam(2))
-		database.Db.Get(&pr, sql, token, filterdate)
-		if pr.Id == 0 {
+		valid, err := passwordResetTokenValid(token, time.Now())
+		if err != nil {
+			return echo.NewHTTPError(http.StatusInternalServerError, "could not verify password reset token").SetInternal(err)
+		}
+		if !valid {
 			util.Flash(`Invalid token!`, data, 0, "", 0)
 			return c.Redirect(http.StatusSeeOther, "/reset")
 		}

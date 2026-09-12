@@ -128,6 +128,7 @@ func init() {
 	AppLang["Error when accesing to database!"] = LangText{"Greška pri pristupu bazi podataka!", "Грешка при приступу бази података!", "Fehler bei den Zugriff zu der Datenbank!"}
 	AppLang["E-Mail not sent!"] = LangText{"E-Mail nije poslat!", "Е-Маил није послат!", "E-Mail war nicht gesendet!"}
 	AppLang["E-Mail sent!"] = LangText{"E-Mail je poslat!", "Е-Маил је послат!", "E-Mail war gesendet!"}
+	AppLang["If the E-Mail exists, a reset link has been sent."] = LangText{"Ako E-Mail postoji, link za poništavanje lozinke je poslat.", "Ако Е-Маил постоји, линк за поништавање лозинке је послат.", "Falls die E-Mail existiert, wurde ein Link zum Zurücksetzen gesendet."}
 	AppLang["Invalid token!"] = LangText{"Neispravan token!", "Неисправан токен!", "Ungültiger Token!"}
 	AppLang["I forgot my password"] = LangText{"Zaboravio sam lozinku", "Заборавио сам лозинку", "Ich habe meine Kennwort vergessen"}
 	AppLang["Reset filter"] = LangText{"Poništi filter", "Поништи филтер", "Filter löschen"}
