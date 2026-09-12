@@ -88,6 +88,51 @@ func authenticateUser(username, password string) (util.User, error) {
 	return user, nil
 }
 
+func rotateSession(c echo.Context, userID int) error {
+	currentHash, ok := c.Get("_id").(string)
+	if !ok || currentHash == "" {
+		return errors.New("current session is missing")
+	}
+
+	token, tokenHash, err := util.NewSessionToken()
+	if err != nil {
+		return err
+	}
+	query := fmt.Sprintf(`UPDATE sessions SET uuid = %v, user_id = %v, created_at = %v WHERE uuid = %v`, util.SqlParam(1), util.SqlParam(2), util.SqlParam(3), util.SqlParam(4))
+	result, err := database.Db.Exec(query, tokenHash, userID, time.Now(), currentHash)
+	if err != nil {
+		return err
+	}
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if rowsAffected != 1 {
+		return errors.New("current session no longer exists")
+	}
+
+	c.Set("_id", tokenHash)
+	if data, ok := c.Get("data").(*util.Data); ok {
+		data.CookieId = tokenHash
+	}
+	c.SetCookie(util.NewSessionCookie(token))
+	return nil
+}
+
+func logout(c echo.Context) error {
+	sessionHash, ok := c.Get("_id").(string)
+	if !ok || sessionHash == "" {
+		return echo.NewHTTPError(http.StatusUnauthorized, "authentication required")
+	}
+
+	query := fmt.Sprintf(`DELETE FROM sessions WHERE uuid = %v`, util.SqlParam(1))
+	if _, err := database.Db.Exec(query, sessionHash); err != nil {
+		return echo.NewHTTPError(http.StatusInternalServerError, "could not end session").SetInternal(err)
+	}
+	c.SetCookie(util.ExpiredSessionCookie())
+	return c.Redirect(http.StatusSeeOther, "/")
+}
+
 func selectAccount(c echo.Context) error {
 	data, ok := c.Get("data").(*util.Data)
 	if !ok || data.User.Id == 0 {
@@ -167,13 +212,7 @@ func DefineRoutes() {
 		return c.Render(http.StatusOK, "login", data)
 	})
 
-	e.GET("/logout", func(c echo.Context) error {
-		uuid := c.Get("_id").(string)
-		sql := fmt.Sprintf(`DELETE FROM sessions WHERE uuid = %v`, util.SqlParam(1))
-		err := database.Db.MustExec(sql, uuid)
-		fmt.Println("logout", err)
-		return c.Redirect(http.StatusSeeOther, "/")
-	}, auth)
+	e.POST("/logout", logout, auth)
 
 	e.GET("/register", func(c echo.Context) error {
 		data := c.Get("data").(*util.Data)
@@ -275,19 +314,37 @@ func DefineRoutes() {
 			} else {
 				userid = data.User.Id
 			}
+			if userid == 0 {
+				util.Flash(`Invalid password!`, data, 0, ``, 0)
+				return c.Redirect(http.StatusSeeOther, "/changepassword")
+			}
 
 			tx, err := database.Db.Begin()
-			fmt.Println(err)
+			if err != nil {
+				return echo.NewHTTPError(http.StatusInternalServerError, "could not change password").SetInternal(err)
+			}
+			defer tx.Rollback()
+
 			sql := fmt.Sprintf(`UPDATE users SET password = %v WHERE id = %v`, util.SqlParam(1), util.SqlParam(2))
-			_, err = tx.Exec(sql, password, userid)
-			fmt.Println(err)
+			if _, err = tx.Exec(sql, password, userid); err != nil {
+				return echo.NewHTTPError(http.StatusInternalServerError, "could not change password").SetInternal(err)
+			}
 			if token != "" {
 				sql := fmt.Sprintf(`UPDATE passwordresets SET done = 1 WHERE token = %v`, util.SqlParam(1))
-				_, err = tx.Exec(sql, token)
-				fmt.Println(err)
+				if _, err = tx.Exec(sql, token); err != nil {
+					return echo.NewHTTPError(http.StatusInternalServerError, "could not complete password reset").SetInternal(err)
+				}
 			}
-			err = tx.Commit()
-			fmt.Println(err)
+			if err = tx.Commit(); err != nil {
+				return echo.NewHTTPError(http.StatusInternalServerError, "could not change password").SetInternal(err)
+			}
+			sessionUserID := 0
+			if data.User.Id != 0 {
+				sessionUserID = data.User.Id
+			}
+			if err := rotateSession(c, sessionUserID); err != nil {
+				return echo.NewHTTPError(http.StatusInternalServerError, "could not rotate session").SetInternal(err)
+			}
 			util.Flash(`Saved`, data, 1, ``, 0)
 		} else {
 			util.Flash(`Invalid password!`, data, 0, ``, 0)
@@ -302,26 +359,15 @@ func DefineRoutes() {
 		username := c.FormValue("username")
 		password := c.FormValue("password")
 
-		uuid := c.Get("_id").(string)
-
-		session := util.Session{}
-		sql := fmt.Sprintf(`SELECT id, uuid, user_id FROM sessions WHERE uuid = %v`, util.SqlParam(1))
-		database.Db.Get(&session, sql, uuid)
-
 		user, err := authenticateUser(username, password)
 		if err == nil {
-
-			sql := fmt.Sprintf(`UPDATE sessions SET user_id = %v WHERE uuid = %v`, util.SqlParam(1), util.SqlParam(2))
-			err := database.Db.MustExec(sql, user.Id, uuid)
-
-			if err == nil {
-				c.Set("id", user.Id)
-				c.Set("name", user.Name)
-				c.Set("username", user.Username)
-				c.Set("email", user.Email)
-			} else {
-				fmt.Println(err)
+			if err := rotateSession(c, user.Id); err != nil {
+				return echo.NewHTTPError(http.StatusInternalServerError, "could not rotate session").SetInternal(err)
 			}
+			c.Set("id", user.Id)
+			c.Set("name", user.Name)
+			c.Set("username", user.Username)
+			c.Set("email", user.Email)
 
 		} else if errors.Is(err, errInvalidCredentials) {
 			util.Flash(`Unknown user or invalid password!`, data, 0, "", 0)

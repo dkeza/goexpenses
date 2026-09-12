@@ -1,23 +1,15 @@
 package util
 
 import (
-	"bytes"
-	"crypto/aes"
-	"crypto/cipher"
 	"crypto/rand"
 	"crypto/sha1"
 	"crypto/subtle"
-	"encoding/base64"
-	"errors"
 	"fmt"
-	"io"
 	"log"
 	"strings"
 
 	"golang.org/x/crypto/bcrypt"
 )
-
-var masterkey = "F!hGtgGuUeqAccD56Hnnk76$7!gfdQ9%"
 
 func CreateUUID() (uuid string) {
 	u := new([16]byte)
@@ -64,84 +56,4 @@ func VerifyPassword(storedHash, password string) (valid bool, needsRehash bool) 
 	legacyHash := Encrypt(password)
 	valid = subtle.ConstantTimeCompare([]byte(storedHash), []byte(legacyHash)) == 1
 	return valid, valid
-}
-
-func addBase64Padding(value string) string {
-	m := len(value) % 4
-	if m != 0 {
-		value += strings.Repeat("=", 4-m)
-	}
-
-	return value
-}
-
-func removeBase64Padding(value string) string {
-	return strings.Replace(value, "=", "", -1)
-}
-
-func Pad(src []byte) []byte {
-	padding := aes.BlockSize - len(src)%aes.BlockSize
-	padtext := bytes.Repeat([]byte{byte(padding)}, padding)
-	return append(src, padtext...)
-}
-
-func Unpad(src []byte) ([]byte, error) {
-	length := len(src)
-	unpadding := int(src[length-1])
-
-	if unpadding > length {
-		return nil, errors.New("unpad error. This could happen when incorrect encryption key is used")
-	}
-
-	return src[:(length - unpadding)], nil
-}
-
-func EncryptString(text string) (string, error) {
-	key := []byte(masterkey)
-	block, err := aes.NewCipher(key)
-	if err != nil {
-		return "", err
-	}
-
-	msg := Pad([]byte(text))
-	ciphertext := make([]byte, aes.BlockSize+len(msg))
-	iv := ciphertext[:aes.BlockSize]
-	if _, err := io.ReadFull(rand.Reader, iv); err != nil {
-		return "", err
-	}
-
-	cfb := cipher.NewCFBEncrypter(block, iv)
-	cfb.XORKeyStream(ciphertext[aes.BlockSize:], []byte(msg))
-	finalMsg := removeBase64Padding(base64.URLEncoding.EncodeToString(ciphertext))
-	return finalMsg, nil
-}
-
-func DecryptString(text string) (string, error) {
-	key := []byte(masterkey)
-	block, err := aes.NewCipher(key)
-	if err != nil {
-		return "", err
-	}
-
-	decodedMsg, err := base64.URLEncoding.DecodeString(addBase64Padding(text))
-	if err != nil {
-		return "", err
-	}
-
-	if (len(decodedMsg) % aes.BlockSize) != 0 {
-		return "", errors.New("blocksize must be multipe of decoded message length")
-	}
-
-	iv := decodedMsg[:aes.BlockSize]
-	msg := decodedMsg[aes.BlockSize:]
-
-	cfb := cipher.NewCFBDecrypter(block, iv)
-	cfb.XORKeyStream(msg, msg)
-
-	unpadMsg, err := Unpad(msg)
-	if err != nil {
-		return "", err
-	}
-
-	return string(unpadMsg), nil
 }

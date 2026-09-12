@@ -1,8 +1,9 @@
 package midware
 
 import (
+	stdsql "database/sql"
+	"errors"
 	"fmt"
-	"log"
 	"net/http"
 	"time"
 
@@ -19,8 +20,12 @@ func SetMiddleware() {
 	e := routes.E
 
 	e.Use(middleware.CSRFWithConfig(middleware.CSRFConfig{
-		TokenLookup:  "form:_CSRF",
-		CookieMaxAge: 86400 * 15,
+		TokenLookup:    "form:_CSRF",
+		CookiePath:     "/",
+		CookieMaxAge:   int(util.SessionDuration.Seconds()),
+		CookieSecure:   util.Settings.CookieSecure,
+		CookieHTTPOnly: true,
+		CookieSameSite: http.SameSiteLaxMode,
 	}))
 	//e.Use(middleware.Logger())
 	e.Use(middleware.Recover())
@@ -40,31 +45,18 @@ func CheckCookie(next echo.HandlerFunc) echo.HandlerFunc {
 	return func(c echo.Context) error {
 		data := new(util.Data)
 
-		cookie, err := c.Cookie("_id")
+		session, sessionHash, err := getOrCreateSession(c)
 		if err != nil {
-			cookie = new(http.Cookie)
-			cookie.Name = "_id"
-			cookie.Value, _ = util.EncryptString(util.Encrypt(util.CreateUUID()))
-			cookie.Expires = time.Now().Add(10 * 365 * 24 * time.Hour)
-			c.SetCookie(cookie)
+			return echo.NewHTTPError(http.StatusInternalServerError, "could not load session").SetInternal(err)
 		}
-		uuid, _ := util.DecryptString(cookie.Value)
-
-		session := util.Session{}
-		sql := fmt.Sprintf(`SELECT id, uuid, user_id, lang, message, expenses_id, last_post_description, message_success, created_at FROM sessions WHERE uuid = %v`, util.SqlParam(1))
-		database.Db.Get(&session, sql, uuid)
 
 		if session.Id == 0 {
-			log.Println("No session in table!")
-			sql := fmt.Sprintf(`INSERT INTO sessions (uuid) VALUES (%v)`, util.SqlParam(1))
-			err := database.Db.MustExec(sql, uuid)
-			log.Println(err)
 			data.Lang = "EN"
 		} else {
 			if session.Message != "" {
 				data.Flash = session.Message
 				sql := fmt.Sprintf(`UPDATE sessions SET message = %v WHERE uuid = %v`, util.SqlParam(1), util.SqlParam(2))
-				_ = database.Db.MustExec(sql, "", uuid)
+				_ = database.Db.MustExec(sql, "", sessionHash)
 			}
 			if session.Expenses_id != 0 {
 
@@ -76,26 +68,26 @@ func CheckCookie(next echo.HandlerFunc) echo.HandlerFunc {
 					ORDER BY description ASC
 				`, util.SqlParam(1))
 				database.Db.Select(&expenses, sql, session.Expenses_id)
-				if expenses[0].Pid != "" {
+				if len(expenses) > 0 && expenses[0].Pid != "" {
 					data.Expenses_id = expenses[0].Pid
 				}
 				sql = fmt.Sprintf(`UPDATE sessions SET expenses_id = %v WHERE uuid = %v`, util.SqlParam(1), util.SqlParam(2))
-				_ = database.Db.MustExec(sql, 0, uuid)
+				_ = database.Db.MustExec(sql, 0, sessionHash)
 			}
 			if session.Last_post_description != "" {
 				data.Last_post_description = session.Last_post_description
 				sql := fmt.Sprintf(`UPDATE sessions SET last_post_description = %v WHERE uuid = %v`, util.SqlParam(1), util.SqlParam(2))
-				_ = database.Db.MustExec(sql, "", uuid)
+				_ = database.Db.MustExec(sql, "", sessionHash)
 			}
 			if session.Message_success != 0 {
 				data.Message_success = session.Message_success
 				sql := fmt.Sprintf(`UPDATE sessions SET message_success = %v WHERE uuid = %v`, util.SqlParam(1), util.SqlParam(2))
-				_ = database.Db.MustExec(sql, 0, uuid)
+				_ = database.Db.MustExec(sql, 0, sessionHash)
 			}
 		}
 
-		c.Set("_id", uuid)
-		data.CookieId = uuid
+		c.Set("_id", sessionHash)
+		data.CookieId = sessionHash
 		if session.User_id > 0 {
 			user := util.User{}
 			sql := fmt.Sprintf(`SELECT id, name, username, email, default_accounts_id, lang FROM users WHERE id = %v`, util.SqlParam(1))
@@ -130,7 +122,7 @@ func CheckCookie(next echo.HandlerFunc) echo.HandlerFunc {
 		data.Csrf = c.Get("csrf").(string)
 
 		currency := util.Currency{}
-		sql = fmt.Sprintf(`SELECT id, code, rate, date FROM currencies WHERE code = %v`, util.SqlParam(1))
+		sql := fmt.Sprintf(`SELECT id, code, rate, date FROM currencies WHERE code = %v`, util.SqlParam(1))
 		database.Db.Get(&currency, sql, `EUR`)
 		data.Eur = util.ToFixed(currency.Rate, 4)
 		data.Eurdate = currency.Date
@@ -142,4 +134,36 @@ func CheckCookie(next echo.HandlerFunc) echo.HandlerFunc {
 
 		return next(c)
 	}
+}
+
+func getOrCreateSession(c echo.Context) (util.Session, string, error) {
+	session := util.Session{}
+	sessionHash := ""
+
+	if cookie, err := c.Cookie(util.SessionCookieName); err == nil {
+		if tokenHash, err := util.HashSessionToken(cookie.Value); err == nil {
+			sessionHash = tokenHash
+			query := fmt.Sprintf(`SELECT id, uuid, user_id, lang, message, expenses_id, last_post_description, message_success FROM sessions WHERE uuid = %v AND created_at >= %v`, util.SqlParam(1), util.SqlParam(2))
+			err = database.Db.Get(&session, query, sessionHash, time.Now().Add(-util.SessionDuration))
+			if err != nil && !errors.Is(err, stdsql.ErrNoRows) {
+				return util.Session{}, "", err
+			}
+		}
+	}
+
+	if session.Id != 0 {
+		return session, sessionHash, nil
+	}
+
+	token, tokenHash, err := util.NewSessionToken()
+	if err != nil {
+		return util.Session{}, "", err
+	}
+	query := fmt.Sprintf(`INSERT INTO sessions (uuid) VALUES (%v)`, util.SqlParam(1))
+	if _, err := database.Db.Exec(query, tokenHash); err != nil {
+		return util.Session{}, "", err
+	}
+	c.SetCookie(util.NewSessionCookie(token))
+
+	return util.Session{}, tokenHash, nil
 }

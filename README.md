@@ -36,6 +36,9 @@ Rename goexpenses.dev.ini to goexpenses.ini, and enter settings.
 Alternative to ini file is use of enviroment variables.
 Look in startgoexpenses.dev.bat for use in Windows.
 
+Session cookies are secure by default. Set `COOKIE_SECURE=false` (or
+`cookiesecure=false` in `goexpenses.ini`) only for local development over HTTP.
+
 Start binary exe
 
 Database would be automatically created. EUR and RSD currency exchange rates would be automatically updated on start, and then once a day.

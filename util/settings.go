@@ -21,6 +21,7 @@ type AppSettings struct {
 	MailFrom                 string
 	MailPassword             string
 	OpenExchangeRatesId      string
+	CookieSecure             bool
 	DatabaseType             string
 	DatabaseConnectionString string
 }
@@ -37,6 +38,7 @@ func ReadSettings() {
 	Settings.MailHostPort = 0
 	Settings.MailPassword = ""
 	Settings.OpenExchangeRatesId = ""
+	Settings.CookieSecure = true
 	Settings.DatabaseType = ""
 	Settings.DatabaseConnectionString = ""
 
@@ -74,6 +76,10 @@ func ReadSettings() {
 		if ok {
 			Settings.DatabaseType = value
 		}
+		value, ok = file.Get("settings", "cookiesecure")
+		if ok {
+			Settings.CookieSecure, _ = strconv.ParseBool(value)
+		}
 		value, ok = file.Get("settings", "DATABASE_URL")
 		if ok {
 			Settings.DatabaseConnectionString = value
@@ -86,6 +92,9 @@ func ReadSettings() {
 		Settings.MailHostPort, _ = strconv.Atoi(os.Getenv("MAIL_PORT"))
 		Settings.MailPassword = os.Getenv("MAIL_PASSWORD")
 		Settings.OpenExchangeRatesId = os.Getenv("EXCHANGE_ID")
+		if cookieSecure, err := strconv.ParseBool(os.Getenv("COOKIE_SECURE")); err == nil {
+			Settings.CookieSecure = cookieSecure
+		}
 		Settings.DatabaseType = os.Getenv("DATABASE_TYPE")
 		Settings.DatabaseConnectionString = os.Getenv("DATABASE_URL")
 	}
