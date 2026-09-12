@@ -1,10 +1,11 @@
 package main
 
 import (
+	"embed"
 	"fmt"
 	"html/template"
 	"io"
-	"os"
+	"io/fs"
 
 	"goexpenses/database"
 	"goexpenses/midware"
@@ -15,6 +16,11 @@ import (
 	"github.com/labstack/echo/v4"
 	_ "github.com/lib/pq"
 )
+
+// embeddedFiles contains every read-only file required at runtime.
+//
+//go:embed templates/*.html static db/*.sql
+var embeddedFiles embed.FS
 
 type Template struct {
 	templates *template.Template
@@ -45,12 +51,15 @@ func init() {
 		// Create database
 		sqlScript := ""
 		if util.Settings.DatabaseType == "sqlite" {
-			sqlScript = "./db/structure.sql"
+			sqlScript = "db/structure.sql"
 		} else {
-			sqlScript = "./db/pg_structure.sql"
+			sqlScript = "db/pg_structure.sql"
 		}
-		sql, err := os.ReadFile(sqlScript)
+		sql, err := embeddedFiles.ReadFile(sqlScript)
 		fmt.Println("After readfile", err)
+		if err != nil {
+			panic(fmt.Errorf("read embedded database structure %q: %w", sqlScript, err))
+		}
 		s := string(sql)
 		fmt.Println("SQL SCRIPT:", s)
 		r := database.Db.MustExec(s)
@@ -98,16 +107,20 @@ func main() {
 	}
 
 	t := &Template{
-		templates: template.Must(template.New("").Funcs(funcMap).ParseGlob("templates/*.html")),
+		templates: template.Must(template.New("").Funcs(funcMap).ParseFS(embeddedFiles, "templates/*.html")),
 	}
 
 	e.Renderer = t
 
 	midware.SetMiddleware()
 
-	e.Static("/static", "static")
-	e.File("/favicon.ico", "static/favicon.ico")
-	e.File("/ads.txt", "static/ads.txt")
+	staticFiles, err := fs.Sub(embeddedFiles, "static")
+	if err != nil {
+		panic(fmt.Errorf("open embedded static files: %w", err))
+	}
+	e.StaticFS("/static", staticFiles)
+	e.FileFS("/favicon.ico", "favicon.ico", staticFiles)
+	e.FileFS("/ads.txt", "ads.txt", staticFiles)
 
 	routes.DefineRoutes()
 

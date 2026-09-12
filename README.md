@@ -22,19 +22,24 @@ Build binary
 go build
 ```
 
-Copy folders and files to install folder
+Copy the executable to the server. HTML templates, static files and database
+structure scripts are embedded in it and do not need to be copied separately.
+
+Runtime configuration remains external. You can copy the example configuration
+file
 
 ```
-db
-static
-templates
 goexpenses.dev.ini
 ```
 
 Rename goexpenses.dev.ini to goexpenses.ini, and enter settings.
 
-Alternative to ini file is use of enviroment variables.
-Look in startgoexpenses.dev.bat for use in Windows.
+Alternatively, use environment variables without an INI file. Environment
+variables override values loaded from `goexpenses.ini`. Look in
+`startgoexpenses.dev.bat` for a Windows example.
+
+If SQLite is used, its database file must remain outside the executable so that
+application data persists between deployments.
 
 Session cookies are secure by default. Set `COOKIE_SECURE=false` (or
 `cookiesecure=false` in `goexpenses.ini`) only for local development over HTTP.
