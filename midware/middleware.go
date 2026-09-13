@@ -41,13 +41,18 @@ func ServerHeader(next echo.HandlerFunc) echo.HandlerFunc {
 	}
 }
 
+func databaseReadError(c echo.Context, operation, message string, err error) error {
+	c.Logger().Errorf("%s: %v", operation, err)
+	return echo.NewHTTPError(http.StatusInternalServerError, message).SetInternal(err)
+}
+
 func CheckCookie(next echo.HandlerFunc) echo.HandlerFunc {
 	return func(c echo.Context) error {
 		data := new(util.Data)
 
 		session, sessionHash, err := getOrCreateSession(c)
 		if err != nil {
-			return echo.NewHTTPError(http.StatusInternalServerError, "could not load session").SetInternal(err)
+			return databaseReadError(c, "load session", "could not load session", err)
 		}
 
 		if session.Id == 0 {
@@ -69,7 +74,9 @@ func CheckCookie(next echo.HandlerFunc) echo.HandlerFunc {
 					WHERE id = %v 
 					ORDER BY description ASC
 				`, util.SqlParam(1))
-				database.Db.Select(&expenses, sql, session.Expenses_id)
+				if err := database.Db.Select(&expenses, sql, session.Expenses_id); err != nil {
+					return databaseReadError(c, "load session expense", "could not load session data", err)
+				}
 				if len(expenses) > 0 && expenses[0].Pid != "" {
 					data.Expenses_id = expenses[0].Pid
 				}
@@ -99,39 +106,55 @@ func CheckCookie(next echo.HandlerFunc) echo.HandlerFunc {
 		if session.User_id > 0 {
 			user := util.User{}
 			sql := fmt.Sprintf(`SELECT id, name, username, email, default_accounts_id, lang FROM users WHERE id = %v`, util.SqlParam(1))
-			database.Db.Get(&user, sql, session.User_id)
+			if err := database.Db.Get(&user, sql, session.User_id); err != nil {
+				if !errors.Is(err, stdsql.ErrNoRows) {
+					return databaseReadError(c, "load session user", "could not load user", err)
+				}
+				sql = fmt.Sprintf(`UPDATE sessions SET user_id = %v WHERE uuid = %v`, util.SqlParam(1), util.SqlParam(2))
+				if _, err := database.Db.Exec(sql, 0, sessionHash); err != nil {
+					return echo.NewHTTPError(http.StatusInternalServerError, "could not clear stale session").SetInternal(err)
+				}
+				session.User_id = 0
+			} else {
+				c.Set("id", user.Id)
+				c.Set("name", user.Name)
+				c.Set("username", user.Username)
+				c.Set("email", user.Email)
 
-			c.Set("id", user.Id)
-			c.Set("name", user.Name)
-			c.Set("username", user.Username)
-			c.Set("email", user.Email)
-
-			data.Username = user.Name
-			data.User.Id = user.Id
-			data.User.Name = user.Name
-			data.User.Email = user.Email
-			data.User.Username = user.Username
-			data.User.Default_accounts_id = user.Default_accounts_id
-			data.User.Lang = user.Lang
-			data.Lang = user.Lang
-			accounts := []util.Account{}
-			sql = fmt.Sprintf(`SELECT a.id, a.description FROM accountsusers au INNER JOIN accounts a ON au.accounts_id = a.id WHERE au.users_id = %v ORDER BY description ASC`, util.SqlParam(1))
-			database.Db.Select(&accounts, sql, data.User.Id)
-			data.Accounts = accounts
-		} else {
+				data.Username = user.Name
+				data.User.Id = user.Id
+				data.User.Name = user.Name
+				data.User.Email = user.Email
+				data.User.Username = user.Username
+				data.User.Default_accounts_id = user.Default_accounts_id
+				data.User.Lang = user.Lang
+				data.Lang = user.Lang
+				accounts := []util.Account{}
+				sql = fmt.Sprintf(`SELECT a.id, a.description FROM accountsusers au INNER JOIN accounts a ON au.accounts_id = a.id WHERE au.users_id = %v ORDER BY description ASC`, util.SqlParam(1))
+				if err := database.Db.Select(&accounts, sql, data.User.Id); err != nil {
+					return databaseReadError(c, "load user accounts", "could not load accounts", err)
+				}
+				data.Accounts = accounts
+			}
+		}
+		if session.User_id == 0 {
 
 			c.Set("id", 0)
 			c.Set("name", "")
 			c.Set("username", "")
 			c.Set("email", "")
-			data.Lang = session.Lang
+			if session.Lang != "" {
+				data.Lang = session.Lang
+			}
 		}
 
 		data.Csrf = c.Get("csrf").(string)
 
 		currency := util.Currency{}
 		sql := fmt.Sprintf(`SELECT id, code, rate, date FROM currencies WHERE code = %v`, util.SqlParam(1))
-		database.Db.Get(&currency, sql, `EUR`)
+		if err := database.Db.Get(&currency, sql, `EUR`); err != nil && !errors.Is(err, stdsql.ErrNoRows) {
+			return databaseReadError(c, "load exchange rate", "could not load exchange rate", err)
+		}
 		data.Eur = util.ToFixed(currency.Rate, 4)
 		data.Eurdate = currency.Date
 

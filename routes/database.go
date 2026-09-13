@@ -61,6 +61,13 @@ func databaseReadError(c echo.Context, operation string, err error) error {
 	return echo.NewHTTPError(http.StatusInternalServerError, "could not load data").SetInternal(err)
 }
 
+func databaseRecordReadError(c echo.Context, operation string, err error) error {
+	if errors.Is(err, sql.ErrNoRows) {
+		return echo.NewHTTPError(http.StatusNotFound, "record not found")
+	}
+	return databaseReadError(c, operation, err)
+}
+
 func createUserWithAccount(name, email, username, passwordHash, lang string) error {
 	return runTransaction(database.Db, func(transaction *sqlx.Tx) error {
 		accountID := 0

@@ -1,6 +1,7 @@
 package midware
 
 import (
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"regexp"
@@ -131,6 +132,90 @@ func TestExpiredCookieCreatesNewSession(t *testing.T) {
 	}
 	if len(recorder.Result().Cookies()) != 1 {
 		t.Fatal("replacement session cookie was not set")
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatalf("database expectations: %v", err)
+	}
+}
+
+func TestSessionDatabaseFailureIsReturned(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatalf("create mock database: %v", err)
+	}
+	defer db.Close()
+
+	database.Db = sqlx.NewDb(db, "sqlmock")
+	token, tokenHash, err := util.NewSessionToken()
+	if err != nil {
+		t.Fatalf("NewSessionToken: %v", err)
+	}
+	query := "SELECT id, uuid, user_id, lang, message, expenses_id, last_post_description, message_success FROM sessions WHERE uuid = $1 AND created_at >= $2"
+	mock.ExpectQuery(regexp.QuoteMeta(query)).
+		WithArgs(tokenHash, sqlmock.AnyArg()).
+		WillReturnError(errors.New("database unavailable"))
+
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	req.AddCookie(&http.Cookie{Name: util.SessionCookieName, Value: token})
+	context := echo.New().NewContext(req, httptest.NewRecorder())
+
+	if _, _, err := getOrCreateSession(context); err == nil {
+		t.Fatal("getOrCreateSession ignored a database failure")
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatalf("database expectations: %v", err)
+	}
+}
+
+func TestCheckCookieClearsSessionForMissingUser(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatalf("create mock database: %v", err)
+	}
+	defer db.Close()
+
+	database.Db = sqlx.NewDb(db, "sqlmock")
+	util.Settings.DatabaseType = "postgres"
+	token, tokenHash, err := util.NewSessionToken()
+	if err != nil {
+		t.Fatalf("NewSessionToken: %v", err)
+	}
+	sessionQuery := "SELECT id, uuid, user_id, lang, message, expenses_id, last_post_description, message_success FROM sessions WHERE uuid = $1 AND created_at >= $2"
+	mock.ExpectQuery(regexp.QuoteMeta(sessionQuery)).
+		WithArgs(tokenHash, sqlmock.AnyArg()).
+		WillReturnRows(sqlmock.NewRows([]string{"id", "uuid", "user_id", "lang", "message", "expenses_id", "last_post_description", "message_success"}).
+			AddRow(9, tokenHash, 404, "EN", "", 0, "", 0))
+	userQuery := "SELECT id, name, username, email, default_accounts_id, lang FROM users WHERE id = $1"
+	mock.ExpectQuery(regexp.QuoteMeta(userQuery)).
+		WithArgs(404).
+		WillReturnRows(sqlmock.NewRows([]string{"id", "name", "username", "email", "default_accounts_id", "lang"}))
+	mock.ExpectExec(regexp.QuoteMeta("UPDATE sessions SET user_id = $1 WHERE uuid = $2")).
+		WithArgs(0, tokenHash).
+		WillReturnResult(sqlmock.NewResult(0, 1))
+	mock.ExpectQuery(regexp.QuoteMeta("SELECT id, code, rate, date FROM currencies WHERE code = $1")).
+		WithArgs("EUR").
+		WillReturnRows(sqlmock.NewRows([]string{"id", "code", "rate", "date"}).
+			AddRow(1, "EUR", 117.2, "2026-09-13 12:00:00"))
+
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	req.AddCookie(&http.Cookie{Name: util.SessionCookieName, Value: token})
+	context := echo.New().NewContext(req, httptest.NewRecorder())
+	context.Set("csrf", "test-token")
+	called := false
+	handler := CheckCookie(func(c echo.Context) error {
+		called = true
+		data := c.Get("data").(*util.Data)
+		if data.User.Id != 0 || data.Username != "" || c.Get("id") != 0 {
+			t.Fatalf("stale session still authenticated: %+v", data.User)
+		}
+		return nil
+	})
+
+	if err := handler(context); err != nil {
+		t.Fatalf("CheckCookie: %v", err)
+	}
+	if !called {
+		t.Fatal("next handler was not called")
 	}
 	if err := mock.ExpectationsWereMet(); err != nil {
 		t.Fatalf("database expectations: %v", err)

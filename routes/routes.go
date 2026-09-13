@@ -419,7 +419,12 @@ func DefineRoutes() {
 
 			session := util.Session{}
 			sql := fmt.Sprintf(`SELECT id, uuid, user_id FROM sessions WHERE uuid = %v`, util.SqlParam(1))
-			database.Db.Get(&session, sql, uuid)
+			if err := database.Db.Get(&session, sql, uuid); err != nil {
+				if errors.Is(err, stdsql.ErrNoRows) {
+					return c.Redirect(http.StatusSeeOther, "/login")
+				}
+				return databaseReadError(c, "authorize session", err)
+			}
 
 			if session.User_id == 0 {
 				return c.Redirect(http.StatusSeeOther, "/login")
@@ -440,8 +445,6 @@ func DefineRoutes() {
 	e := E
 
 	e.GET("/login", func(c echo.Context) error {
-		//x := c.Get("csrf")
-		//fmt.Println(x)
 		data := c.Get("data").(*util.Data)
 		data.Active = "login"
 		return c.Render(http.StatusOK, "login", data)
@@ -593,7 +596,9 @@ func DefineRoutes() {
 
 		incomes := []util.Income{}
 		sql := fmt.Sprintf(`SELECT id, description, p_id FROM incomes WHERE accounts_id = %v AND deleted = 0 ORDER BY description ASC`, util.SqlParam(1))
-		database.Db.Select(&incomes, sql, data.User.Default_accounts_id)
+		if err := database.Db.Select(&incomes, sql, data.User.Default_accounts_id); err != nil {
+			return databaseReadError(c, "load incomes", err)
+		}
 		data.Incomes = incomes
 		return c.Render(http.StatusOK, "incomes", data)
 	}, auth)
@@ -648,12 +653,15 @@ func DefineRoutes() {
 		data.Active = "incomes"
 
 		id := c.QueryParam("id")
-		fmt.Println("incomes/show", id)
 		incomes := []util.Income{}
 		sql := fmt.Sprintf(`SELECT id, description, p_id FROM incomes WHERE p_id = %v AND accounts_id = %v AND deleted = 0`, util.SqlParam(1), util.SqlParam(2))
-		database.Db.Select(&incomes, sql, id, data.User.Default_accounts_id)
+		if err := database.Db.Select(&incomes, sql, id, data.User.Default_accounts_id); err != nil {
+			return databaseReadError(c, "load income", err)
+		}
+		if len(incomes) == 0 {
+			return echo.NewHTTPError(http.StatusNotFound, "record not found")
+		}
 		data.Incomes = incomes
-		fmt.Println("incomes/show", data.Incomes)
 		return c.Render(http.StatusOK, "incomesshow", data)
 	}, auth)
 

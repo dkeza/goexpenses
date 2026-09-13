@@ -1,7 +1,10 @@
 package routes
 
 import (
+	"database/sql"
 	"errors"
+	"net/http"
+	"net/http/httptest"
 	"regexp"
 	"testing"
 	"time"
@@ -10,6 +13,7 @@ import (
 
 	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/jmoiron/sqlx"
+	"github.com/labstack/echo/v4"
 )
 
 func useMockRouteDatabase(t *testing.T) (sqlmock.Sqlmock, *sqlx.DB) {
@@ -47,6 +51,19 @@ func TestExecuteExactlyOneRejectsMissingRecord(t *testing.T) {
 	}
 	if err := mock.ExpectationsWereMet(); err != nil {
 		t.Fatalf("database expectations: %v", err)
+	}
+}
+
+func TestDatabaseRecordReadErrorReturnsNotFound(t *testing.T) {
+	context := echo.New().NewContext(
+		httptest.NewRequest(http.MethodGet, "/items/missing", nil),
+		httptest.NewRecorder(),
+	)
+
+	err := databaseRecordReadError(context, "load item", sql.ErrNoRows)
+	httpError, ok := err.(*echo.HTTPError)
+	if !ok || httpError.Code != http.StatusNotFound {
+		t.Fatalf("databaseRecordReadError = %v, want HTTP 404", err)
 	}
 }
 

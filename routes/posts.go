@@ -2,7 +2,6 @@ package routes
 
 import (
 	"fmt"
-	"log"
 	"net/http"
 	"strconv"
 	"time"
@@ -43,7 +42,9 @@ func DefinePosts() {
 					FROM accounts 
 					WHERE id = %v
 				`, util.SqlParam(1))
-				database.Db.Get(&account, sql, data.User.Default_accounts_id)
+				if err := database.Db.Get(&account, sql, data.User.Default_accounts_id); err != nil {
+					return databaseRecordReadError(c, "load account date filter", err)
+				}
 				if account.Fromdate != "" {
 					cfrom = account.Fromdate
 					cto = account.Todate
@@ -73,23 +74,27 @@ func DefinePosts() {
 		}
 
 		postsum := util.Postsum{}
+		var errsql error
 		if ldatefilter {
 			sql := fmt.Sprintf(`
-			SELECT CAST(SUM(amount) AS Numeric(12,2)) AS saldo, 
-				CAST(SUM(amount/exchange) AS Numeric(12,2)) AS saldoe 
+			SELECT COALESCE(CAST(SUM(amount) AS Numeric(12,2)), 0) AS saldo,
+				COALESCE(CAST(SUM(amount/NULLIF(exchange, 0)) AS Numeric(12,2)), 0) AS saldoe
 				FROM posts 
 				WHERE accounts_id = %v AND deleted = 0 AND created_at 
 				BETWEEN %v AND %v
 			`, util.SqlParam(1), util.SqlParam(2), util.SqlParam(3))
-			database.Db.Get(&postsum, sql, data.User.Default_accounts_id, filterdatefrom, filterdateto)
+			errsql = database.Db.Get(&postsum, sql, data.User.Default_accounts_id, filterdatefrom, filterdateto)
 		} else {
 			sql := fmt.Sprintf(`
-			SELECT CAST(SUM(amount) AS Numeric(12,2)) AS saldo, 
-				CAST(SUM(amount/exchange) AS Numeric(12,2)) AS saldoe 
+			SELECT COALESCE(CAST(SUM(amount) AS Numeric(12,2)), 0) AS saldo,
+				COALESCE(CAST(SUM(amount/NULLIF(exchange, 0)) AS Numeric(12,2)), 0) AS saldoe
 				FROM posts 
 				WHERE accounts_id = %v AND deleted = 0
 			`, util.SqlParam(1))
-			database.Db.Get(&postsum, sql, data.User.Default_accounts_id)
+			errsql = database.Db.Get(&postsum, sql, data.User.Default_accounts_id)
+		}
+		if errsql != nil {
+			return databaseReadError(c, "load post totals", errsql)
 		}
 		data.Saldo = fmt.Sprintf("%.2f", postsum.Saldo)
 		data.Saldoe = fmt.Sprintf("%.2f", postsum.Saldoe)
@@ -97,20 +102,23 @@ func DefinePosts() {
 		incomesum := util.Incomessum{}
 		if ldatefilter {
 			sql := fmt.Sprintf(`
-			SELECT CAST(SUM(amount) AS Numeric(12,2)) AS saldo, 
-				CAST(SUM(amount/exchange) AS Numeric(12,2)) AS saldoe 
+			SELECT COALESCE(CAST(SUM(amount) AS Numeric(12,2)), 0) AS saldo,
+				COALESCE(CAST(SUM(amount/NULLIF(exchange, 0)) AS Numeric(12,2)), 0) AS saldoe
 				FROM posts 
 				WHERE incomes_id > 0 AND accounts_id = %v AND deleted = 0 AND created_at BETWEEN %v AND %v
 			`, util.SqlParam(1), util.SqlParam(2), util.SqlParam(3))
-			database.Db.Get(&incomesum, sql, data.User.Default_accounts_id, filterdatefrom, filterdateto)
+			errsql = database.Db.Get(&incomesum, sql, data.User.Default_accounts_id, filterdatefrom, filterdateto)
 		} else {
 			sql := fmt.Sprintf(`
-			SELECT CAST(SUM(amount) AS Numeric(12,2)) AS saldo, 
-				CAST(SUM(amount/exchange) AS Numeric(12,2)) AS saldoe 
+			SELECT COALESCE(CAST(SUM(amount) AS Numeric(12,2)), 0) AS saldo,
+				COALESCE(CAST(SUM(amount/NULLIF(exchange, 0)) AS Numeric(12,2)), 0) AS saldoe
 				FROM posts 
 				WHERE incomes_id > 0 AND accounts_id = %v AND deleted = 0
 			`, util.SqlParam(1))
-			database.Db.Get(&incomesum, sql, data.User.Default_accounts_id)
+			errsql = database.Db.Get(&incomesum, sql, data.User.Default_accounts_id)
+		}
+		if errsql != nil {
+			return databaseReadError(c, "load income totals", errsql)
 		}
 		data.Incomesum = fmt.Sprintf("%.2f", incomesum.Saldo)
 		data.Incomesume = fmt.Sprintf("%.2f", incomesum.Saldoe)
@@ -118,19 +126,22 @@ func DefinePosts() {
 		expensesum := util.Expensessum{}
 		if ldatefilter {
 			sql := fmt.Sprintf(`
-			SELECT CAST(SUM(amount) AS Numeric(12,2)) AS saldo, 
-				CAST(SUM(amount/exchange) AS Numeric(12,2)) AS saldoe 
+			SELECT COALESCE(CAST(SUM(amount) AS Numeric(12,2)), 0) AS saldo,
+				COALESCE(CAST(SUM(amount/NULLIF(exchange, 0)) AS Numeric(12,2)), 0) AS saldoe
 				FROM posts 
 				WHERE expenses_id > 0 AND accounts_id = %v AND deleted = 0 AND created_at BETWEEN %v AND %v
 			`, util.SqlParam(1), util.SqlParam(2), util.SqlParam(3))
-			database.Db.Get(&expensesum, sql, data.User.Default_accounts_id, filterdatefrom, filterdateto)
+			errsql = database.Db.Get(&expensesum, sql, data.User.Default_accounts_id, filterdatefrom, filterdateto)
 		} else {
 			sql := fmt.Sprintf(`
-			SELECT CAST(SUM(amount) AS Numeric(12,2)) AS saldo, 
-				CAST(SUM(amount/exchange) AS Numeric(12,2)) AS saldoe 
+			SELECT COALESCE(CAST(SUM(amount) AS Numeric(12,2)), 0) AS saldo,
+				COALESCE(CAST(SUM(amount/NULLIF(exchange, 0)) AS Numeric(12,2)), 0) AS saldoe
 				FROM posts WHERE expenses_id > 0 AND accounts_id = %v AND deleted = 0
 			`, util.SqlParam(1))
-			database.Db.Get(&expensesum, sql, data.User.Default_accounts_id)
+			errsql = database.Db.Get(&expensesum, sql, data.User.Default_accounts_id)
+		}
+		if errsql != nil {
+			return databaseReadError(c, "load expense totals", errsql)
 		}
 		data.Expensesum = fmt.Sprintf("%.2f", expensesum.Saldo)
 		data.Expensesume = fmt.Sprintf("%.2f", expensesum.Saldoe)
@@ -142,18 +153,19 @@ func DefinePosts() {
 			WHERE accounts_id = %v AND deleted = 0 
 			ORDER BY description ASC
 		`, util.SqlParam(1))
-		database.Db.Select(&expenses, sql, data.User.Default_accounts_id)
+		if err := database.Db.Select(&expenses, sql, data.User.Default_accounts_id); err != nil {
+			return databaseReadError(c, "load expenses", err)
+		}
 		data.Expenses = expenses
 
 		posts := []util.Post{}
-		var errsql error
 		if ldatefilter {
 			sql := ""
 			if util.Settings.DatabaseType == "sqlite" {
 				sql = fmt.Sprintf(`
 				SELECT p.id, p.description, ifnull(e.description,'') AS expense, 
 					ifnull(i.description,'') AS income, created_at AS date, created_ts, p.amount, 
-					CAST(p.amount/p.exchange AS Numeric(12,2)) AS amounte, p.p_id 
+					COALESCE(CAST(p.amount/NULLIF(p.exchange, 0) AS Numeric(12,2)), 0) AS amounte, p.p_id
 					FROM posts p 
 					LEFT JOIN expenses e ON p.expenses_id = e.id 
 					LEFT JOIN incomes i ON p.incomes_id = i.id 
@@ -164,7 +176,7 @@ func DefinePosts() {
 				sql = fmt.Sprintf(`
 				SELECT p.id, p.description, COALESCE(e.description,'') AS expense, 
 					COALESCE(i.description,'') AS income, created_at AS date, created_ts, p.amount, 
-					CAST(p.amount/p.exchange AS Numeric(12,2)) AS amounte, p.p_id 
+					COALESCE(CAST(p.amount/NULLIF(p.exchange, 0) AS Numeric(12,2)), 0) AS amounte, p.p_id
 					FROM posts p 
 					LEFT JOIN expenses e ON p.expenses_id = e.id 
 					LEFT JOIN incomes i ON p.incomes_id = i.id 
@@ -179,7 +191,7 @@ func DefinePosts() {
 				sql = fmt.Sprintf(`
 				SELECT p.id, p.description, ifnull(e.description,'') AS expense, 
 					ifnull(i.description,'') AS income, created_at AS date, created_ts, p.amount, 
-					CAST(p.amount/p.exchange AS Numeric(12,2)) AS amounte, p.p_id 
+					COALESCE(CAST(p.amount/NULLIF(p.exchange, 0) AS Numeric(12,2)), 0) AS amounte, p.p_id
 					FROM posts p 
 					LEFT JOIN expenses e ON p.expenses_id = e.id 
 					LEFT JOIN incomes i ON p.incomes_id = i.id 
@@ -190,7 +202,7 @@ func DefinePosts() {
 				sql = fmt.Sprintf(`
 				SELECT p.id, p.description, COALESCE(e.description,'') AS expense, 
 					COALESCE(i.description,'') AS income, created_at AS date, created_ts, p.amount, 
-					CAST(p.amount/p.exchange AS Numeric(12,2)) AS amounte, p.p_id 
+					COALESCE(CAST(p.amount/NULLIF(p.exchange, 0) AS Numeric(12,2)), 0) AS amounte, p.p_id
 					FROM posts p 
 					LEFT JOIN expenses e ON p.expenses_id = e.id 
 					LEFT JOIN incomes i ON p.incomes_id = i.id 
@@ -202,18 +214,13 @@ func DefinePosts() {
 		}
 
 		if errsql != nil {
-			log.Println("/posts SQL Error: ", errsql.Error())
+			return databaseReadError(c, "load posts", errsql)
 		}
 
 		data.Posts = posts
 		data.Date = time.Now().Format("2006-01-02")
 
-		rerr := c.Render(http.StatusOK, "posts", data)
-		if rerr != nil {
-			log.Println("/posts Rendering Error: ", rerr.Error())
-		}
-
-		return rerr
+		return c.Render(http.StatusOK, "posts", data)
 	}, auth)
 
 	e.POST("/posts/save", func(c echo.Context) error {
@@ -239,8 +246,6 @@ func DefinePosts() {
 
 		expenses_pid := expenses_id
 		incomes_pid := incomes_id
-		log.Println(incomes_pid)
-
 		amountnum, _ := strconv.ParseFloat(amount, 64)
 		if amountnum == 0.00 {
 			amounte, _ := strconv.ParseFloat(amounte, 64)
@@ -261,11 +266,14 @@ func DefinePosts() {
 			sql := fmt.Sprintf(`
 				SELECT id, description, amount, expenses_id 
 				FROM expenses 
-				WHERE accounts_id = %v AND p_id = %v 
+				WHERE accounts_id = %v AND p_id = %v AND deleted = 0
 				ORDER BY description ASC
 			`, util.SqlParam(1), util.SqlParam(2))
 			errExpenses := database.Db.Select(&expenses, sql, data.User.Default_accounts_id, expenses_pid)
-			if errExpenses != nil || len(expenses) == 0 {
+			if errExpenses != nil {
+				return databaseReadError(c, "validate expense", errExpenses)
+			}
+			if len(expenses) == 0 {
 				util.Flash(`Changes not saved, because of invalid input data!`, data, 0, "", 0)
 				return c.Redirect(http.StatusSeeOther, "/posts")
 			}
@@ -284,24 +292,21 @@ func DefinePosts() {
 			}
 		}
 
-		//incomes_idnum, _ := strconv.Atoi(incomes_id)
-
 		incomes_idnum := 0
 		incomes := []util.Income{}
-		log.Println("incomes_pid:", incomes_pid)
 		if incomes_pid != "" {
 			// Check if valid income is selected
-			sql := fmt.Sprintf(`SELECT id, description FROM incomes WHERE accounts_id = %v AND p_id = %v ORDER BY description ASC`, util.SqlParam(1), util.SqlParam(2))
+			sql := fmt.Sprintf(`SELECT id, description FROM incomes WHERE accounts_id = %v AND p_id = %v AND deleted = 0 ORDER BY description ASC`, util.SqlParam(1), util.SqlParam(2))
 			errIncomes := database.Db.Select(&incomes, sql, data.User.Default_accounts_id, incomes_pid)
-			log.Println("errIncomes", errIncomes)
-			log.Println("incomes", incomes)
-			if errIncomes != nil || len(incomes) == 0 {
+			if errIncomes != nil {
+				return databaseReadError(c, "validate income", errIncomes)
+			}
+			if len(incomes) == 0 {
 				util.Flash(`Changes not saved, because of invalid input data!`, data, 0, "", 0)
 				return c.Redirect(http.StatusSeeOther, "/posts")
-			} else {
-				incomes_idnum = incomes[0].Id
-				amountnum = amountnum * -1
 			}
+			incomes_idnum = incomes[0].Id
+			amountnum = amountnum * -1
 		}
 
 		records := []postWrite{{
@@ -388,7 +393,10 @@ func DefinePosts() {
 		}
 		errsql := database.Db.Select(&posts, sql, id, data.User.Default_accounts_id)
 		if errsql != nil {
-			log.Println("/posts/show errsql:", errsql)
+			return databaseReadError(c, "load post", errsql)
+		}
+		if len(posts) == 0 {
+			return echo.NewHTTPError(http.StatusNotFound, "record not found")
 		}
 		for _, post := range posts {
 			post.DateOnly = post.DateTime.Format("2006-01-02")
@@ -396,11 +404,7 @@ func DefinePosts() {
 			data.Posts = append(data.Posts, post)
 		}
 
-		errrender := c.Render(http.StatusOK, "postsshow", data)
-		if errrender != nil {
-			log.Println("/posts/show Rendering error:", errrender)
-		}
-		return errrender
+		return c.Render(http.StatusOK, "postsshow", data)
 	}, auth)
 
 	e.POST("/posts/update", func(c echo.Context) error {
@@ -474,7 +478,9 @@ func DefinePosts() {
 			WHERE accounts_id = %v AND deleted = 0 
 			ORDER BY description ASC
 		`, util.SqlParam(1))
-		database.Db.Select(&incomes, sql, data.User.Default_accounts_id)
+		if err := database.Db.Select(&incomes, sql, data.User.Default_accounts_id); err != nil {
+			return databaseReadError(c, "load incomes", err)
+		}
 		data.Incomes = incomes
 		data.Date = time.Now().Format("2006-01-02")
 

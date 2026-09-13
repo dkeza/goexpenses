@@ -30,9 +30,9 @@ func DefineExpenses() {
 			WHERE e1.accounts_id = %v AND e1.deleted = 0 
 			ORDER BY 2 ASC
 		`, util.SqlParam(1))
-		err := database.Db.Select(&expenses, sql, data.User.Default_accounts_id)
-
-		//database.Db.Select(&expenses, "SELECT id, description FROM expenses WHERE accounts_id = ? AND deleted = 0 ORDER BY description ASC", data.User.Default_accounts_id)
+		if err := database.Db.Select(&expenses, sql, data.User.Default_accounts_id); err != nil {
+			return databaseReadError(c, "load expenses", err)
+		}
 		data.Expenses = expenses
 
 		expensesadd := []util.Expense{}
@@ -47,14 +47,12 @@ func DefineExpenses() {
 			FROM expenses
 			ORDER BY 2 ASC
 		`, util.SqlParam(1))
-		err = database.Db.Select(&expensesadd, sql, data.User.Default_accounts_id)
-		//database.Db.Select(&expenses, "SELECT id, description FROM expenses WHERE accounts_id = ? AND deleted = 0 ORDER BY description ASC", data.User.Default_accounts_id)
-
+		if err := database.Db.Select(&expensesadd, sql, data.User.Default_accounts_id); err != nil {
+			return databaseReadError(c, "load related expenses", err)
+		}
 		data.ExpensesAdd = expensesadd
 
-		err = c.Render(http.StatusOK, "expenses", data)
-		fmt.Println(err)
-		return err
+		return c.Render(http.StatusOK, "expenses", data)
 	}, auth)
 
 	e.GET("/expenses/show", func(c echo.Context) error {
@@ -88,7 +86,10 @@ func DefineExpenses() {
 				WHERE id = %v AND accounts_id = %v AND deleted = 0
 			`, util.SqlParam(1), util.SqlParam(2))
 			errsql := database.Db.Select(&expensesadd, sql, expenses[0].ExpensesId, data.User.Default_accounts_id)
-			if !(errsql != nil || len(expensesadd) == 0) {
+			if errsql != nil {
+				return databaseReadError(c, "load selected related expense", errsql)
+			}
+			if len(expensesadd) > 0 {
 				expenses[0].ExpensesPid = expensesadd[0].Pid
 			}
 
@@ -115,9 +116,7 @@ func DefineExpenses() {
 		}
 		data.ExpensesAdd = expensesadd
 
-		err := c.Render(http.StatusOK, "expensesshow", data)
-		fmt.Println(err)
-		return err
+		return c.Render(http.StatusOK, "expensesshow", data)
 	}, auth)
 
 	e.POST("/expenses/save", func(c echo.Context) error {
@@ -151,8 +150,6 @@ func DefineExpenses() {
 			}
 			expenses_idnum = expenses[0].Id
 		}
-
-		fmt.Println("expenses_idnum", expenses_idnum)
 
 		amountnum, _ := strconv.ParseFloat(amount, 64)
 		if amountnum == 0.00 {
@@ -189,8 +186,6 @@ func DefineExpenses() {
 			}
 		}
 
-		fmt.Println("expenses_id:", expenses_id)
-
 		expenses_idnum := 0
 		if expenses_id != "" {
 			expenses := []util.Expense{}
@@ -220,8 +215,6 @@ func DefineExpenses() {
 	e.POST("/expenses/delete", func(c echo.Context) error {
 		data := c.Get("data").(*util.Data)
 		id := c.FormValue("id")
-
-		fmt.Println("expenses/delete", id)
 
 		sql := fmt.Sprintf(`UPDATE expenses SET deleted = 1 WHERE p_id = %v AND accounts_id = %v AND deleted = 0`, util.SqlParam(1), util.SqlParam(2))
 		if err := executeExactlyOne(database.Db, sql, id, data.User.Default_accounts_id); err != nil {
