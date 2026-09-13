@@ -45,11 +45,15 @@ func MainRoute() {
 			if data.Lang != l {
 				data.Lang = l
 				sql := fmt.Sprintf(`UPDATE sessions SET lang = %v WHERE uuid = %v`, util.SqlParam(1), util.SqlParam(2))
-				_ = database.Db.MustExec(sql, l, data.CookieId)
+				if _, err := database.Db.Exec(sql, l, data.CookieId); err != nil {
+					return databaseWriteError(c, "update session language", err)
+				}
 
 				if data.Username != "" {
 					sql := fmt.Sprintf(`UPDATE users SET lang = %v WHERE id = %v`, util.SqlParam(1), util.SqlParam(2))
-					_ = database.Db.MustExec(sql, l, data.User.Id)
+					if _, err := database.Db.Exec(sql, l, data.User.Id); err != nil {
+						return databaseWriteError(c, "update user language", err)
+					}
 					data.User.Lang = l
 				}
 			}
@@ -465,42 +469,9 @@ func DefineRoutes() {
 				util.Flash(`Invalid password!`, data, 0, ``, 0)
 				return c.Redirect(http.StatusSeeOther, "/register")
 			}
-			password = passwordHash
-			tx, err := database.Db.Begin()
-			fmt.Println(err)
-
-			accountid := 0
-			if database.DatabaseType == "sqlite" {
-				sql := fmt.Sprintf(`INSERT INTO accounts (description) VALUES (%v)`, util.SqlParam(1))
-				_, err = tx.Exec(sql, util.GetLangText(`My account`, data.Lang))
-				row := tx.QueryRow("select last_insert_rowid()") // SQLite specific
-				err = row.Scan(&accountid)
-			} else {
-				sql := fmt.Sprintf(`INSERT INTO accounts (description) VALUES (%v) RETURNING id`, util.SqlParam(1))
-				row := tx.QueryRow(sql, util.GetLangText(`My account`, data.Lang))
-				err = row.Scan(&accountid)
+			if err := createUserWithAccount(name, email, username, passwordHash, data.Lang); err != nil {
+				return databaseWriteError(c, "register user", err)
 			}
-			fmt.Println(err)
-
-			userid := 0
-			if database.DatabaseType == "sqlite" {
-				sql := fmt.Sprintf(`INSERT INTO users (name, email, username, password, default_accounts_id, lang) VALUES (%v, %v, %v, %v, %v, %v)`, util.SqlParam(1), util.SqlParam(2), util.SqlParam(3), util.SqlParam(4), util.SqlParam(5), util.SqlParam(6))
-				_, err = tx.Exec(sql, name, email, username, password, accountid, data.Lang)
-				row := tx.QueryRow("select last_insert_rowid()") // SQLite specific
-				err = row.Scan(&userid)
-			} else {
-				sql := fmt.Sprintf(`INSERT INTO users (name, email, username, password, default_accounts_id, lang) VALUES (%v, %v, %v, %v, %v, %v) RETURNING id`, util.SqlParam(1), util.SqlParam(2), util.SqlParam(3), util.SqlParam(4), util.SqlParam(5), util.SqlParam(6))
-				row := tx.QueryRow(sql, name, email, username, password, accountid, data.Lang)
-				err = row.Scan(&userid)
-			}
-			fmt.Println(err)
-
-			sql := fmt.Sprintf(`INSERT INTO accountsusers (accounts_id, users_id) VALUES (%v, %v)`, util.SqlParam(1), util.SqlParam(2))
-			_, err = tx.Exec(sql, accountid, userid)
-			fmt.Println(err)
-
-			err = tx.Commit()
-			fmt.Println(err)
 		}
 		return c.Redirect(http.StatusSeeOther, "/login")
 	})
@@ -609,30 +580,9 @@ func DefineRoutes() {
 			return c.Redirect(http.StatusSeeOther, "/accounts/show")
 		}
 
-		tx, err := database.Db.Begin()
-		fmt.Println(err)
-
-		accountid := 0
-		if database.DatabaseType == "sqlite" {
-			sql := fmt.Sprintf(`INSERT INTO accounts (description) VALUES (%v)`, util.SqlParam(1))
-			_, err = tx.Exec(sql, description)
-			fmt.Println(err)
-			row := tx.QueryRow("select last_insert_rowid()") // SQLite specific
-			err = row.Scan(&accountid)
-		} else {
-			sql := fmt.Sprintf(`INSERT INTO accounts (description) VALUES (%v) RETURNING id`, util.SqlParam(1))
-			row := tx.QueryRow(sql, description)
-			err = row.Scan(&accountid)
+		if err := createAccount(data.User.Id, description); err != nil {
+			return databaseWriteError(c, "create account", err)
 		}
-		fmt.Println(err)
-
-		userid := data.User.Id
-		sql := fmt.Sprintf(`INSERT INTO accountsusers (accounts_id, users_id) VALUES (%v, %v)`, util.SqlParam(1), util.SqlParam(2))
-		_, err = tx.Exec(sql, accountid, userid)
-		fmt.Println(err)
-
-		err = tx.Commit()
-		fmt.Println(err)
 
 		return c.Redirect(http.StatusSeeOther, "/posts")
 	}, auth)
@@ -652,8 +602,14 @@ func DefineRoutes() {
 		data := c.Get("data").(*util.Data)
 
 		description := c.FormValue("description")
+		if strings.TrimSpace(description) == "" {
+			util.Flash(`Invalid description!`, data, 0, ``, 0)
+			return c.Redirect(http.StatusSeeOther, "/incomes")
+		}
 		sql := fmt.Sprintf(`INSERT INTO incomes (description, accounts_id, p_id) VALUES (%v, %v, %v)`, util.SqlParam(1), util.SqlParam(2), util.SqlParam(3))
-		database.Db.MustExec(sql, description, data.User.Default_accounts_id, util.Encrypt(util.CreateUUID()))
+		if err := executeExactlyOne(database.Db, sql, strings.TrimSpace(description), data.User.Default_accounts_id, util.Encrypt(util.CreateUUID())); err != nil {
+			return databaseWriteError(c, "create income", err)
+		}
 
 		return c.Redirect(http.StatusSeeOther, "/incomes")
 	}, auth)
@@ -663,9 +619,14 @@ func DefineRoutes() {
 		id := c.FormValue("id")
 		description := c.FormValue("description")
 
-		fmt.Println("incomes/update", id, description)
+		if id == "" || strings.TrimSpace(description) == "" {
+			util.Flash(`Invalid description!`, data, 0, ``, 0)
+			return c.Redirect(http.StatusSeeOther, "/incomes")
+		}
 		sql := fmt.Sprintf(`UPDATE incomes SET description = %v WHERE p_id = %v AND accounts_id = %v AND deleted = 0`, util.SqlParam(1), util.SqlParam(2), util.SqlParam(3))
-		database.Db.MustExec(sql, description, id, data.User.Default_accounts_id)
+		if err := executeExactlyOne(database.Db, sql, strings.TrimSpace(description), id, data.User.Default_accounts_id); err != nil {
+			return databaseWriteError(c, "update income", err)
+		}
 
 		return c.Redirect(http.StatusSeeOther, "/incomes")
 	}, auth)
@@ -674,9 +635,10 @@ func DefineRoutes() {
 		data := c.Get("data").(*util.Data)
 		id := c.FormValue("id")
 
-		fmt.Println("incomes/delete", id)
-		sql := fmt.Sprintf(`UPDATE incomes SET deleted = 1 WHERE p_id = %v AND accounts_id = %v`, util.SqlParam(1), util.SqlParam(2))
-		database.Db.MustExec(sql, id, data.User.Default_accounts_id)
+		sql := fmt.Sprintf(`UPDATE incomes SET deleted = 1 WHERE p_id = %v AND accounts_id = %v AND deleted = 0`, util.SqlParam(1), util.SqlParam(2))
+		if err := executeExactlyOne(database.Db, sql, id, data.User.Default_accounts_id); err != nil {
+			return databaseWriteError(c, "delete income", err)
+		}
 
 		return c.Redirect(http.StatusSeeOther, "/incomes")
 	}, auth)

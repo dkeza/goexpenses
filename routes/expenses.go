@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"goexpenses/database"
 	"goexpenses/util"
@@ -72,8 +73,12 @@ func DefineExpenses() {
 		`, util.SqlParam(1), util.SqlParam(2))
 
 		errsql := database.Db.Select(&expenses, sql, id, data.User.Default_accounts_id)
-		fmt.Println("amounte:", expenses[0].Amounte)
-		fmt.Println(errsql)
+		if errsql != nil {
+			return databaseReadError(c, "load expense", errsql)
+		}
+		if len(expenses) == 0 {
+			return echo.NewHTTPError(http.StatusNotFound, "record not found")
+		}
 
 		if expenses[0].ExpensesId != 0 {
 			expensesadd := []util.Expense{}
@@ -90,8 +95,6 @@ func DefineExpenses() {
 		}
 
 		data.Expenses = expenses
-		fmt.Println("expenses/show", data.Expenses)
-
 		expensesadd := []util.Expense{}
 		sql = fmt.Sprintf(`
 		SELECT e1.id, e1.description, e1.amount, 
@@ -107,7 +110,9 @@ func DefineExpenses() {
 			ORDER BY 2 ASC
 		`, util.SqlParam(1))
 		errsql = database.Db.Select(&expensesadd, sql, data.User.Default_accounts_id)
-		fmt.Println(errsql)
+		if errsql != nil {
+			return databaseReadError(c, "load related expenses", errsql)
+		}
 		data.ExpensesAdd = expensesadd
 
 		err := c.Render(http.StatusOK, "expensesshow", data)
@@ -123,7 +128,7 @@ func DefineExpenses() {
 		amount := c.FormValue("amount")
 		amounte := c.FormValue("amounte")
 
-		if description == "" {
+		if strings.TrimSpace(description) == "" {
 			util.Flash(`Invalid description!`, data, 0, ``, 0)
 			return c.Redirect(http.StatusSeeOther, "/expenses")
 		}
@@ -137,9 +142,14 @@ func DefineExpenses() {
 				WHERE p_id = %v AND accounts_id = %v AND deleted = 0
 			`, util.SqlParam(1), util.SqlParam(2))
 			errsql := database.Db.Select(&expenses, sql, expenses_id, data.User.Default_accounts_id)
-			if !(errsql != nil || len(expenses) == 0) {
-				expenses_idnum = expenses[0].Id
+			if errsql != nil {
+				return databaseReadError(c, "validate related expense", errsql)
 			}
+			if len(expenses) == 0 {
+				util.Flash(`Changes not saved, because of invalid input data!`, data, 0, "", 0)
+				return c.Redirect(http.StatusSeeOther, "/expenses")
+			}
+			expenses_idnum = expenses[0].Id
 		}
 
 		fmt.Println("expenses_idnum", expenses_idnum)
@@ -153,8 +163,9 @@ func DefineExpenses() {
 		}
 
 		sql := fmt.Sprintf(`INSERT INTO expenses (description, accounts_id, amount, exchange, expenses_id, p_id) VALUES (%v,%v,%v,%v,%v,%v)`, util.SqlParam(1), util.SqlParam(2), util.SqlParam(3), util.SqlParam(4), util.SqlParam(5), util.SqlParam(6))
-		err := database.Db.MustExec(sql, description, data.User.Default_accounts_id, amountnum, data.Eur, expenses_idnum, util.Encrypt(util.CreateUUID()))
-		fmt.Println(err)
+		if err := executeExactlyOne(database.Db, sql, strings.TrimSpace(description), data.User.Default_accounts_id, amountnum, data.Eur, expenses_idnum, util.Encrypt(util.CreateUUID())); err != nil {
+			return databaseWriteError(c, "create expense", err)
+		}
 		return c.Redirect(http.StatusSeeOther, "/expenses")
 	}, auth)
 
@@ -165,6 +176,10 @@ func DefineExpenses() {
 		expenses_id := c.FormValue("expense_id")
 		amount := c.FormValue("amount")
 		amounte := c.FormValue("amounte")
+		if id == "" || strings.TrimSpace(description) == "" {
+			util.Flash(`Invalid description!`, data, 0, ``, 0)
+			return c.Redirect(http.StatusSeeOther, "/expenses")
+		}
 
 		amountnum, _ := strconv.ParseFloat(amount, 64)
 		if amountnum == 0.00 {
@@ -185,13 +200,19 @@ func DefineExpenses() {
 				WHERE p_id = %v AND accounts_id = %v AND deleted = 0
 			`, util.SqlParam(1), util.SqlParam(2))
 			errsql := database.Db.Select(&expenses, sql, expenses_id, data.User.Default_accounts_id)
-			if !(errsql != nil || len(expenses) == 0) {
-				expenses_idnum = expenses[0].Id
+			if errsql != nil {
+				return databaseReadError(c, "validate related expense", errsql)
 			}
+			if len(expenses) == 0 {
+				util.Flash(`Changes not saved, because of invalid input data!`, data, 0, "", 0)
+				return c.Redirect(http.StatusSeeOther, "/expenses")
+			}
+			expenses_idnum = expenses[0].Id
 		}
-		sql := fmt.Sprintf(`UPDATE expenses SET description = %v, amount = %v, exchange = %v, expenses_id = %v WHERE p_id = %v AND accounts_id = %v`, util.SqlParam(1), util.SqlParam(2), util.SqlParam(3), util.SqlParam(4), util.SqlParam(5), util.SqlParam(6))
-		err := database.Db.MustExec(sql, description, amountnum, data.Eur, expenses_idnum, id, data.User.Default_accounts_id)
-		fmt.Println(err)
+		sql := fmt.Sprintf(`UPDATE expenses SET description = %v, amount = %v, exchange = %v, expenses_id = %v WHERE p_id = %v AND accounts_id = %v AND deleted = 0`, util.SqlParam(1), util.SqlParam(2), util.SqlParam(3), util.SqlParam(4), util.SqlParam(5), util.SqlParam(6))
+		if err := executeExactlyOne(database.Db, sql, strings.TrimSpace(description), amountnum, data.Eur, expenses_idnum, id, data.User.Default_accounts_id); err != nil {
+			return databaseWriteError(c, "update expense", err)
+		}
 
 		return c.Redirect(http.StatusSeeOther, "/expenses")
 	}, auth)
@@ -202,8 +223,10 @@ func DefineExpenses() {
 
 		fmt.Println("expenses/delete", id)
 
-		sql := fmt.Sprintf(`UPDATE expenses SET deleted = 1 WHERE p_id = %v AND accounts_id = %v`, util.SqlParam(1), util.SqlParam(2))
-		database.Db.MustExec(sql, id, data.User.Default_accounts_id)
+		sql := fmt.Sprintf(`UPDATE expenses SET deleted = 1 WHERE p_id = %v AND accounts_id = %v AND deleted = 0`, util.SqlParam(1), util.SqlParam(2))
+		if err := executeExactlyOne(database.Db, sql, id, data.User.Default_accounts_id); err != nil {
+			return databaseWriteError(c, "delete expense", err)
+		}
 
 		return c.Redirect(http.StatusSeeOther, "/expenses")
 	}, auth)

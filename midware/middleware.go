@@ -56,7 +56,9 @@ func CheckCookie(next echo.HandlerFunc) echo.HandlerFunc {
 			if session.Message != "" {
 				data.Flash = session.Message
 				sql := fmt.Sprintf(`UPDATE sessions SET message = %v WHERE uuid = %v`, util.SqlParam(1), util.SqlParam(2))
-				_ = database.Db.MustExec(sql, "", sessionHash)
+				if _, err := database.Db.Exec(sql, "", sessionHash); err != nil {
+					return echo.NewHTTPError(http.StatusInternalServerError, "could not update session").SetInternal(err)
+				}
 			}
 			if session.Expenses_id != 0 {
 
@@ -72,17 +74,23 @@ func CheckCookie(next echo.HandlerFunc) echo.HandlerFunc {
 					data.Expenses_id = expenses[0].Pid
 				}
 				sql = fmt.Sprintf(`UPDATE sessions SET expenses_id = %v WHERE uuid = %v`, util.SqlParam(1), util.SqlParam(2))
-				_ = database.Db.MustExec(sql, 0, sessionHash)
+				if _, err := database.Db.Exec(sql, 0, sessionHash); err != nil {
+					return echo.NewHTTPError(http.StatusInternalServerError, "could not update session").SetInternal(err)
+				}
 			}
 			if session.Last_post_description != "" {
 				data.Last_post_description = session.Last_post_description
 				sql := fmt.Sprintf(`UPDATE sessions SET last_post_description = %v WHERE uuid = %v`, util.SqlParam(1), util.SqlParam(2))
-				_ = database.Db.MustExec(sql, "", sessionHash)
+				if _, err := database.Db.Exec(sql, "", sessionHash); err != nil {
+					return echo.NewHTTPError(http.StatusInternalServerError, "could not update session").SetInternal(err)
+				}
 			}
 			if session.Message_success != 0 {
 				data.Message_success = session.Message_success
 				sql := fmt.Sprintf(`UPDATE sessions SET message_success = %v WHERE uuid = %v`, util.SqlParam(1), util.SqlParam(2))
-				_ = database.Db.MustExec(sql, 0, sessionHash)
+				if _, err := database.Db.Exec(sql, 0, sessionHash); err != nil {
+					return echo.NewHTTPError(http.StatusInternalServerError, "could not update session").SetInternal(err)
+				}
 			}
 		}
 

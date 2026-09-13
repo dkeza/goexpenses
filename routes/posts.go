@@ -32,7 +32,9 @@ func DefinePosts() {
 
 		if creset != "" {
 			sql := fmt.Sprintf(`UPDATE accounts SET fromdate = %v, todate = %v WHERE id = %v`, util.SqlParam(1), util.SqlParam(2), util.SqlParam(3))
-			database.Db.MustExec(sql, "", "", data.User.Default_accounts_id)
+			if err := executeExactlyOne(database.Db, sql, "", "", data.User.Default_accounts_id); err != nil {
+				return databaseWriteError(c, "reset account date filter", err)
+			}
 		} else {
 			if cfrom == "" {
 				account := util.Account{}
@@ -61,7 +63,9 @@ func DefinePosts() {
 						filterdateto = tto
 						data.Filter = filterdatefrom.Format("02-01-2006") + " - " + filterdateto.Format("02-01-2006")
 						sql := fmt.Sprintf(`UPDATE accounts SET fromdate = %v, todate = %v WHERE id = %v`, util.SqlParam(1), util.SqlParam(2), util.SqlParam(3))
-						database.Db.MustExec(sql, cfrom, cto, data.User.Default_accounts_id)
+						if err := executeExactlyOne(database.Db, sql, cfrom, cto, data.User.Default_accounts_id); err != nil {
+							return databaseWriteError(c, "save account date filter", err)
+						}
 					}
 				}
 
@@ -221,6 +225,10 @@ func DefinePosts() {
 		amount := c.FormValue("amount")
 		amounte := c.FormValue("amounte")
 		date := c.FormValue("date")
+		if data.Eur <= 0 {
+			util.Flash(`Changes not saved, because of invalid input data!`, data, 0, "", 0)
+			return c.Redirect(http.StatusSeeOther, "/posts")
+		}
 
 		createdAt := time.Now()
 		currentDate, errDate := time.Parse("2006-01-02", date)
@@ -296,27 +304,44 @@ func DefinePosts() {
 			}
 		}
 
-		sql := fmt.Sprintf(`INSERT INTO posts (description, expenses_id, incomes_id, amount, exchange, accounts_id, p_id, created_at) VALUES (%v,%v,%v,%v,%v,%v,%v,%v)`, util.SqlParam(1), util.SqlParam(2), util.SqlParam(3), util.SqlParam(4), util.SqlParam(5), util.SqlParam(6), util.SqlParam(7), util.SqlParam((8)))
-		err := database.Db.MustExec(sql, description, expenses_idnum, incomes_idnum, amountnum, data.Eur, data.User.Default_accounts_id, util.Encrypt(util.CreateUUID()), createdAt)
-
-		log.Println("/posts SQL Error:", err, "expenses_idnum:", expenses_idnum)
-
+		records := []postWrite{{
+			Description: description,
+			ExpenseID:   expenses_idnum,
+			IncomeID:    incomes_idnum,
+			Amount:      amountnum,
+			Exchange:    data.Eur,
+			AccountID:   data.User.Default_accounts_id,
+			PublicID:    util.Encrypt(util.CreateUUID()),
+			CreatedAt:   createdAt,
+		}}
 		if expenses_idnum > 0 && expenses[0].ExpensesId > 0 {
 			expensesadd := []util.Expense{}
-			sql := fmt.Sprintf(`SELECT e1.id, e1.amount FROM expenses e1 WHERE e1.id = %v ORDER BY 2 ASC`, util.SqlParam(1))
-			errsql2 := database.Db.Select(&expensesadd, sql, expenses[0].ExpensesId)
-
+			sql := fmt.Sprintf(`SELECT e1.id, e1.amount FROM expenses e1 WHERE e1.id = %v AND e1.accounts_id = %v AND e1.deleted = 0`, util.SqlParam(1), util.SqlParam(2))
+			errsql2 := database.Db.Select(&expensesadd, sql, expenses[0].ExpensesId, data.User.Default_accounts_id)
 			if errsql2 != nil {
-				log.Println("/posts SQL Error errsql2: ", errsql2)
+				return databaseReadError(c, "load linked expense", errsql2)
+			}
+			if len(expensesadd) == 0 {
+				util.Flash(`Changes not saved, because of invalid input data!`, data, 0, "", 0)
+				return c.Redirect(http.StatusSeeOther, "/posts")
 			}
 
 			addexp := expenses[0].ExpensesId
 			addamount := expensesadd[0].Amount
-
 			if addexp != 0 {
-				sql := fmt.Sprintf(`INSERT INTO posts (description, expenses_id, incomes_id, amount, exchange, accounts_id, p_id) VALUES (%v,%v,%v,%v,%v,%v,%v)`, util.SqlParam(1), util.SqlParam(2), util.SqlParam(3), util.SqlParam(4), util.SqlParam(5), util.SqlParam(6), util.SqlParam(7))
-				err = database.Db.MustExec(sql, description, addexp, 0, addamount, data.Eur, data.User.Default_accounts_id, util.Encrypt(util.CreateUUID()))
+				records = append(records, postWrite{
+					Description: description,
+					ExpenseID:   addexp,
+					Amount:      addamount,
+					Exchange:    data.Eur,
+					AccountID:   data.User.Default_accounts_id,
+					PublicID:    util.Encrypt(util.CreateUUID()),
+					CreatedAt:   time.Now(),
+				})
 			}
+		}
+		if err := createPosts(records); err != nil {
+			return databaseWriteError(c, "create post", err)
 		}
 
 		util.Flash(`Saved`, data, 1, description, expenses_idnum)
@@ -327,8 +352,10 @@ func DefinePosts() {
 		data := c.Get("data").(*util.Data)
 		id := c.FormValue("id")
 
-		sql := fmt.Sprintf(`UPDATE posts SET deleted = 1 WHERE p_id = %v AND accounts_id = %v`, util.SqlParam(1), util.SqlParam(2))
-		database.Db.MustExec(sql, id, data.User.Default_accounts_id)
+		sql := fmt.Sprintf(`UPDATE posts SET deleted = 1 WHERE p_id = %v AND accounts_id = %v AND deleted = 0`, util.SqlParam(1), util.SqlParam(2))
+		if err := executeExactlyOne(database.Db, sql, id, data.User.Default_accounts_id); err != nil {
+			return databaseWriteError(c, "delete post", err)
+		}
 
 		return c.Redirect(http.StatusSeeOther, "/posts")
 	}, auth)
@@ -406,7 +433,10 @@ func DefinePosts() {
 		}
 		errsql1 := database.Db.Select(&posts, sql, id, data.User.Default_accounts_id)
 		if errsql1 != nil {
-			log.Println("/posts/update errsql1:", errsql1)
+			return databaseReadError(c, "load post for update", errsql1)
+		}
+		if len(posts) == 0 {
+			return echo.NewHTTPError(http.StatusNotFound, "record not found")
 		}
 		for _, post := range posts {
 			storedDate = post.DateTime
@@ -419,11 +449,15 @@ func DefinePosts() {
 			createdAt = time.Date(enteredDate.Year(), enteredDate.Month(), enteredDate.Day(), storedDate.Hour(), storedDate.Minute(), storedDate.Second(), storedDate.Nanosecond(), storedDate.Location())
 		}
 
-		sql = fmt.Sprintf(`UPDATE posts SET description = %v, amount = %v, created_at = %v WHERE p_id = %v AND accounts_id = %v`, util.SqlParam(1), util.SqlParam(2), util.SqlParam(3), util.SqlParam(4), util.SqlParam(5))
+		amountNumber, err := strconv.ParseFloat(amount, 64)
+		if err != nil {
+			util.Flash(`Invalid amount!`, data, 0, description, 0)
+			return c.Redirect(http.StatusSeeOther, "/posts")
+		}
+		sql = fmt.Sprintf(`UPDATE posts SET description = %v, amount = %v, created_at = %v WHERE p_id = %v AND accounts_id = %v AND deleted = 0`, util.SqlParam(1), util.SqlParam(2), util.SqlParam(3), util.SqlParam(4), util.SqlParam(5))
 
-		errsql2 := database.Db.MustExec(sql, description, amount, createdAt, id, data.User.Default_accounts_id)
-		if errsql2 != nil {
-			log.Printf("/posts/update errsql2: %+v\n", errsql2)
+		if err := executeExactlyOne(database.Db, sql, description, amountNumber, createdAt, id, data.User.Default_accounts_id); err != nil {
+			return databaseWriteError(c, "update post", err)
 		}
 
 		return c.Redirect(http.StatusSeeOther, "/posts")
