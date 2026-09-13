@@ -4,7 +4,6 @@ go 1.27.1
 
 require (
 	github.com/DATA-DOG/go-sqlmock v1.5.2
-	github.com/buger/jsonparser v1.6.1
 	github.com/jasonlvhit/gocron v0.0.1
 	github.com/jmoiron/sqlx v1.4.0
 	github.com/labstack/echo/v4 v4.15.4

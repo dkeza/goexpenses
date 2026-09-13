@@ -66,11 +66,10 @@ func main() {
 	}
 	defer database.Db.Close()
 
-	//gocron.Every(1).Minute().Do(util.GetExchangeRates)
-	// Do it on every restart
-	util.GetExchangeRates()
+	// Refresh in the background so an unavailable rates service cannot delay startup.
+	util.RefreshExchangeRatesAsync()
 	util.DeleteOldSessions()
-	gocron.Every(1).Day().At("07:00").Do(util.GetExchangeRates)
+	gocron.Every(1).Day().At("07:00").Do(util.RefreshExchangeRatesAsync)
 	gocron.Every(1).Day().At("05:00").Do(util.DeleteOldSessions)
 
 	e := routes.E

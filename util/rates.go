@@ -1,56 +1,169 @@
 package util
 
 import (
+	"context"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"io"
 	"log"
 	"math"
 	"net/http"
+	"net/url"
+	"sync/atomic"
+	"time"
 
 	"goexpenses/database"
 
-	"github.com/buger/jsonparser"
-
-	"fmt"
-	"io"
-	"strconv"
-	"time"
+	"github.com/jmoiron/sqlx"
 )
 
-func GetExchangeRates() (float64, string) {
-	var kurs float64
-	date := time.Now().Format("2006-01-02 15:04:05")
-	log.Println("Getting exchange rates from internet")
-	r, err := http.Get("https://openexchangerates.org/api/latest.json?app_id=" + Settings.OpenExchangeRatesId)
-	if err == nil {
+const (
+	exchangeRatesEndpoint    = "https://openexchangerates.org/api/latest.json"
+	exchangeRateRequestLimit = int64(1 << 20)
+	exchangeRateTimeout      = 10 * time.Second
+	exchangeRateMaxAge       = 7 * 24 * time.Hour
+	exchangeRateRetryDelay   = time.Minute
+)
 
-		defer r.Body.Close()
-		body, _ := io.ReadAll(r.Body)
-
-		value, dataType, offset, err := jsonparser.Get(body, "rates", "EUR")
-		x := string(value)
-		value, dataType, offset, err = jsonparser.Get(body, "rates", "RSD")
-		y := string(value)
-		eur, _ := strconv.ParseFloat(x, 32)
-		rsd, _ := strconv.ParseFloat(y, 32)
-		kurs = ToFixed(rsd/eur, 4)
-		log.Println(kurs, dataType, offset, err)
-		log.Println("Kurs:", kurs)
-		if kurs > 0.00 {
-
-			count := 0
-			database.Db.Get(&count, "SELECT COUNT(*) FROM currencies WHERE code = 'EUR'")
-			if count == 0 {
-				log.Println("Insert EUR record")
-				sql := fmt.Sprintf(`INSERT INTO currencies (code) VALUES (%v)`, SqlParam(1))
-				database.Db.MustExec(sql, `EUR`)
-			}
-
-			sql := fmt.Sprintf(`UPDATE currencies SET rate = %v, date = %v WHERE code = %v`, SqlParam(1), SqlParam(2), SqlParam(3))
-			err1 := database.Db.MustExec(sql, kurs, date, `EUR`)
-			log.Println(err1)
-		}
-
+var (
+	exchangeRateHTTPClient = &http.Client{
+		Timeout: exchangeRateTimeout,
+		CheckRedirect: func(*http.Request, []*http.Request) error {
+			return http.ErrUseLastResponse
+		},
 	}
-	return kurs, date
+	exchangeRateRefreshing  atomic.Bool
+	exchangeRateLastAttempt atomic.Int64
+)
+
+type exchangeRatesResponse struct {
+	Timestamp int64              `json:"timestamp"`
+	Rates     map[string]float64 `json:"rates"`
+}
+
+func GetExchangeRates() (float64, string) {
+	ctx, cancel := context.WithTimeout(context.Background(), exchangeRateTimeout)
+	defer cancel()
+
+	rate, date, err := updateExchangeRates(ctx, exchangeRateHTTPClient, exchangeRatesEndpoint, Settings.OpenExchangeRatesId, database.Db)
+	if err != nil {
+		log.Printf("Could not update exchange rates: %v", err)
+		return 0, ""
+	}
+	log.Printf("Updated EUR exchange rate: %.4f", rate)
+	return rate, date
+}
+
+func RefreshExchangeRatesAsync() {
+	now := time.Now()
+	lastAttempt := exchangeRateLastAttempt.Load()
+	if lastAttempt != 0 && now.Sub(time.Unix(0, lastAttempt)) < exchangeRateRetryDelay {
+		return
+	}
+	if !exchangeRateRefreshing.CompareAndSwap(false, true) {
+		return
+	}
+	exchangeRateLastAttempt.Store(now.UnixNano())
+	go func() {
+		defer exchangeRateRefreshing.Store(false)
+		GetExchangeRates()
+	}()
+}
+
+func updateExchangeRates(ctx context.Context, client *http.Client, endpoint, apiKey string, db *sqlx.DB) (float64, string, error) {
+	rate, rateTime, err := fetchExchangeRate(ctx, client, endpoint, apiKey, exchangeRateRequestLimit)
+	if err != nil {
+		return 0, "", err
+	}
+	if err := storeExchangeRate(ctx, db, rate, rateTime); err != nil {
+		return 0, "", err
+	}
+	return rate, rateTime.Format("2006-01-02 15:04:05"), nil
+}
+
+func fetchExchangeRate(ctx context.Context, client *http.Client, endpoint, apiKey string, responseLimit int64) (float64, time.Time, error) {
+	if client == nil {
+		return 0, time.Time{}, errors.New("exchange rate HTTP client is missing")
+	}
+	if responseLimit < 1 {
+		return 0, time.Time{}, errors.New("exchange rate response limit is invalid")
+	}
+
+	requestURL, err := url.Parse(endpoint)
+	if err != nil || (requestURL.Scheme != "http" && requestURL.Scheme != "https") || requestURL.Host == "" {
+		return 0, time.Time{}, errors.New("exchange rate endpoint is invalid")
+	}
+	query := requestURL.Query()
+	query.Set("app_id", apiKey)
+	requestURL.RawQuery = query.Encode()
+
+	request, err := http.NewRequestWithContext(ctx, http.MethodGet, requestURL.String(), nil)
+	if err != nil {
+		return 0, time.Time{}, errors.New("create exchange rate request")
+	}
+	response, err := client.Do(request)
+	if err != nil {
+		if response != nil && response.Body != nil {
+			response.Body.Close()
+		}
+		if errors.Is(err, context.DeadlineExceeded) || errors.Is(ctx.Err(), context.DeadlineExceeded) {
+			return 0, time.Time{}, errors.New("exchange rate request timed out")
+		}
+		return 0, time.Time{}, errors.New("exchange rate request failed")
+	}
+	defer response.Body.Close()
+
+	if response.StatusCode < http.StatusOK || response.StatusCode >= http.StatusMultipleChoices {
+		return 0, time.Time{}, fmt.Errorf("exchange rate service returned HTTP %d", response.StatusCode)
+	}
+	body, err := io.ReadAll(io.LimitReader(response.Body, responseLimit+1))
+	if err != nil {
+		return 0, time.Time{}, errors.New("read exchange rate response")
+	}
+	if int64(len(body)) > responseLimit {
+		return 0, time.Time{}, errors.New("exchange rate response is too large")
+	}
+
+	payload := exchangeRatesResponse{}
+	if err := json.Unmarshal(body, &payload); err != nil {
+		return 0, time.Time{}, errors.New("exchange rate response contains invalid JSON")
+	}
+	eur, eurOK := payload.Rates["EUR"]
+	rsd, rsdOK := payload.Rates["RSD"]
+	if !eurOK || !rsdOK || eur <= 0 || rsd <= 0 || math.IsNaN(eur) || math.IsNaN(rsd) || math.IsInf(eur, 0) || math.IsInf(rsd, 0) {
+		return 0, time.Time{}, errors.New("exchange rate response contains invalid EUR or RSD rates")
+	}
+	if payload.Timestamp <= 0 {
+		return 0, time.Time{}, errors.New("exchange rate response contains an invalid timestamp")
+	}
+	rateTime := time.Unix(payload.Timestamp, 0).UTC()
+	now := time.Now().UTC()
+	if rateTime.Before(now.Add(-exchangeRateMaxAge)) || rateTime.After(now.Add(time.Hour)) {
+		return 0, time.Time{}, errors.New("exchange rate response contains a stale or future timestamp")
+	}
+
+	rate := ToFixed(rsd/eur, 4)
+	if rate <= 0 || math.IsNaN(rate) || math.IsInf(rate, 0) {
+		return 0, time.Time{}, errors.New("calculated EUR exchange rate is invalid")
+	}
+	return rate, rateTime, nil
+}
+
+func storeExchangeRate(ctx context.Context, db *sqlx.DB, rate float64, rateTime time.Time) error {
+	if db == nil {
+		return errors.New("store exchange rate: database is not connected")
+	}
+	_, err := db.ExecContext(ctx, `
+		INSERT INTO currencies (code, rate, date)
+		VALUES ($1, $2, $3)
+		ON CONFLICT (code) DO UPDATE
+		SET rate = EXCLUDED.rate,
+		    date = EXCLUDED.date`, "EUR", rate, rateTime)
+	if err != nil {
+		return fmt.Errorf("store exchange rate: %w", err)
+	}
+	return nil
 }
 
 func ToFixed(num float64, precision int) float64 {

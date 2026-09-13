@@ -128,7 +128,8 @@ func CheckCookie(next echo.HandlerFunc) echo.HandlerFunc {
 		data.Eurdate = currency.Date
 
 		if data.Eur == 0.00 {
-			data.Eur, data.Eurdate = util.GetExchangeRates()
+			data.Eurdate = time.Now().Format("2006-01-02 15:04:05")
+			util.RefreshExchangeRatesAsync()
 		}
 		c.Set("data", data)
 

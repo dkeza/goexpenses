@@ -58,6 +58,10 @@ PostgreSQL advisory lock, and applied in transactions. The recorded schema
 version is updated only after a migration succeeds. As with every database
 deployment, create a backup before installing a new application version.
 
+Exchange rates are refreshed in the background, so an unavailable rates service
+does not block application startup or user requests. Failed or invalid responses
+leave the last successfully stored rate unchanged.
+
 Session cookies are secure by default. Set `COOKIE_SECURE=false` (or
 `cookiesecure=false` in `goexpenses.ini`) only for local development over HTTP.
 
