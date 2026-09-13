@@ -1,7 +1,5 @@
 -- Table: public.accounts
 
-DROP TABLE IF EXISTS public.accounts;
-
 CREATE TABLE public.accounts
 (
   id SERIAL PRIMARY KEY,
@@ -12,8 +10,6 @@ CREATE TABLE public.accounts
 );
 
 -- Table: public.users
-
-DROP TABLE IF EXISTS public.users;
 
 CREATE TABLE public.users
 (
@@ -30,8 +26,6 @@ CREATE TABLE public.users
 
 -- Table: public.sessions
 
-DROP TABLE IF EXISTS public.sessions;
-
 CREATE TABLE public.sessions
 (
   id SERIAL PRIMARY KEY,
@@ -47,8 +41,6 @@ CREATE TABLE public.sessions
 
 -- Table: public.posts
 
-DROP TABLE IF EXISTS public.posts;
-
 CREATE TABLE public.posts
 (
   id SERIAL PRIMARY KEY,
@@ -60,12 +52,11 @@ CREATE TABLE public.posts
   accounts_id integer NOT NULL DEFAULT 0,
   exchange decimal(12,4) NOT NULL DEFAULT 0,
   deleted integer NOT NULL DEFAULT 0,
-  p_id character varying NOT NULL DEFAULT ''::character varying
+  p_id character varying NOT NULL DEFAULT ''::character varying,
+  created_ts timestamp NOT NULL DEFAULT NOW()
   );
 
 -- Table: public.currencies
-
-DROP TABLE IF EXISTS public.currencies;
 
 CREATE TABLE public.currencies
 (
@@ -76,8 +67,6 @@ CREATE TABLE public.currencies
 );
 
 -- Table: public.expenses
-
-DROP TABLE IF EXISTS public.expenses;
 
 CREATE TABLE public.expenses
 (
@@ -93,8 +82,6 @@ CREATE TABLE public.expenses
 
 -- Table: public.incomes
 
-DROP TABLE IF EXISTS public.incomes;
-
 CREATE TABLE public.incomes
 (
   id SERIAL PRIMARY KEY,
@@ -106,8 +93,6 @@ CREATE TABLE public.incomes
 
 -- Table: public.params
 
-DROP TABLE IF EXISTS public.params;
-
 CREATE TABLE public.params
 (
   id SERIAL PRIMARY KEY,
@@ -116,8 +101,6 @@ CREATE TABLE public.params
 
 
 -- Table: public.passwordresets
-
-DROP TABLE IF EXISTS public.passwordresets;
 
 CREATE TABLE public.passwordresets
 (
@@ -130,13 +113,10 @@ CREATE TABLE public.passwordresets
 
 -- Table: public.accountsusers
 
-DROP TABLE IF EXISTS public.accountsusers;
-
 CREATE TABLE public.accountsusers
 (
   id SERIAL PRIMARY KEY,
   accounts_id integer NOT NULL DEFAULT 0,
   users_id integer NOT NULL DEFAULT 0
 );
-
 

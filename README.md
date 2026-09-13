@@ -1,6 +1,5 @@
 # goexpenses
-Simple expenses web application written in Go, using Echo and PostgresSQL.
-You must manualy execute script pg_structure.sql on Postgres database first.
+Simple expenses web application written in Go, using Echo and PostgreSQL.
 You can define expenses and incomes, and then enter posts.
 It is possible to enter amounts in RSD or EUR currency.
 
@@ -52,6 +51,12 @@ servers which do not require authentication.
 
 PostgreSQL is currently the only enabled database driver. Invalid configuration
 is reported at startup without printing passwords, API keys, or database URLs.
+
+The application creates the database schema automatically on first startup.
+Later schema migrations are embedded in the executable, serialized with a
+PostgreSQL advisory lock, and applied in transactions. The recorded schema
+version is updated only after a migration succeeds. As with every database
+deployment, create a backup before installing a new application version.
 
 Session cookies are secure by default. Set `COOKIE_SECURE=false` (or
 `cookiesecure=false` in `goexpenses.ini`) only for local development over HTTP.

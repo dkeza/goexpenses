@@ -1,15 +1,18 @@
 package main
 
 import (
+	"context"
 	"embed"
 	"fmt"
 	"html/template"
 	"io"
 	"io/fs"
 	"log"
+	"time"
 
 	"goexpenses/database"
 	"goexpenses/midware"
+	"goexpenses/migrations"
 	"goexpenses/routes"
 	"goexpenses/util"
 
@@ -31,49 +34,37 @@ func (t *Template) Render(w io.Writer, name string, data interface{}, c echo.Con
 	return t.templates.ExecuteTemplate(w, name, data)
 }
 
-func init() {
-	fmt.Println("Starting...")
+func initializeApplication() error {
 	if err := util.ReadSettings(); err != nil {
-		log.Fatalf("cannot start: %v", err)
+		return err
 	}
 
-	database.Connect()
-
-	// Check if database exists
-	session := util.Session{}
-	err := database.Db.Get(&session, "SELECT id, uuid, user_id, lang, message FROM sessions WHERE 1=0")
-	expectedErrorMsg := ""
-	fmt.Println("Check if database exists", err)
-	if util.Settings.DatabaseType == "sqlite" {
-		expectedErrorMsg = "no such table: sessions"
-	} else {
-		expectedErrorMsg = `pq: relation "sessions" does not exist`
-	}
-	if err.Error() == expectedErrorMsg {
-		fmt.Println("Create database")
-		// Create database
-		sqlScript := ""
-		if util.Settings.DatabaseType == "sqlite" {
-			sqlScript = "db/structure.sql"
-		} else {
-			sqlScript = "db/pg_structure.sql"
-		}
-		sql, err := embeddedFiles.ReadFile(sqlScript)
-		fmt.Println("After readfile", err)
-		if err != nil {
-			panic(fmt.Errorf("read embedded database structure %q: %w", sqlScript, err))
-		}
-		s := string(sql)
-		fmt.Println("SQL SCRIPT:", s)
-		r := database.Db.MustExec(s)
-		fmt.Println("MustExec:", r)
+	connectionContext, cancelConnection := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancelConnection()
+	if err := database.Connect(connectionContext); err != nil {
+		return err
 	}
 
+	initialSchema, err := embeddedFiles.ReadFile("db/pg_structure.sql")
+	if err != nil {
+		database.Db.Close()
+		return fmt.Errorf("read embedded database schema: %w", err)
+	}
+	migrationContext, cancelMigrations := context.WithTimeout(context.Background(), 5*time.Minute)
+	defer cancelMigrations()
+	if err := migrations.Apply(migrationContext, database.Db, initialSchema, util.Settings.Build); err != nil {
+		database.Db.Close()
+		return err
+	}
+	return nil
 }
 
 func main() {
-
-	DatabaseUpdate()
+	fmt.Println("Starting...")
+	if err := initializeApplication(); err != nil {
+		log.Fatalf("cannot start: %v", err)
+	}
+	defer database.Db.Close()
 
 	//gocron.Every(1).Minute().Do(util.GetExchangeRates)
 	// Do it on every restart
@@ -135,95 +126,4 @@ func main() {
 		e.Logger.Fatal(err.Error())
 	}
 
-}
-
-func DatabaseUpdate() {
-	paramTest := util.Param{}
-	err := database.Db.Get(&paramTest, "SELECT id, build FROM params WHERE id=1")
-	if err != nil {
-		if err.Error() == "no such table: params" {
-			fmt.Println("Must create params table")
-			database.Db.MustExec(`
-				CREATE TABLE params (
-				    build INTEGER NOT NULL
-				                  DEFAULT (0),
-				    id    INTEGER PRIMARY KEY
-				                  NOT NULL
-				);
-			`)
-		}
-	}
-
-	param := util.Param{}
-	database.Db.Get(&param, "SELECT id, build FROM params WHERE id=1")
-
-	if param.Id != 1 {
-		database.Db.MustExec(fmt.Sprintf(`INSERT INTO params (id, build) VALUES (%v, %v)`, util.SqlParam(1), util.SqlParam(2)), 1, 0)
-	}
-
-	// BEGIN Here add build revision specific changes for database
-
-	if param.Build < 1 {
-		fmt.Println("Must update public id in post table")
-		posts := []util.Post{}
-		database.Db.Select(&posts, `
-			SELECT id, p_id 
-				FROM posts 
-				WHERE p_id = '' 
-				`)
-		for _, post := range posts {
-			fmt.Println("Updating post.p_id for id ", post.Id)
-			if post.Pid == "" {
-				sql := fmt.Sprintf(`UPDATE posts SET p_id = %v WHERE id = %v`, util.SqlParam(1), util.SqlParam(2))
-				database.Db.MustExec(sql, util.Encrypt(util.CreateUUID()), post.Id)
-			}
-		}
-		fmt.Println("Must update public id in expenses table")
-		expenses := []util.Expense{}
-		database.Db.Select(&expenses, `
-			SELECT id, p_id 
-				FROM expenses 
-				WHERE p_id = '' 
-				`)
-		for _, record := range expenses {
-			fmt.Println("Updating expenses.p_id for id ", record.Id)
-			if record.Pid == "" {
-				sql := fmt.Sprintf(`UPDATE expenses SET p_id = %v WHERE id = %v`, util.SqlParam(1), util.SqlParam(2))
-				database.Db.MustExec(sql, util.Encrypt(util.CreateUUID()), record.Id)
-			}
-		}
-		fmt.Println("Must update public id in incomes table")
-		incomes := []util.Income{}
-		database.Db.Select(&incomes, `
-			SELECT id, p_id 
-				FROM incomes 
-				WHERE p_id = '' 
-				`)
-		for _, record := range incomes {
-			fmt.Println("Updating incomes.p_id for id ", record.Id)
-			if record.Pid == "" {
-				sql := fmt.Sprintf(`UPDATE incomes SET p_id = %v WHERE id = %v`, util.SqlParam(1), util.SqlParam(2))
-				database.Db.MustExec(sql, util.Encrypt(util.CreateUUID()), record.Id)
-			}
-		}
-	}
-
-	if param.Build < 8 {
-		fmt.Println("Add created_at to sessions table")
-		database.Db.MustExec(`DELETE FROM sessions`)
-		database.Db.MustExec(`ALTER TABLE sessions ADD COLUMN created_at timestamp NOT NULL DEFAULT NOW()`)
-	}
-
-	if param.Build < 11 {
-		fmt.Println("Add created_ts to posts table")
-		database.Db.MustExec(`ALTER TABLE posts ADD COLUMN created_ts timestamp NOT NULL DEFAULT NOW()`)
-		database.Db.MustExec(`UPDATE posts SET created_ts = created_at;`)
-	}
-
-	if param.Build != util.Settings.Build {
-		// Update to leatest database version
-		fmt.Println("Update build version to ", util.Settings.Build)
-		sql := fmt.Sprintf(`UPDATE params SET build = %v`, util.SqlParam(1))
-		database.Db.MustExec(sql, util.Settings.Build)
-	}
 }
