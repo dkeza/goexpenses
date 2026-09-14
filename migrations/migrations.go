@@ -22,6 +22,7 @@ var migrationPaths = map[int]string{
 	8:  "sql/008_session_created_at.sql",
 	11: "sql/011_post_created_ts.sql",
 	12: "sql/012_current_version.sql",
+	13: "sql/013_current_version.sql",
 }
 
 func Apply(ctx context.Context, db *sqlx.DB, initialSchema []byte, targetVersion int) error {

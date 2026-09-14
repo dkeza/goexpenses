@@ -37,7 +37,7 @@ type environmentLookup func(string) (string, bool)
 
 func defaultSettings() AppSettings {
 	return AppSettings{
-		Build:        12,
+		Build:        13,
 		Port:         "8080",
 		CookieSecure: true,
 		DatabaseType: "postgres",
