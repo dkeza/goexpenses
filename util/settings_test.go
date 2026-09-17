@@ -25,7 +25,7 @@ DATABASE_URL=postgres://user:database-secret@db.example.com/app
 	if err != nil {
 		t.Fatalf("loadSettings: %v", err)
 	}
-	if settings.Build != 13 || settings.Host != "https://app.example.com" || settings.Port != "8081" {
+	if settings.Build != defaultSettings().Build || settings.Host != "https://app.example.com" || settings.Port != "8081" {
 		t.Fatal("INI application settings were not loaded")
 	}
 	if settings.MailHost != "smtp.example.com" || settings.MailHostPort != 587 || settings.MailFrom != "app@example.com" || settings.MailPassword != "ini-secret" {

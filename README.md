@@ -58,6 +58,20 @@ PostgreSQL advisory lock, and applied in transactions. The recorded schema
 version is updated only after a migration succeeds. As with every database
 deployment, create a backup before installing a new application version.
 
+Version bump
+
+Create a dedicated branch with a clean working tree, then run:
+
+```
+./scripts/bump-version.sh
+```
+
+The script increments the application/schema version, registers and creates a
+no-op migration for the new version, and runs all tests. Review and commit the
+generated changes before opening a pull request. For a release that changes the
+database schema, replace the generated `SELECT 1;` with the required SQL before
+committing.
+
 Exchange rates are refreshed in the background, so an unavailable rates service
 does not block application startup or user requests. Failed or invalid responses
 leave the last successfully stored rate unchanged.
