@@ -45,3 +45,68 @@ jobs:
           name: goexpenses-linux-armv7
           path: dist/goexpenses
           retention-days: 7
+
+  deploy:
+    name: Deploy to Raspberry Pi
+    if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+    needs: test
+    runs-on: ubuntu-latest
+    environment: production
+    concurrency:
+      group: goexpenses-production
+      cancel-in-progress: false
+
+    steps:
+      - name: Download Raspberry Pi binary
+        uses: actions/download-artifact@v7
+        with:
+          name: goexpenses-linux-armv7
+          path: artifact
+
+      - name: Install cloudflared
+        run: |
+          curl --fail --location --retry 3 \
+            --output "$RUNNER_TEMP/cloudflared" \
+            https://github.com/cloudflare/cloudflared/releases/download/2026.9.1/cloudflared-linux-amd64
+          printf '%s  %s\n' \
+            '03f1f25d1cc93b9ad6c60569d44060bc4f17ed97075760ed8cfca4b12dcd68cc' \
+            "$RUNNER_TEMP/cloudflared" | sha256sum --check
+          sudo install -m 0755 "$RUNNER_TEMP/cloudflared" /usr/local/bin/cloudflared
+          cloudflared --version
+
+      - name: Configure SSH
+        env:
+          DEPLOY_SSH_PRIVATE_KEY: ${{ secrets.DEPLOY_SSH_PRIVATE_KEY }}
+          DEPLOY_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+        run: |
+          test -n "$DEPLOY_SSH_PRIVATE_KEY"
+          test -n "$DEPLOY_KNOWN_HOSTS"
+          install -d -m 0700 "$HOME/.ssh"
+          printf '%s\n' "$DEPLOY_SSH_PRIVATE_KEY" > "$HOME/.ssh/goexpenses_actions"
+          chmod 0600 "$HOME/.ssh/goexpenses_actions"
+          printf '%s\n' "$DEPLOY_KNOWN_HOSTS" > "$HOME/.ssh/known_hosts"
+          chmod 0600 "$HOME/.ssh/known_hosts"
+          printf '%s\n' \
+            'Host deep.kezic.net' \
+            '    User pi' \
+            '    Port 22' \
+            '    IdentityFile ~/.ssh/goexpenses_actions' \
+            '    IdentitiesOnly yes' \
+            '    StrictHostKeyChecking yes' \
+            '    ProxyCommand /usr/local/bin/cloudflared access ssh --hostname %h' \
+            > "$HOME/.ssh/config"
+          chmod 0600 "$HOME/.ssh/config"
+
+      - name: Upload binary
+        env:
+          TUNNEL_SERVICE_TOKEN_ID: ${{ secrets.CF_ACCESS_CLIENT_ID }}
+          TUNNEL_SERVICE_TOKEN_SECRET: ${{ secrets.CF_ACCESS_CLIENT_SECRET }}
+        run: |
+          chmod 0755 artifact/goexpenses
+          scp artifact/goexpenses deep.kezic.net:/home/pi/goexpenses.new
+
+      - name: Deploy binary
+        env:
+          TUNNEL_SERVICE_TOKEN_ID: ${{ secrets.CF_ACCESS_CLIENT_ID }}
+          TUNNEL_SERVICE_TOKEN_SECRET: ${{ secrets.CF_ACCESS_CLIENT_SECRET }}
+        run: ssh deep.kezic.net /home/pi/server/deploy-goexpenses.sh
