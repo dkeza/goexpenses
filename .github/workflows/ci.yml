@@ -13,7 +13,7 @@ permissions:
 
 jobs:
   test:
-    name: Go tests
+    name: Go tests and ARM build
     runs-on: ubuntu-latest
 
     steps:
@@ -28,3 +28,20 @@ jobs:
 
       - name: Run tests
         run: go test ./...
+
+      - name: Build Raspberry Pi binary
+        env:
+          CGO_ENABLED: "0"
+          GOOS: linux
+          GOARCH: arm
+          GOARM: "7"
+        run: |
+          mkdir -p dist
+          go build -trimpath -o dist/goexpenses .
+
+      - name: Upload Raspberry Pi binary
+        uses: actions/upload-artifact@v7
+        with:
+          name: goexpenses-linux-armv7
+          path: dist/goexpenses
+          retention-days: 7
