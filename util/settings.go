@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"goexpenses/database"
+	"goexpenses/migrations"
 
 	ini "github.com/vaughan0/go-ini"
 )
@@ -37,7 +38,7 @@ type environmentLookup func(string) (string, bool)
 
 func defaultSettings() AppSettings {
 	return AppSettings{
-		Build:        13,
+		Build:        migrations.CurrentVersion,
 		Port:         "8080",
 		CookieSecure: true,
 		DatabaseType: "postgres",

@@ -14,6 +14,9 @@ import (
 
 const advisoryLockID int64 = 6754112174613617249
 
+// CurrentVersion is the application and database schema version.
+const CurrentVersion = 13
+
 //go:embed sql/*.sql
 var migrationFiles embed.FS
 
