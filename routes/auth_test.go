@@ -28,7 +28,7 @@ func TestAuthenticateUserMigratesLegacyPassword(t *testing.T) {
 		userID   = 17
 	)
 	legacyHash := util.Encrypt(password)
-	selectQuery := `SELECT id, name, username, email, password FROM users WHERE username = $1`
+	selectQuery := `SELECT id, name, username, email, password FROM users WHERE lower(btrim(username)) = $1`
 	updateQuery := `UPDATE users SET password = $1 WHERE id = $2 AND password = $3`
 
 	mock.ExpectQuery(regexp.QuoteMeta(selectQuery)).
@@ -71,7 +71,7 @@ func TestAuthenticateUserAcceptsBcryptPassword(t *testing.T) {
 		t.Fatalf("HashPassword: %v", err)
 	}
 
-	const selectQuery = `SELECT id, name, username, email, password FROM users WHERE username = $1`
+	const selectQuery = `SELECT id, name, username, email, password FROM users WHERE lower(btrim(username)) = $1`
 	mock.ExpectQuery(regexp.QuoteMeta(selectQuery)).
 		WithArgs(username).
 		WillReturnRows(sqlmock.NewRows([]string{"id", "name", "username", "email", "password"}).
@@ -104,7 +104,7 @@ func TestAuthenticateUserRejectsWrongPassword(t *testing.T) {
 		t.Fatalf("HashPassword: %v", err)
 	}
 
-	const selectQuery = `SELECT id, name, username, email, password FROM users WHERE username = $1`
+	const selectQuery = `SELECT id, name, username, email, password FROM users WHERE lower(btrim(username)) = $1`
 	mock.ExpectQuery(regexp.QuoteMeta(selectQuery)).
 		WithArgs("bcrypt-user").
 		WillReturnRows(sqlmock.NewRows([]string{"id", "name", "username", "email", "password"}).

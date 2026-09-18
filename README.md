@@ -58,6 +58,18 @@ PostgreSQL advisory lock, and applied in transactions. The recorded schema
 version is updated only after a migration succeeds. As with every database
 deployment, create a backup before installing a new application version.
 
+The schema enforces case-insensitive uniqueness for user names and e-mail
+addresses, unique public record IDs, account membership uniqueness, and the
+required account relationships for financial records. Migration 15 deliberately
+fails if existing users or public IDs conflict, because choosing which identity
+to keep cannot be done safely without an operator. Resolve the reported
+duplicates and restart the application to retry the transactional migration.
+
+The normal test suite skips the PostgreSQL integration test unless
+`TEST_DATABASE_URL` is set. CI supplies a disposable PostgreSQL service and
+tests fresh schema creation, the version 14 to 15 upgrade, registration, login,
+posting, and database constraint enforcement.
+
 Version bump
 
 Create a dedicated branch with a clean working tree, then run:

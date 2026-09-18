@@ -15,7 +15,7 @@ import (
 const advisoryLockID int64 = 6754112174613617249
 
 // CurrentVersion is the application and database schema version.
-const CurrentVersion = 14
+const CurrentVersion = 15
 
 //go:embed sql/*.sql
 var migrationFiles embed.FS
@@ -27,6 +27,7 @@ var migrationPaths = map[int]string{
 	12: "sql/012_current_version.sql",
 	13: "sql/013_current_version.sql",
 	14: "sql/014_current_version.sql",
+	15: "sql/015_data_integrity.sql",
 }
 
 func Apply(ctx context.Context, db *sqlx.DB, initialSchema []byte, targetVersion int) error {
