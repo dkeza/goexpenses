@@ -3,11 +3,16 @@ package main
 import (
 	"context"
 	"embed"
+	"errors"
 	"fmt"
 	"html/template"
 	"io"
 	"io/fs"
 	"log"
+	"net/http"
+	"os"
+	"os/signal"
+	"syscall"
 	"time"
 
 	"goexpenses/database"
@@ -25,6 +30,13 @@ import (
 //
 //go:embed templates/*.html static db/*.sql
 var embeddedFiles embed.FS
+
+const gracefulShutdownTimeout = 10 * time.Second
+
+type applicationServer interface {
+	Start(address string) error
+	Shutdown(context.Context) error
+}
 
 type Template struct {
 	templates *template.Template
@@ -59,10 +71,36 @@ func initializeApplication() error {
 	return nil
 }
 
-func main() {
-	fmt.Println("Starting...")
+func serveUntilShutdown(ctx context.Context, server applicationServer, address string) error {
+	serverErrors := make(chan error, 1)
+	go func() {
+		serverErrors <- server.Start(address)
+	}()
+
+	select {
+	case err := <-serverErrors:
+		if err == nil || errors.Is(err, http.ErrServerClosed) {
+			return nil
+		}
+		return fmt.Errorf("start HTTP server: %w", err)
+	case <-ctx.Done():
+		shutdownContext, cancelShutdown := context.WithTimeout(context.Background(), gracefulShutdownTimeout)
+		defer cancelShutdown()
+		if err := server.Shutdown(shutdownContext); err != nil {
+			return fmt.Errorf("shut down HTTP server: %w", err)
+		}
+
+		err := <-serverErrors
+		if err == nil || errors.Is(err, http.ErrServerClosed) {
+			return nil
+		}
+		return fmt.Errorf("stop HTTP server: %w", err)
+	}
+}
+
+func runApplication(ctx context.Context) error {
 	if err := initializeApplication(); err != nil {
-		log.Fatalf("cannot start: %v", err)
+		return err
 	}
 	defer database.Db.Close()
 
@@ -117,12 +155,27 @@ func main() {
 
 	routes.DefineRoutes()
 
-	gocron.Start()
+	stopScheduler := gocron.Start()
+	defer func() {
+		stopScheduler <- true
+	}()
 
 	e.Logger.Info("Listening on port " + util.Settings.Port)
-
-	if err := e.Start(":" + util.Settings.Port); err != nil {
-		e.Logger.Fatal(err.Error())
+	if err := serveUntilShutdown(ctx, e, ":"+util.Settings.Port); err != nil {
+		return err
 	}
+	if ctx.Err() != nil {
+		e.Logger.Info("Shutdown complete")
+	}
+	return nil
+}
 
+func main() {
+	fmt.Println("Starting...")
+	ctx, stopSignals := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	err := runApplication(ctx)
+	stopSignals()
+	if err != nil {
+		log.Fatalf("application stopped: %v", err)
+	}
 }
