@@ -83,8 +83,8 @@ func healthCheck(c echo.Context) error {
 
 func authenticateUser(username, password string) (util.User, error) {
 	user := util.User{}
-	query := fmt.Sprintf(`SELECT id, name, username, email, password FROM users WHERE username = %v`, util.SqlParam(1))
-	if err := database.Db.Get(&user, query, username); err != nil {
+	query := fmt.Sprintf(`SELECT id, name, username, email, password FROM users WHERE lower(btrim(username)) = %v`, util.SqlParam(1))
+	if err := database.Db.Get(&user, query, strings.ToLower(strings.TrimSpace(username))); err != nil {
 		if errors.Is(err, stdsql.ErrNoRows) {
 			return util.User{}, errInvalidCredentials
 		}
@@ -213,11 +213,11 @@ func createPasswordReset(email string, now time.Time) (recipient string, token s
 	defer tx.Rollback()
 
 	user := util.User{}
-	query := fmt.Sprintf(`SELECT id, email FROM users WHERE email = %v`, util.SqlParam(1))
+	query := fmt.Sprintf(`SELECT id, email FROM users WHERE lower(btrim(email)) = %v`, util.SqlParam(1))
 	if util.Settings.DatabaseType == "postgres" {
 		query += " FOR UPDATE"
 	}
-	if err = tx.Get(&user, query, strings.TrimSpace(email)); err != nil {
+	if err = tx.Get(&user, query, strings.ToLower(strings.TrimSpace(email))); err != nil {
 		if errors.Is(err, stdsql.ErrNoRows) {
 			return "", "", false, nil
 		}
@@ -375,6 +375,10 @@ func changePassword(c echo.Context) error {
 		util.Flash(`Invalid password!`, data, 0, ``, 0)
 		return c.Redirect(http.StatusSeeOther, "/changepassword")
 	}
+	if !validNewPassword(password) {
+		util.Flash(`Password must contain between 10 and 72 characters.`, data, 0, ``, 0)
+		return c.Redirect(http.StatusSeeOther, "/changepassword")
+	}
 
 	passwordHash, err := util.HashPassword(password)
 	if err != nil {
@@ -482,20 +486,28 @@ func DefineRoutes() {
 
 	e.POST("/register", func(c echo.Context) error {
 		data := c.Get("data").(*util.Data)
-		name := c.FormValue("name")
-		email := c.FormValue("email")
-		username := c.FormValue("username")
-		password := c.FormValue("password")
+		input, validationMessage := validateRegistration(
+			c.FormValue("name"),
+			c.FormValue("email"),
+			c.FormValue("username"),
+			c.FormValue("password"),
+		)
+		if validationMessage != "" {
+			util.Flash(validationMessage, data, 0, ``, 0)
+			return c.Redirect(http.StatusSeeOther, "/register")
+		}
 
-		if name != "" && password != "" {
-			passwordHash, err := util.HashPassword(password)
-			if err != nil {
-				util.Flash(`Invalid password!`, data, 0, ``, 0)
+		passwordHash, err := util.HashPassword(input.Password)
+		if err != nil {
+			util.Flash(`Invalid password!`, data, 0, ``, 0)
+			return c.Redirect(http.StatusSeeOther, "/register")
+		}
+		if err := createUserWithAccount(input.Name, input.Email, input.Username, passwordHash, data.Lang); err != nil {
+			if message := registrationConflictMessage(err); message != "" {
+				util.Flash(message, data, 0, ``, 0)
 				return c.Redirect(http.StatusSeeOther, "/register")
 			}
-			if err := createUserWithAccount(name, email, username, passwordHash, data.Lang); err != nil {
-				return databaseWriteError(c, "register user", err)
-			}
+			return databaseWriteError(c, "register user", err)
 		}
 		return c.Redirect(http.StatusSeeOther, "/login")
 	})

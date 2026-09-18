@@ -10,19 +10,19 @@
 	  <input type="hidden" name="_CSRF" value="{{ .Csrf }}">
 	<div class="form-group">
 	    <label class="sr-only" for="name">{{ GetLangText "Name" .Lang }}</label>
-	    <input type="text" class="form-control" name="name" placeholder="{{ GetLangText "Name" .Lang }}">
+	    <input type="text" class="form-control" id="name" name="name" maxlength="100" required autocomplete="name" placeholder="{{ GetLangText "Name" .Lang }}">
 	  </div>
 	  <div class="form-group">
 	    <label class="sr-only" for="email">{{ GetLangText "E-Mail" .Lang }}</label>
-	    <input type="email" class="form-control" name="email" placeholder="{{ GetLangText "E-Mail" .Lang }}">
+	    <input type="email" class="form-control" id="email" name="email" maxlength="254" required autocomplete="email" placeholder="{{ GetLangText "E-Mail" .Lang }}">
 	  </div>
 	  <div class="form-group">
 	    <label class="sr-only" for="username">{{ GetLangText "User name" .Lang }}</label>
-	    <input type="text" class="form-control" name="username" placeholder="{{ GetLangText "User name" .Lang }}">
+	    <input type="text" class="form-control" id="username" name="username" minlength="3" maxlength="64" pattern="[A-Za-z0-9._-]+" required autocomplete="username" placeholder="{{ GetLangText "User name" .Lang }}">
 	  </div>
 	  <div class="form-group">
 	    <label class="sr-only" for="password">{{ GetLangText "Password" .Lang }}</label>
-	    <input type="password" class="form-control" name="password" placeholder="{{ GetLangText "Password" .Lang }}">
+	    <input type="password" class="form-control" id="password" name="password" minlength="10" maxlength="72" required autocomplete="new-password" placeholder="{{ GetLangText "Password" .Lang }}">
 	  </div>
 	  <button type="submit" class="btn btn-success">{{ GetLangText "Register" .Lang }}</button>
 	</form>
