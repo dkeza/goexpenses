@@ -14,7 +14,7 @@ permissions:
 jobs:
   test:
     name: Go tests and ARM build
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
 
     steps:
       - name: Checkout repository
@@ -50,7 +50,7 @@ jobs:
     name: Deploy to Raspberry Pi
     if: github.event_name == 'push' && github.ref == 'refs/heads/master'
     needs: test
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     environment: production
     concurrency:
       group: goexpenses-production
