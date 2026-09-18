@@ -1,6 +1,7 @@
 package routes
 
 import (
+	"context"
 	"crypto/tls"
 	stdsql "database/sql"
 	"errors"
@@ -25,6 +26,8 @@ var Auth echo.MiddlewareFunc
 var errInvalidCredentials = errors.New("invalid credentials")
 
 const (
+	HealthPath                   = "/healthz"
+	healthCheckTimeout           = 2 * time.Second
 	passwordResetDuration        = 2 * time.Hour
 	passwordResetRequestInterval = 15 * time.Minute
 	passwordResetResponseMessage = "If the E-Mail exists, a reset link has been sent."
@@ -60,6 +63,22 @@ func MainRoute() {
 		}
 		return c.Render(http.StatusOK, "index", data)
 	})
+}
+
+func healthCheck(c echo.Context) error {
+	if database.Db == nil {
+		c.Logger().Error("health check failed: database is not initialized")
+		return c.String(http.StatusServiceUnavailable, "service unavailable\n")
+	}
+
+	ctx, cancel := context.WithTimeout(c.Request().Context(), healthCheckTimeout)
+	defer cancel()
+	if err := database.Db.PingContext(ctx); err != nil {
+		c.Logger().Errorf("health check database ping: %v", err)
+		return c.String(http.StatusServiceUnavailable, "service unavailable\n")
+	}
+
+	return c.String(http.StatusOK, "ok\n")
 }
 
 func authenticateUser(username, password string) (util.User, error) {
@@ -435,6 +454,8 @@ func DefineRoutes() {
 	}
 
 	auth := Auth
+
+	E.GET(HealthPath, healthCheck)
 
 	MainRoute()
 

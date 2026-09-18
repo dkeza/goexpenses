@@ -20,6 +20,9 @@ func SetMiddleware() {
 	e := routes.E
 
 	e.Use(middleware.CSRFWithConfig(middleware.CSRFConfig{
+		Skipper: func(c echo.Context) bool {
+			return c.Request().URL.Path == routes.HealthPath
+		},
 		TokenLookup:    "form:_CSRF",
 		CookiePath:     "/",
 		CookieMaxAge:   int(util.SessionDuration.Seconds()),
@@ -48,6 +51,10 @@ func databaseReadError(c echo.Context, operation, message string, err error) err
 
 func CheckCookie(next echo.HandlerFunc) echo.HandlerFunc {
 	return func(c echo.Context) error {
+		if c.Request().URL.Path == routes.HealthPath {
+			return next(c)
+		}
+
 		data := new(util.Data)
 
 		session, sessionHash, err := getOrCreateSession(c)

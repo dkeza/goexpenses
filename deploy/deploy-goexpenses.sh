@@ -5,7 +5,7 @@ set -Eeuo pipefail
 readonly staged_binary="${1:-/home/pi/goexpenses.new}"
 readonly target_binary="/home/pi/server/goexpenses"
 readonly service_name="goexpenses"
-readonly health_url="http://127.0.0.1:8080/"
+readonly health_url="http://127.0.0.1:8080/healthz"
 readonly timestamp="$(date -u +%Y%m%d-%H%M%S)"
 readonly backup_binary="${target_binary}.backup.${timestamp}"
 readonly next_binary="${target_binary}.next.$$"
