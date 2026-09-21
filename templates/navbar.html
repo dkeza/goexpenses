@@ -1,71 +1,66 @@
 {{ define "navbar" }}
-
-<nav class="navbar navbar-inverse navbar-fixed-top">
-  <div class="container">
-    <div class="navbar-header">
-      <button type="button" class="navbar-toggle collapsed" data-toggle="collapse" data-target="#navbar" aria-expanded="false" aria-controls="navbar">
-        <span class="sr-only">Toggle navigation</span>
-        <span class="icon-bar"></span>
-        <span class="icon-bar"></span>
-        <span class="icon-bar"></span>
-      </button>
-      {{if eq .User.Name ""}} <a class="navbar-brand" href="/">{{ GetLangText "Expenses" .Lang }}</a> {{else}} <span class="navbar-brand">{{ GetLangText "Hi" .Lang }} {{ .User.Name }}</span> {{end}}
-    </div>
-    <div id="navbar" class="collapse navbar-collapse">
-      <ul class="nav navbar-nav">
-        <li {{if eq .Active "home"}} class="active"{{end}}><a href="/">{{ GetLangText "Home" .Lang }}</a></li>
-		    <li {{if eq .Active "expenses"}} class="active"{{end}}><a href="/expenses">{{ GetLangText "Expenses" .Lang }}</a></li>
-        <li {{if eq .Active "incomes"}} class="active"{{end}}><a href="/incomes">{{ GetLangText "Incomes" .Lang }}</a></li>
-		    <li {{if eq .Active "posts"}} class="active"{{end}}><a href="/posts">{{ GetLangText "Posts" .Lang }}</a></li>
+<nav class="navbar navbar-expand-lg bg-body border-bottom sticky-top" aria-label="{{ GetLangText "Main navigation" .Lang }}">
+  <div class="container-xl">
+    <a class="navbar-brand d-flex align-items-center gap-2" href="/">
+      <span class="brand-mark" aria-hidden="true">€</span>
+      <span>{{ GetLangText "Expenses" .Lang }}</span>
+    </a>
+    <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#main-navigation" aria-controls="main-navigation" aria-expanded="false" aria-label="{{ GetLangText "Toggle navigation" .Lang }}">
+      <span class="navbar-toggler-icon"></span>
+    </button>
+    <div class="collapse navbar-collapse" id="main-navigation">
+      <ul class="navbar-nav me-auto mb-2 mb-lg-0">
+        <li class="nav-item"><a class="nav-link{{ if eq .Active "home" }} active{{ end }}"{{ if eq .Active "home" }} aria-current="page"{{ end }} href="/">{{ GetLangText "Home" .Lang }}</a></li>
+        <li class="nav-item"><a class="nav-link{{ if eq .Active "expenses" }} active{{ end }}"{{ if eq .Active "expenses" }} aria-current="page"{{ end }} href="/expenses">{{ GetLangText "Expenses" .Lang }}</a></li>
+        <li class="nav-item"><a class="nav-link{{ if eq .Active "incomes" }} active{{ end }}"{{ if eq .Active "incomes" }} aria-current="page"{{ end }} href="/incomes">{{ GetLangText "Incomes" .Lang }}</a></li>
+        <li class="nav-item"><a class="nav-link{{ if eq .Active "posts" }} active{{ end }}"{{ if eq .Active "posts" }} aria-current="page"{{ end }} href="/posts">{{ GetLangText "Posts" .Lang }}</a></li>
       </ul>
-
-      <ul class="nav navbar-nav navbar-right">
-        <li class="dropdown">
-          <a href="#" class="dropdown-toggle" data-toggle="dropdown" role="button" aria-haspopup="true" aria-expanded="false">{{ GetLangText "Language" .Lang }}<span class="caret"></span></a>
-          <ul class="dropdown-menu">
-            <li><a href="/?lang=EN">English</a></li>
-            <li><a href="/?lang=DE">Deutsch</a></li>
-            <li><a href="/?lang=RS">Srpski</a></li>
-            <li><a href="/?lang=SR">Српски</a></li>
+      <ul class="navbar-nav align-items-lg-center gap-lg-1">
+        <li class="nav-item dropdown">
+          <button class="nav-link dropdown-toggle btn btn-link" type="button" data-bs-toggle="dropdown" aria-expanded="false">{{ GetLangText "Language" .Lang }}</button>
+          <ul class="dropdown-menu dropdown-menu-end">
+            <li><a class="dropdown-item" href="/?lang=EN" lang="en">English</a></li>
+            <li><a class="dropdown-item" href="/?lang=DE" lang="de">Deutsch</a></li>
+            <li><a class="dropdown-item" href="/?lang=RS" lang="sr-Latn">Srpski</a></li>
+            <li><a class="dropdown-item" href="/?lang=SR" lang="sr-Cyrl">Српски</a></li>
           </ul>
         </li>
-		{{if eq .User.Name ""}}
-		
-			<li><a href="/login">{{ GetLangText "Login" .Lang }}</a></li>
-
-		{{else}}
-
-	        <li class="dropdown">
-	          <a href="#" class="dropdown-toggle" data-toggle="dropdown" role="button" aria-haspopup="true" aria-expanded="false"><span class="glyphicon glyphicon-user" aria-hidden="true"></span><span class="caret"></span></a>
-	          <ul class="dropdown-menu">
-				<li>
-					<form action="/logout" method="post">
-						<input type="hidden" name="_CSRF" value="{{ .Csrf }}">
-						<button type="submit" class="btn btn-link navbar-btn">{{ GetLangText "Logout" .Lang }}</button>
-					</form>
-				</li>
-	            <li><a href="/changepassword">{{ GetLangText "Change password" .Lang }}</a></li>
-	          </ul>
-	        </li>
-		
-		{{end}}
-		
-		<li><a href="#">v{{ ShowBuildVersion }}</a></li>
+        <li class="nav-item">
+          <button class="nav-link theme-toggle" id="theme-toggle" type="button" aria-label="{{ GetLangText "Toggle color theme" .Lang }}" title="{{ GetLangText "Toggle color theme" .Lang }}">
+            <span class="theme-icon" aria-hidden="true">◐</span>
+          </button>
+        </li>
+        {{ if eq .User.Name "" }}
+          <li class="nav-item"><a class="btn btn-primary ms-lg-2" href="/login">{{ GetLangText "Login" .Lang }}</a></li>
+        {{ else }}
+          <li class="nav-item dropdown">
+            <button class="nav-link dropdown-toggle btn btn-link user-menu" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+              <span class="user-avatar" aria-hidden="true">{{ printf "%.1s" .User.Name }}</span>
+              <span>{{ .User.Name }}</span>
+            </button>
+            <ul class="dropdown-menu dropdown-menu-end">
+              <li><a class="dropdown-item" href="/changepassword">{{ GetLangText "Change password" .Lang }}</a></li>
+              <li><hr class="dropdown-divider"></li>
+              <li>
+                <form action="/logout" method="post">
+                  <input type="hidden" name="_CSRF" value="{{ .Csrf }}">
+                  <button type="submit" class="dropdown-item">{{ GetLangText "Logout" .Lang }}</button>
+                </form>
+              </li>
+            </ul>
+          </li>
+        {{ end }}
+        <li class="nav-item"><span class="navbar-text version-label">v{{ ShowBuildVersion }}</span></li>
       </ul>
-
-    </div><!--/.nav-collapse -->
+    </div>
   </div>
 </nav>
 
-<div class="container">
-
-	{{if ne .Flash ""}}
-
-	<div class="alert alert-{{ if eq .Message_success 0 }}danger{{ else }}success{{ end }} alert-dismissible" role="alert">
-	  <button type="button" class="close" data-dismiss="alert" aria-label="Close"><span aria-hidden="true">&times;</span></button>
-	  {{ .Flash }}
-	</div>
-
-	{{ end }}
-
+<main class="container-xl app-main">
+  {{ if ne .Flash "" }}
+    <div class="alert alert-{{ if eq .Message_success 0 }}danger{{ else }}success{{ end }} alert-dismissible fade show" role="alert">
+      {{ .Flash }}
+      <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="{{ GetLangText "Close" .Lang }}"></button>
+    </div>
+  {{ end }}
 {{ end }}

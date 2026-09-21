@@ -1,32 +1,16 @@
 {{ define "register" }}
-
-  {{ template "header" . }}
-
-  {{ template "navbar" . }}
-
-	<h1>{{ GetLangText "Register" .Lang }}</h1>
-
-	<form action="/register" method="post">
-	  <input type="hidden" name="_CSRF" value="{{ .Csrf }}">
-	<div class="form-group">
-	    <label class="sr-only" for="name">{{ GetLangText "Name" .Lang }}</label>
-	    <input type="text" class="form-control" id="name" name="name" maxlength="100" required autocomplete="name" placeholder="{{ GetLangText "Name" .Lang }}">
-	  </div>
-	  <div class="form-group">
-	    <label class="sr-only" for="email">{{ GetLangText "E-Mail" .Lang }}</label>
-	    <input type="email" class="form-control" id="email" name="email" maxlength="254" required autocomplete="email" placeholder="{{ GetLangText "E-Mail" .Lang }}">
-	  </div>
-	  <div class="form-group">
-	    <label class="sr-only" for="username">{{ GetLangText "User name" .Lang }}</label>
-	    <input type="text" class="form-control" id="username" name="username" minlength="3" maxlength="64" pattern="[A-Za-z0-9._-]+" required autocomplete="username" placeholder="{{ GetLangText "User name" .Lang }}">
-	  </div>
-	  <div class="form-group">
-	    <label class="sr-only" for="password">{{ GetLangText "Password" .Lang }}</label>
-	    <input type="password" class="form-control" id="password" name="password" minlength="10" maxlength="72" required autocomplete="new-password" placeholder="{{ GetLangText "Password" .Lang }}">
-	  </div>
-	  <button type="submit" class="btn btn-success">{{ GetLangText "Register" .Lang }}</button>
-	</form>
-
-	{{ template "footer" . }}
-
+{{ template "header" . }}
+{{ template "navbar" . }}
+<section class="auth-card surface-card">
+  <div class="page-heading"><h1>{{ GetLangText "Register" .Lang }}</h1></div>
+  <form action="/register" method="post" class="vstack gap-3">
+    <input type="hidden" name="_CSRF" value="{{ .Csrf }}">
+    <div><label class="form-label" for="name">{{ GetLangText "Name" .Lang }}</label><input type="text" class="form-control" id="name" name="name" maxlength="100" required autocomplete="name"></div>
+    <div><label class="form-label" for="email">{{ GetLangText "E-Mail" .Lang }}</label><input type="email" class="form-control" id="email" name="email" maxlength="254" required autocomplete="email"></div>
+    <div><label class="form-label" for="username">{{ GetLangText "User name" .Lang }}</label><input type="text" class="form-control" id="username" name="username" minlength="3" maxlength="64" pattern="[A-Za-z0-9._-]+" required autocomplete="username"></div>
+    <div><label class="form-label" for="password">{{ GetLangText "Password" .Lang }}</label><input type="password" class="form-control" id="password" name="password" minlength="10" maxlength="72" required autocomplete="new-password"></div>
+    <button type="submit" class="btn btn-primary">{{ GetLangText "Register" .Lang }}</button>
+  </form>
+</section>
+{{ template "footer" . }}
 {{ end }}

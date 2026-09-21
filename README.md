@@ -5,6 +5,10 @@ It is possible to enter amounts in RSD or EUR currency.
 
 Project is using modules for dependency management.
 
+The server-rendered UI uses locally bundled Bootstrap 5.3.8 assets. Custom
+colors, spacing, responsive layouts, and light/dark themes are defined in
+`static/css/main.css`; no frontend build step is required.
+
 Requires Go 1.27.1 or newer.
 
 Build and installation
@@ -102,4 +106,5 @@ https://goexpenses.kezic.net/
 Credits to
 
 * [Echo Web Framework](https://github.com/labstack/echo)
+* [Bootstrap](https://getbootstrap.com/)
 * [open exchange rates](https://openexchangerates.org)

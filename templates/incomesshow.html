@@ -1,33 +1,15 @@
 {{ define "incomesshow" }}
-
-  {{ template "header" . }}
-
-  {{ template "navbar" . }}
-
-	<h1>{{ GetLangText "Update income" .Lang }}</h1>
-
-	{{ with .Incomes}}
-	{{ range . }}
-	<form class="form-inline" action="/incomes/update" method="post">
-	  <input type="hidden" name="_CSRF" value="{{ $.Csrf }}">
-	<div class="form-group">
-	    <label class="sr-only" for="description">{{ GetLangText "Description" $.Lang }}</label>
-	    <input type="hidden" name="id" value="{{ .Pid }}">
-		<input type="text" class="form-control" id="description" name="description" placeholder="{{ GetLangText "Description" $.Lang }}" value="{{ .Description }}">
-	  </div>
-	  <button type="submit" class="btn btn-default">{{ GetLangText "Save" $.Lang }}</button>
-	  <button type="button" class="btn btn-warning" onClick="onCancelIncomesShow()">{{ GetLangText "Cancel" $.Lang }}</button>
-	</form>
-
-	<script>
-		function onCancelIncomesShow() {
-			window.location = "/incomes";
-		}
-	</script>
-
-	{{ end }}
-	{{ end }}
-
-	{{ template "footer" . }}
-
+{{ template "header" . }}
+{{ template "navbar" . }}
+<section class="auth-card surface-card">
+  <div class="page-heading"><h1>{{ GetLangText "Update income" .Lang }}</h1></div>
+  {{ with .Incomes }}{{ range . }}
+  <form action="/incomes/update" method="post" class="vstack gap-3">
+    <input type="hidden" name="_CSRF" value="{{ $.Csrf }}"><input type="hidden" name="id" value="{{ .Pid }}">
+    <div><label class="form-label" for="description">{{ GetLangText "Description" $.Lang }}</label><input type="text" class="form-control" id="description" name="description" value="{{ .Description }}" required></div>
+    <div class="d-flex gap-2"><button type="submit" class="btn btn-primary">{{ GetLangText "Save" $.Lang }}</button><a class="btn btn-outline-secondary" href="/incomes">{{ GetLangText "Cancel" $.Lang }}</a></div>
+  </form>
+  {{ end }}{{ end }}
+</section>
+{{ template "footer" . }}
 {{ end }}

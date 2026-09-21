@@ -27,6 +27,15 @@ type LangText struct {
 var AppLang = map[string]LangText{}
 
 func init() {
+	AppLang["Main navigation"] = LangText{"Glavna navigacija", "Главна навигација", "Hauptnavigation"}
+	AppLang["Toggle navigation"] = LangText{"Otvori ili zatvori navigaciju", "Отвори или затвори навигацију", "Navigation ein- oder ausblenden"}
+	AppLang["Toggle color theme"] = LangText{"Promeni temu", "Промени тему", "Farbschema wechseln"}
+	AppLang["Confirm deletion"] = LangText{"Potvrda brisanja", "Потврда брисања", "Löschen bestätigen"}
+	AppLang["Actions"] = LangText{"Akcije", "Радње", "Aktionen"}
+	AppLang["Summary"] = LangText{"Pregled", "Преглед", "Übersicht"}
+	AppLang["Apply filter"] = LangText{"Primeni filter", "Примени филтер", "Filter anwenden"}
+	AppLang["Reset password"] = LangText{"Poništi lozinku", "Поништи лозинку", "Kennwort zurücksetzen"}
+	AppLang["Reset link would be sent to Your E-Mail. Please click on received link to proceed."] = LangText{"Link za poništavanje lozinke biće poslat na vašu E-Mail adresu.", "Линк за поништавање лозинке биће послат на вашу Е-Пошту.", "Ein Link zum Zurücksetzen wird an Ihre E-Mail-Adresse gesendet."}
 	AppLang["Expenses"] = LangText{"Troškovi", "Трошкови", "Kosten"}
 	AppLang["Expense"] = LangText{"Тrоšak", "Трошак", "Kosten"}
 	AppLang["Incomes"] = LangText{"Prihodi", "Приходи", "Einkommen"}

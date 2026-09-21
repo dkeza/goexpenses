@@ -1,15 +1,16 @@
 {{ define "index" }}
-
-  {{ template "header" . }}
-
-  {{ template "navbar" . }}
-
-    <div class="starter-template">
-      <h1>{{ GetLangText "Simple Expenses App" .Lang }}</h1>
-      <p class="lead">{{ GetLangText "Register, and create unlimited accounts." .Lang }}<br>{{ GetLangText "Track Your incomes and expenses." .Lang }}</p>
+{{ template "header" . }}
+{{ template "navbar" . }}
+<section class="hero">
+  <span class="brand-mark mx-auto mb-4" aria-hidden="true">€</span>
+  <h1>{{ GetLangText "Simple Expenses App" .Lang }}</h1>
+  <p class="lead">{{ GetLangText "Register, and create unlimited accounts." .Lang }} {{ GetLangText "Track Your incomes and expenses." .Lang }}</p>
+  {{ if eq .User.Name "" }}
+    <div class="d-flex flex-column flex-sm-row justify-content-center gap-2 mt-4">
+      <a class="btn btn-primary btn-lg" href="/register">{{ GetLangText "Register" .Lang }}</a>
+      <a class="btn btn-outline-secondary btn-lg" href="/login">{{ GetLangText "Login" .Lang }}</a>
     </div>
-
-
-  {{ template "footer" . }}
-
+  {{ end }}
+</section>
+{{ template "footer" . }}
 {{ end }}

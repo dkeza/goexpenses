@@ -1,66 +1,22 @@
 {{ define "postsshow" }}
-
-  {{ template "header" . }}
-
-  {{ template "navbar" . }}
-
-	<h1>{{ GetLangText "Update post" .Lang }}</h1>
-
-	{{ with .Posts}}
-	{{ range . }}
-	<p>ID: {{ .Pid }}</p>
-	<form class="form-inline" action="/posts/update" method="post">
-		<input type="hidden" name="_CSRF" value="{{ $.Csrf }}">
-		<input type="hidden" name="id" value="{{ .Pid }}">
-		<div class="form-group">
-			<label class="sr-only" for="description">{{ GetLangText "Description" $.Lang }}</label>
-			<input type="text" class="form-control" id="description" name="description" placeholder="{{ GetLangText "Description" $.Lang }}" value="{{ .Description }}">
-		</div>
-		<div class="form-group">
-			<label class="sr-only" for="expense">{{ GetLangText "Expense" $.Lang }}</label>
-			<input type="text" class="form-control" id="expense" placeholder="" value="{{ .Expense }}" readonly>
-		</div>
-		<div class="form-group">
-			<label class="sr-only" for="income">{{ GetLangText "Income" $.Lang }}</label>
-			<input type="text" class="form-control" id="income" placeholder="" value="{{ .Income }}" readonly>
-		</div>
-
-		<div class="form-group">
-			<label class="sr-only" for="dateonly"
-				>{{ GetLangText "Date" $.Lang }}</label
-			>
-			<input
-				type="date"
-				class="form-control"
-				id="dateonly"
-				name="dateonly"
-				placeholder=""
-				value="{{ .DateOnly }}"
-			/>
-		</div>
-
-		<div class="form-group">
-			<label class="sr-only" for="timestamp">{{ GetLangText "Timestamp" $.Lang }}</label>
-			<input type="text" class="form-control" id="timestamp" placeholder="" value="{{ FormatDateTime .Timestamp }}" readonly>
-		</div>
-
-		<div class="form-group">
-			<label class="sr-only" for="amount">{{ GetLangText "Amount" $.Lang }}</label>
-			<input type="number" step="any" class="form-control" id="amount" name="amount" placeholder="{{ GetLangText "Amount" $.Lang }}" value="{{ .Amount }}">
-		</div>
-		<button type="submit" class="btn btn-success">{{ GetLangText "Save" $.Lang }}</button>
-		<button type="button" class="btn btn-warning" onClick="onCancelPostsShow()">{{ GetLangText "Cancel" $.Lang }}</button>
-	</form>
-
-	<script>
-		function onCancelPostsShow() {
-			window.location = "/posts";
-		}
-	</script>
-
-	{{ end }}
-	{{ end }}
-
-	{{ template "footer" . }}
-
+{{ template "header" . }}
+{{ template "navbar" . }}
+<section class="form-card surface-card">
+  <div class="page-heading"><h1>{{ GetLangText "Update post" .Lang }}</h1></div>
+  {{ with .Posts }}{{ range . }}
+  <form action="/posts/update" method="post">
+    <input type="hidden" name="_CSRF" value="{{ $.Csrf }}"><input type="hidden" name="id" value="{{ .Pid }}">
+    <div class="row g-3">
+      <div class="col-12 col-lg-6"><label class="form-label" for="description">{{ GetLangText "Description" $.Lang }}</label><input type="text" class="form-control" id="description" name="description" value="{{ .Description }}"></div>
+      <div class="col-6 col-lg-3"><label class="form-label" for="expense">{{ GetLangText "Expense" $.Lang }}</label><input type="text" class="form-control" id="expense" value="{{ .Expense }}" readonly></div>
+      <div class="col-6 col-lg-3"><label class="form-label" for="income">{{ GetLangText "Income" $.Lang }}</label><input type="text" class="form-control" id="income" value="{{ .Income }}" readonly></div>
+      <div class="col-12 col-md-4"><label class="form-label" for="dateonly">{{ GetLangText "Date" $.Lang }}</label><input type="date" class="form-control" id="dateonly" name="dateonly" value="{{ .DateOnly }}"></div>
+      <div class="col-12 col-md-4"><label class="form-label" for="timestamp">{{ GetLangText "Timestamp" $.Lang }}</label><input type="text" class="form-control" id="timestamp" value="{{ FormatDateTime .Timestamp }}" readonly></div>
+      <div class="col-12 col-md-4"><label class="form-label" for="amount">{{ GetLangText "Amount" $.Lang }}</label><input type="number" step="any" class="form-control" id="amount" name="amount" value="{{ .Amount }}"></div>
+      <div class="col-12 d-flex gap-2"><button type="submit" class="btn btn-primary">{{ GetLangText "Save" $.Lang }}</button><a class="btn btn-outline-secondary" href="/posts">{{ GetLangText "Cancel" $.Lang }}</a></div>
+    </div>
+  </form>
+  {{ end }}{{ end }}
+</section>
+{{ template "footer" . }}
 {{ end }}

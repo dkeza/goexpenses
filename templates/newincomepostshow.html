@@ -1,49 +1,19 @@
 {{ define "newincomepostshow" }}
-
-  {{ template "header" . }}
-
-  {{ template "navbar" . }}
-
-	<h1>{{ GetLangText "Enter new income post" .Lang }}</h1>
-
-	<form class="form-inline" action="/posts/save" method="post">
-		<input type="hidden" name="_CSRF" value="{{ .Csrf }}">
-		<input type="hidden" name="expense_id" value="">
-	  <div class="form-group">
-	    <label class="sr-only" for="description">{{ GetLangText "Description" .Lang }}</label>
-	    <input type="text" class="form-control" id="description" name="description" placeholder="{{ GetLangText "Description" .Lang }}">
-	  </div>
-	  <div class="form-group">
-	    <label class="sr-only" for="income_id">{{ GetLangText "Income type" .Lang }}</label>
-		<select name="income_id" class="form-control">
-		{{ with .Incomes}}
-			{{ range . }}
-				<option value="{{ .Pid }}">{{ .Description }}</option>
-			{{ end }}
-		{{ end }}
-		</select>
-	  </div>
-      <div class="form-group">
-        <label class="sr-only" for="date">{{ GetLangText "Date" .Lang }}</label>
-        <input
-          type="date"
-          class="form-control"
-          id="date"
-          name="date"
-          value="{{ .Date }}"
-        />
-      </div>
-	  <div class="form-group">
-	    <label class="sr-only" for="amount">{{ GetLangText "Amount" .Lang }}</label>
-	    <input type="number" min="1" step="any" class="form-control" id="amount" name="amount" placeholder="{{ GetLangText "Amount" .Lang }}">
-	  </div>
-	  <div class="form-group">
-	    <label class="sr-only" for="amounte">{{ GetLangText "Amount" .Lang }} €</label>
-	    <input type="number" min="1" step="any" class="form-control" id="amounte" name="amounte" placeholder="{{ GetLangText "Amount" .Lang }} €">
-	  </div>
-	  <button type="submit" class="btn btn-default">{{ GetLangText "Save" .Lang }}</button>
-	</form>
-
-	{{ template "footer" . }}
-
+{{ template "header" . }}
+{{ template "navbar" . }}
+<section class="form-card surface-card">
+  <div class="page-heading"><h1>{{ GetLangText "Enter new income post" .Lang }}</h1></div>
+  <form action="/posts/save" method="post">
+    <input type="hidden" name="_CSRF" value="{{ .Csrf }}"><input type="hidden" name="expense_id" value="">
+    <div class="row g-3">
+      <div class="col-12 col-lg-5"><label class="form-label" for="description">{{ GetLangText "Description" .Lang }}</label><input type="text" class="form-control" id="description" name="description" required></div>
+      <div class="col-12 col-sm-6 col-lg-4"><label class="form-label" for="income_id">{{ GetLangText "Income type" .Lang }}</label><select id="income_id" name="income_id" class="form-select">{{ with .Incomes }}{{ range . }}<option value="{{ .Pid }}">{{ .Description }}</option>{{ end }}{{ end }}</select></div>
+      <div class="col-12 col-sm-6 col-lg-3"><label class="form-label" for="date">{{ GetLangText "Date" .Lang }}</label><input type="date" class="form-control" id="date" name="date" value="{{ .Date }}" required></div>
+      <div class="col-6"><label class="form-label" for="amount">{{ GetLangText "Amount" .Lang }} RSD</label><input type="number" min="0.01" step="any" class="form-control" id="amount" name="amount"></div>
+      <div class="col-6"><label class="form-label" for="amounte">{{ GetLangText "Amount" .Lang }} EUR</label><input type="number" min="0.01" step="any" class="form-control" id="amounte" name="amounte"></div>
+      <div class="col-12 d-flex gap-2"><button type="submit" class="btn btn-primary">{{ GetLangText "Save" .Lang }}</button><a class="btn btn-outline-secondary" href="/posts">{{ GetLangText "Cancel" .Lang }}</a></div>
+    </div>
+  </form>
+</section>
+{{ template "footer" . }}
 {{ end }}
