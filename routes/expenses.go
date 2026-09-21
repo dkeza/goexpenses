@@ -3,7 +3,6 @@ package routes
 import (
 	"fmt"
 	"net/http"
-	"strconv"
 	"strings"
 
 	"goexpenses/database"
@@ -151,12 +150,10 @@ func DefineExpenses() {
 			expenses_idnum = expenses[0].Id
 		}
 
-		amountnum, _ := strconv.ParseFloat(amount, 64)
-		if amountnum == 0.00 {
-			amounte, _ := strconv.ParseFloat(amounte, 64)
-			if amounte != 0.00 {
-				amountnum = util.ToFixed(amounte*data.Eur, 2)
-			}
+		amountnum, err := parseAmountInputs(amount, amounte, data.Eur)
+		if err != nil {
+			util.Flash(`Invalid amount!`, data, 0, description, 0)
+			return c.Redirect(http.StatusSeeOther, "/expenses")
 		}
 
 		sql := fmt.Sprintf(`INSERT INTO expenses (description, accounts_id, amount, exchange, expenses_id, p_id) VALUES (%v,%v,%v,%v,%v,%v)`, util.SqlParam(1), util.SqlParam(2), util.SqlParam(3), util.SqlParam(4), util.SqlParam(5), util.SqlParam(6))
@@ -178,12 +175,10 @@ func DefineExpenses() {
 			return c.Redirect(http.StatusSeeOther, "/expenses")
 		}
 
-		amountnum, _ := strconv.ParseFloat(amount, 64)
-		if amountnum == 0.00 {
-			amounte, _ := strconv.ParseFloat(amounte, 64)
-			if amounte != 0.00 {
-				amountnum = util.ToFixed(amounte*data.Eur, 2)
-			}
+		amountnum, err := parseAmountInputs(amount, amounte, data.Eur)
+		if err != nil {
+			util.Flash(`Invalid amount!`, data, 0, description, 0)
+			return c.Redirect(http.StatusSeeOther, "/expenses")
 		}
 
 		expenses_idnum := 0
