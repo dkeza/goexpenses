@@ -33,6 +33,9 @@ func init() {
 	AppLang["Income"] = LangText{"Prihod", "Приход", "Einkommen"}
 	AppLang["Home"] = LangText{"Početak", "Почетак", "Anfang"}
 	AppLang["Posts"] = LangText{"Stavke", "Ставке", "Buchungen"}
+	AppLang["Posts pagination"] = LangText{"Stranice stavki", "Странице ставки", "Buchungsseiten"}
+	AppLang["Newer"] = LangText{"Novije", "Новије", "Neuere"}
+	AppLang["Older"] = LangText{"Starije", "Старије", "Ältere"}
 	AppLang["Hi"] = LangText{"Zdravo", "Здраво", "Hallo"}
 	AppLang["Language"] = LangText{"Jezik", "Језик", "Sprache"}
 	AppLang["Simple Expenses App"] = LangText{"Jednostavna aplikacija za evidenciju troškova", "Једноставна апликација за контролу трошкова", "Einfache Ausgaben App"}

@@ -76,7 +76,7 @@ func TestPostgresRegistrationLoginAndPost(t *testing.T) {
 		DROP INDEX expenses_public_id_uidx;
 		DROP INDEX incomes_public_id_uidx;
 		DROP INDEX accountsusers_account_user_uidx;
-		DROP INDEX posts_active_account_date_idx;
+		DROP INDEX posts_active_account_date_id_idx;
 		DROP INDEX expenses_active_account_description_idx;
 		DROP INDEX incomes_active_account_description_idx;
 		DROP INDEX sessions_created_at_idx;

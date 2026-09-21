@@ -145,6 +145,27 @@ template "account" . }}
   </table>
 </div>
 
+{{ if or .Pagination.HasPrev .Pagination.HasNext }}
+<nav aria-label="{{ GetLangText "Posts pagination" .Lang }}">
+  <ul class="pager">
+    {{ if .Pagination.HasPrev }}
+    <li class="previous">
+      <a href="/posts?before={{ .Pagination.PrevCursor }}">
+        <span aria-hidden="true">&larr;</span> {{ GetLangText "Newer" .Lang }}
+      </a>
+    </li>
+    {{ end }}
+    {{ if .Pagination.HasNext }}
+    <li class="next">
+      <a href="/posts?after={{ .Pagination.NextCursor }}">
+        {{ GetLangText "Older" .Lang }} <span aria-hidden="true">&rarr;</span>
+      </a>
+    </li>
+    {{ end }}
+  </ul>
+</nav>
+{{ end }}
+
 <script>
   function postsDelete(id, description, csrf) {
   	bootbox.confirm({
@@ -162,9 +183,9 @@ template "account" . }}
   	    callback: function (result) {
   	        if (result) {
   		        $.post("/posts/delete", { _CSRF:csrf,id:id },  function(data){
-  					setTimeout(function () {
-  					        location.reload()
-  					    }, 100);
+					setTimeout(function () {
+					        location.assign('/posts')
+					    }, 100);
         				});
   			}
   	    }

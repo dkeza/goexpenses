@@ -26,9 +26,17 @@ type Data struct {
 	Date                  string
 	Accounts              []Account
 	Posts                 []Post
+	Pagination            Pagination
 	Expenses              []Expense
 	ExpensesAdd           []Expense
 	Incomes               []Income
+}
+
+type Pagination struct {
+	NextCursor string
+	PrevCursor string
+	HasNext    bool
+	HasPrev    bool
 }
 
 // Account

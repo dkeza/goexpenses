@@ -67,7 +67,7 @@ duplicates and restart the application to retry the transactional migration.
 
 The normal test suite skips the PostgreSQL integration test unless
 `TEST_DATABASE_URL` is set. CI supplies a disposable PostgreSQL service and
-tests fresh schema creation, the version 14 to 15 upgrade, registration, login,
+tests fresh schema creation, the version 14 to current upgrade, registration, login,
 posting, and database constraint enforcement.
 
 Version bump
