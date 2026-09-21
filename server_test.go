@@ -59,7 +59,7 @@ func TestEmbeddedPostgresSchemaIsCurrentAndNonDestructive(t *testing.T) {
 		"created_at timestamp NOT NULL DEFAULT NOW()",
 		"created_ts timestamp NOT NULL DEFAULT NOW()",
 		"users_username_lower_uidx",
-		"posts_active_account_date_idx",
+		"posts_active_account_date_id_idx",
 		"posts_account_fk",
 	} {
 		if !strings.Contains(schemaText, required) {

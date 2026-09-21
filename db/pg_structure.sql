@@ -143,8 +143,8 @@ CREATE UNIQUE INDEX expenses_public_id_uidx ON public.expenses (p_id) WHERE p_id
 CREATE UNIQUE INDEX incomes_public_id_uidx ON public.incomes (p_id) WHERE p_id <> '';
 CREATE UNIQUE INDEX accountsusers_account_user_uidx ON public.accountsusers (accounts_id, users_id);
 
-CREATE INDEX posts_active_account_date_idx
-  ON public.posts (accounts_id, created_at DESC)
+CREATE INDEX posts_active_account_date_id_idx
+  ON public.posts (accounts_id, created_at DESC, id DESC)
   WHERE deleted = 0;
 CREATE INDEX expenses_active_account_description_idx
   ON public.expenses (accounts_id, description)

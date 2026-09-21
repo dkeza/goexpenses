@@ -1,8 +1,12 @@
 package routes
 
 import (
+	"encoding/base64"
+	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
+	"slices"
 	"time"
 
 	"goexpenses/database"
@@ -11,6 +15,145 @@ import (
 	"github.com/labstack/echo/v4"
 )
 
+const postsPageSize = 50
+
+type postPageCursor struct {
+	CreatedAt time.Time `json:"created_at"`
+	ID        int       `json:"id"`
+}
+
+type postPageRequest struct {
+	Cursor    postPageCursor
+	Direction string
+}
+
+func encodePostCursor(post util.Post) (string, error) {
+	encoded, err := json.Marshal(postPageCursor{CreatedAt: post.DateTime, ID: post.Id})
+	if err != nil {
+		return "", fmt.Errorf("encode post cursor: %w", err)
+	}
+	return base64.RawURLEncoding.EncodeToString(encoded), nil
+}
+
+func decodePostCursor(encoded string) (postPageCursor, error) {
+	decoded, err := base64.RawURLEncoding.DecodeString(encoded)
+	if err != nil {
+		return postPageCursor{}, errors.New("invalid post cursor encoding")
+	}
+
+	cursor := postPageCursor{}
+	if err := json.Unmarshal(decoded, &cursor); err != nil || cursor.ID <= 0 || cursor.CreatedAt.IsZero() {
+		return postPageCursor{}, errors.New("invalid post cursor")
+	}
+	return cursor, nil
+}
+
+func parsePostPageRequest(c echo.Context) (postPageRequest, error) {
+	after := c.QueryParam("after")
+	before := c.QueryParam("before")
+	if after != "" && before != "" {
+		return postPageRequest{}, errors.New("only one post cursor may be specified")
+	}
+
+	request := postPageRequest{}
+	encoded := after
+	if before != "" {
+		request.Direction = "before"
+		encoded = before
+	} else if after != "" {
+		request.Direction = "after"
+	}
+	if encoded == "" {
+		return request, nil
+	}
+
+	cursor, err := decodePostCursor(encoded)
+	if err != nil {
+		return postPageRequest{}, err
+	}
+	request.Cursor = cursor
+	return request, nil
+}
+
+func setPostPagination(data *util.Data, posts []util.Post, request postPageRequest, hasMore bool) error {
+	data.Pagination = util.Pagination{}
+	if len(posts) == 0 {
+		return nil
+	}
+
+	data.Pagination.HasPrev = request.Direction == "after" || (request.Direction == "before" && hasMore)
+	data.Pagination.HasNext = request.Direction == "before" || (request.Direction != "before" && hasMore)
+
+	var err error
+	if data.Pagination.HasPrev {
+		data.Pagination.PrevCursor, err = encodePostCursor(posts[0])
+		if err != nil {
+			return err
+		}
+	}
+	if data.Pagination.HasNext {
+		data.Pagination.NextCursor, err = encodePostCursor(posts[len(posts)-1])
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func loadPostsPage(accountID int, filterDateFrom, filterDateTo *time.Time, request postPageRequest) ([]util.Post, bool, error) {
+	posts := []util.Post{}
+	queryArgs := []any{accountID}
+	where := "p.accounts_id = " + util.SqlParam(len(queryArgs)) + " AND p.deleted = 0"
+	if filterDateFrom != nil && filterDateTo != nil {
+		queryArgs = append(queryArgs, *filterDateFrom, *filterDateTo)
+		where += fmt.Sprintf(" AND p.created_at BETWEEN %v AND %v", util.SqlParam(len(queryArgs)-1), util.SqlParam(len(queryArgs)))
+	}
+
+	order := "p.created_at DESC, p.id DESC"
+	if request.Direction != "" {
+		queryArgs = append(queryArgs, request.Cursor.CreatedAt, request.Cursor.CreatedAt, request.Cursor.ID)
+		operator := "<"
+		if request.Direction == "before" {
+			operator = ">"
+			order = "p.created_at ASC, p.id ASC"
+		}
+		where += fmt.Sprintf(
+			" AND (p.created_at %s %v OR (p.created_at = %v AND p.id %s %v))",
+			operator,
+			util.SqlParam(len(queryArgs)-2),
+			util.SqlParam(len(queryArgs)-1),
+			operator,
+			util.SqlParam(len(queryArgs)),
+		)
+	}
+
+	queryArgs = append(queryArgs, postsPageSize+1)
+	query := fmt.Sprintf(`
+		SELECT p.id, p.description, COALESCE(e.description,'') AS expense,
+			COALESCE(i.description,'') AS income, p.created_at AS date,
+			p.created_at AS datetime, p.created_ts, p.amount,
+			COALESCE(CAST(p.amount/NULLIF(p.exchange, 0) AS Numeric(12,2)), 0) AS amounte, p.p_id
+		FROM posts p
+		LEFT JOIN expenses e ON p.expenses_id = e.id
+		LEFT JOIN incomes i ON p.incomes_id = i.id
+		WHERE %s
+		ORDER BY %s
+		LIMIT %s
+	`, where, order, util.SqlParam(len(queryArgs)))
+	if err := database.Db.Select(&posts, query, queryArgs...); err != nil {
+		return nil, false, err
+	}
+
+	hasMore := len(posts) > postsPageSize
+	if hasMore {
+		posts = posts[:postsPageSize]
+	}
+	if request.Direction == "before" {
+		slices.Reverse(posts)
+	}
+	return posts, hasMore, nil
+}
+
 func DefinePosts() {
 	e := E
 	auth := Auth
@@ -18,6 +161,10 @@ func DefinePosts() {
 	e.GET("/posts", func(c echo.Context) error {
 		data := c.Get("data").(*util.Data)
 		data.Active = "posts"
+		pageRequest, err := parsePostPageRequest(c)
+		if err != nil {
+			return echo.NewHTTPError(http.StatusBadRequest, "invalid paging cursor").SetInternal(err)
+		}
 		cfrom := c.QueryParam("from")
 		cto := c.QueryParam("to")
 		creset := c.QueryParam("reset")
@@ -157,65 +304,18 @@ func DefinePosts() {
 		}
 		data.Expenses = expenses
 
-		posts := []util.Post{}
+		var pageFilterFrom, pageFilterTo *time.Time
 		if ldatefilter {
-			sql := ""
-			if util.Settings.DatabaseType == "sqlite" {
-				sql = fmt.Sprintf(`
-				SELECT p.id, p.description, ifnull(e.description,'') AS expense, 
-					ifnull(i.description,'') AS income, created_at AS date, created_ts, p.amount, 
-					COALESCE(CAST(p.amount/NULLIF(p.exchange, 0) AS Numeric(12,2)), 0) AS amounte, p.p_id
-					FROM posts p 
-					LEFT JOIN expenses e ON p.expenses_id = e.id 
-					LEFT JOIN incomes i ON p.incomes_id = i.id 
-					WHERE p.accounts_id = %v AND p.deleted = 0 AND created_at BETWEEN %v AND %v 
-					ORDER BY created_at DESC
-				`, util.SqlParam(1), util.SqlParam(2), util.SqlParam(3))
-			} else {
-				sql = fmt.Sprintf(`
-				SELECT p.id, p.description, COALESCE(e.description,'') AS expense, 
-					COALESCE(i.description,'') AS income, created_at AS date, created_ts, p.amount, 
-					COALESCE(CAST(p.amount/NULLIF(p.exchange, 0) AS Numeric(12,2)), 0) AS amounte, p.p_id
-					FROM posts p 
-					LEFT JOIN expenses e ON p.expenses_id = e.id 
-					LEFT JOIN incomes i ON p.incomes_id = i.id 
-					WHERE p.accounts_id = %v AND p.deleted = 0 AND created_at BETWEEN %v AND %v 
-					ORDER BY created_at DESC
-				`, util.SqlParam(1), util.SqlParam(2), util.SqlParam(3))
-			}
-			errsql = database.Db.Select(&posts, sql, data.User.Default_accounts_id, filterdatefrom, filterdateto)
-		} else {
-			sql := ""
-			if util.Settings.DatabaseType == "sqlite" {
-				sql = fmt.Sprintf(`
-				SELECT p.id, p.description, ifnull(e.description,'') AS expense, 
-					ifnull(i.description,'') AS income, created_at AS date, created_ts, p.amount, 
-					COALESCE(CAST(p.amount/NULLIF(p.exchange, 0) AS Numeric(12,2)), 0) AS amounte, p.p_id
-					FROM posts p 
-					LEFT JOIN expenses e ON p.expenses_id = e.id 
-					LEFT JOIN incomes i ON p.incomes_id = i.id 
-					WHERE p.accounts_id = %v AND p.deleted = 0 
-					ORDER BY created_at DESC
-				`, util.SqlParam(1))
-			} else {
-				sql = fmt.Sprintf(`
-				SELECT p.id, p.description, COALESCE(e.description,'') AS expense, 
-					COALESCE(i.description,'') AS income, created_at AS date, created_ts, p.amount, 
-					COALESCE(CAST(p.amount/NULLIF(p.exchange, 0) AS Numeric(12,2)), 0) AS amounte, p.p_id
-					FROM posts p 
-					LEFT JOIN expenses e ON p.expenses_id = e.id 
-					LEFT JOIN incomes i ON p.incomes_id = i.id 
-					WHERE p.accounts_id = %v AND p.deleted = 0 
-					ORDER BY created_at DESC
-				`, util.SqlParam(1))
-			}
-			errsql = database.Db.Select(&posts, sql, data.User.Default_accounts_id)
+			pageFilterFrom = &filterdatefrom
+			pageFilterTo = &filterdateto
 		}
-
-		if errsql != nil {
-			return databaseReadError(c, "load posts", errsql)
+		posts, hasMore, err := loadPostsPage(data.User.Default_accounts_id, pageFilterFrom, pageFilterTo, pageRequest)
+		if err != nil {
+			return databaseReadError(c, "load posts", err)
 		}
-
+		if err := setPostPagination(data, posts, pageRequest, hasMore); err != nil {
+			return echo.NewHTTPError(http.StatusInternalServerError, "could not build paging links").SetInternal(err)
+		}
 		data.Posts = posts
 		data.Date = time.Now().Format("2006-01-02")
 
