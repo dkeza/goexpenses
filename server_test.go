@@ -1,12 +1,15 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"net/http"
 	"strings"
 	"sync"
 	"testing"
+
+	"goexpenses/util"
 )
 
 type fakeApplicationServer struct {
@@ -71,6 +74,30 @@ func TestEmbeddedPostgresSchemaIsCurrentAndNonDestructive(t *testing.T) {
 func TestTemplatesParse(t *testing.T) {
 	if _, err := parseTemplates(); err != nil {
 		t.Fatalf("parse embedded templates: %v", err)
+	}
+}
+
+func TestStaticAssetURLsIncludeBuildVersion(t *testing.T) {
+	templates, err := parseTemplates()
+	if err != nil {
+		t.Fatalf("parse embedded templates: %v", err)
+	}
+
+	originalBuild := util.Settings.Build
+	util.Settings.Build = 123
+	t.Cleanup(func() {
+		util.Settings.Build = originalBuild
+	})
+
+	data := &util.Data{}
+	for _, name := range []string{"header", "footer"} {
+		var rendered bytes.Buffer
+		if err := templates.ExecuteTemplate(&rendered, name, data); err != nil {
+			t.Fatalf("render %s template: %v", name, err)
+		}
+		if count := strings.Count(rendered.String(), "?v=123"); count != 2 {
+			t.Fatalf("%s template has %d versioned asset URLs, want 2", name, count)
+		}
 	}
 }
 
