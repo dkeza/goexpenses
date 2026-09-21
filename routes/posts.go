@@ -27,6 +27,21 @@ type postPageRequest struct {
 	Direction string
 }
 
+func parsePostFilterRange(from, to string) (time.Time, time.Time, error) {
+	var fromDate, toDate time.Time
+	var err error
+	for _, layout := range []string{"2006-01-02", "02.01.2006"} {
+		fromDate, err = time.Parse(layout, from)
+		if err == nil {
+			toDate, err = time.Parse(layout, to)
+			if err == nil {
+				return fromDate, toDate.AddDate(0, 0, 1).Add(-time.Nanosecond), nil
+			}
+		}
+	}
+	return time.Time{}, time.Time{}, errors.New("invalid post filter date range")
+}
+
 func encodePostCursor(post util.Post) (string, error) {
 	encoded, err := json.Marshal(postPageCursor{CreatedAt: post.DateTime, ID: post.Id})
 	if err != nil {
@@ -198,24 +213,17 @@ func DefinePosts() {
 			}
 
 			if cfrom != "" {
-				layout := "02.01.2006T15:04:05.000Z"
-				clfrom := cfrom + "T00:00:00.000Z"
-				tfrom, err := time.Parse(layout, clfrom)
+				tfrom, tto, err := parsePostFilterRange(cfrom, cto)
 				if err == nil {
-					clto := cto + "T23:59:59.999Z"
-					tto, err := time.Parse(layout, clto)
-					if err == nil {
-						ldatefilter = true
-						filterdatefrom = tfrom
-						filterdateto = tto
-						data.Filter = filterdatefrom.Format("02-01-2006") + " - " + filterdateto.Format("02-01-2006")
-						sql := fmt.Sprintf(`UPDATE accounts SET fromdate = %v, todate = %v WHERE id = %v`, util.SqlParam(1), util.SqlParam(2), util.SqlParam(3))
-						if err := executeExactlyOne(database.Db, sql, cfrom, cto, data.User.Default_accounts_id); err != nil {
-							return databaseWriteError(c, "save account date filter", err)
-						}
+					ldatefilter = true
+					filterdatefrom = tfrom
+					filterdateto = tto
+					data.Filter = filterdatefrom.Format("02-01-2006") + " - " + filterdateto.Format("02-01-2006")
+					sql := fmt.Sprintf(`UPDATE accounts SET fromdate = %v, todate = %v WHERE id = %v`, util.SqlParam(1), util.SqlParam(2), util.SqlParam(3))
+					if err := executeExactlyOne(database.Db, sql, cfrom, cto, data.User.Default_accounts_id); err != nil {
+						return databaseWriteError(c, "save account date filter", err)
 					}
 				}
-
 			}
 		}
 

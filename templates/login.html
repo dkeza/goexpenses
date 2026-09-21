@@ -1,27 +1,18 @@
 {{ define "login" }}
-
-  {{ template "header" . }}
-
-  {{ template "navbar" . }}
-
-	<h1>{{ GetLangText "Login" .Lang }}</h1>
-
-	<form class="form-inline" action="/auth" method="post">
-	  <input type="hidden" name="_CSRF" value="{{ .Csrf }}">
-	  <div class="form-group">
-	    <label class="sr-only" for="username">{{ GetLangText "User name" .Lang }}</label>
-	    <input type="text" class="form-control" name="username" placeholder="{{ GetLangText "User name" .Lang }}">
-	  </div>
-	  <div class="form-group">
-	    <label class="sr-only" for="password">{{ GetLangText "Password" .Lang }}</label>
-	    <input type="password" class="form-control" name="password" placeholder="{{ GetLangText "Password" .Lang }}">
-	  </div>
-	  <button type="submit" class="btn btn-success">{{ GetLangText "Login me in" .Lang }}</button>
-	  <a class="btn btn-default" href="/register" role="button">{{ GetLangText "Register" .Lang }}</a>
-	</form>
-	<br>
-	<a class="btn btn-default btn-xs" href="/reset" role="button">{{ GetLangText "I forgot my password" .Lang }}</a>
-
-	{{ template "footer" . }}
-
+{{ template "header" . }}
+{{ template "navbar" . }}
+<section class="auth-card surface-card">
+  <div class="page-heading"><h1>{{ GetLangText "Login" .Lang }}</h1></div>
+  <form action="/auth" method="post" class="vstack gap-3">
+    <input type="hidden" name="_CSRF" value="{{ .Csrf }}">
+    <div><label class="form-label" for="username">{{ GetLangText "User name" .Lang }}</label><input type="text" class="form-control" id="username" name="username" required autocomplete="username"></div>
+    <div><label class="form-label" for="password">{{ GetLangText "Password" .Lang }}</label><input type="password" class="form-control" id="password" name="password" required autocomplete="current-password"></div>
+    <button type="submit" class="btn btn-primary">{{ GetLangText "Login me in" .Lang }}</button>
+  </form>
+  <div class="d-flex flex-wrap justify-content-between gap-2 mt-4">
+    <a href="/register">{{ GetLangText "Register" .Lang }}</a>
+    <a href="/reset">{{ GetLangText "I forgot my password" .Lang }}</a>
+  </div>
+</section>
+{{ template "footer" . }}
 {{ end }}

@@ -42,6 +42,35 @@ type Template struct {
 	templates *template.Template
 }
 
+func templateFunctions() template.FuncMap {
+	return template.FuncMap{
+		"FormatCurrency": func(c float64) string {
+			return fmt.Sprintf("%.2f", c)
+		},
+		"GetLangText": util.GetLangText,
+		"FormatDateTime": func(dt string) string {
+			return dt[8:10] + "." + dt[5:7] + "." + dt[0:4] + " " + dt[11:19]
+		},
+		"FormatDate": func(dt string) string {
+			return dt[8:10] + "." + dt[5:7] + "." + dt[0:4]
+		},
+		"FormatVisibleId": func(vid string) string {
+			x := ""
+			if len(vid) > 0 {
+				x = vid[len(vid)-10:]
+			}
+			return x
+		},
+		"ShowBuildVersion": func() string {
+			return fmt.Sprint(util.Settings.Build)
+		},
+	}
+}
+
+func parseTemplates() (*template.Template, error) {
+	return template.New("").Funcs(templateFunctions()).ParseFS(embeddedFiles, "templates/*.html")
+}
+
 func (t *Template) Render(w io.Writer, name string, data interface{}, c echo.Context) error {
 	return t.templates.ExecuteTemplate(w, name, data)
 }
@@ -112,33 +141,8 @@ func runApplication(ctx context.Context) error {
 
 	e := routes.E
 
-	// Example how we can use some custom function in template
-	funcMap := template.FuncMap{
-		"FormatCurrency": func(c float64) string {
-			return fmt.Sprintf("%.2f", c)
-		},
-		"GetLangText": util.GetLangText,
-		"FormatDateTime": func(dt string) string {
-			return dt[8:10] + "." + dt[5:7] + "." + dt[0:4] + " " + dt[11:19]
-			//2019-03-05T00:00:00Z
-		},
-		"FormatDate": func(dt string) string {
-			return dt[8:10] + "." + dt[5:7] + "." + dt[0:4]
-		},
-		"FormatVisibleId": func(vid string) string {
-			x := ""
-			if len(vid) > 0 {
-				x = vid[len(vid)-10:]
-			}
-			return x
-		},
-		"ShowBuildVersion": func() string {
-			return fmt.Sprint(util.Settings.Build)
-		},
-	}
-
 	t := &Template{
-		templates: template.Must(template.New("").Funcs(funcMap).ParseFS(embeddedFiles, "templates/*.html")),
+		templates: template.Must(parseTemplates()),
 	}
 
 	e.Renderer = t

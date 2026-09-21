@@ -68,6 +68,12 @@ func TestEmbeddedPostgresSchemaIsCurrentAndNonDestructive(t *testing.T) {
 	}
 }
 
+func TestTemplatesParse(t *testing.T) {
+	if _, err := parseTemplates(); err != nil {
+		t.Fatalf("parse embedded templates: %v", err)
+	}
+}
+
 func TestServeUntilShutdownStopsServerAfterContextCancellation(t *testing.T) {
 	server := newFakeApplicationServer()
 	ctx, cancel := context.WithCancel(context.Background())

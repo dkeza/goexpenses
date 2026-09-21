@@ -1,8 +1,27 @@
 {{ define "footer" }}
+</main>
 
-  </div><!-- /.container -->
+<div class="modal fade" id="delete-confirmation" tabindex="-1" aria-labelledby="delete-confirmation-title" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2 class="modal-title fs-5" id="delete-confirmation-title">{{ GetLangText "Confirm deletion" .Lang }}</h2>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="{{ GetLangText "Close" .Lang }}"></button>
+      </div>
+      <div class="modal-body">
+        <p>{{ GetLangText "Do You really want delete this record?" .Lang }}</p>
+        <p class="fw-semibold mb-0" id="delete-confirmation-detail"></p>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">{{ GetLangText "No" .Lang }}</button>
+        <button type="button" class="btn btn-danger" id="delete-confirmation-submit">{{ GetLangText "Yes" .Lang }}</button>
+      </div>
+    </div>
+  </div>
+</div>
 
+<script src="/static/js/bootstrap.min.js"></script>
+<script src="/static/js/app.js"></script>
 </body>
 </html>
-
 {{ end }}

@@ -1,33 +1,19 @@
 {{ define "account" }}
-
 {{ $accountid := .User.Default_accounts_id }}
-
-<div class="row">
-	<div class="col-md-8">
-
-		<div class="account_section">
-			<form id="account-selector" class="form-inline" action="/accounts/select" method="post">
-				<input type="hidden" name="_CSRF" value="{{ .Csrf }}">
-				<div class="form-group">
-					<label class="sr-only" for="default_accounts_id">{{ GetLangText "Account" .Lang }}</label>
-					<select name="accounts_id" id="default_accounts_id" class="form-control">
-					{{ with .Accounts}}
-						{{ range . }}
-							<option {{ if eq .Id $accountid }} selected="selected" {{end}} value="{{ .Id }}">{{ .Description }}</option>
-						{{ end }}
-					{{ end }}
-					</select>
-				</div>
-				<noscript><button type="submit" class="btn btn-default">OK</button></noscript>
-			</form>
-			<a class="btn btn-warning" href="/accounts/show">{{ GetLangText "New account" .Lang }}</a>
-		</div>
-	</div>
-
-	<div class="col-md-4 pull-right">
-		<span>1 € = {{ .Eur }} RSD ({{ FormatDateTime .Eurdate }})</span>
-	</div>
-
-</div>
-
+<section class="account-bar surface-card" aria-label="{{ GetLangText "Account" .Lang }}">
+  <div class="account-controls">
+    <form id="account-selector" action="/accounts/select" method="post">
+      <input type="hidden" name="_CSRF" value="{{ .Csrf }}">
+      <label class="form-label" for="default_accounts_id">{{ GetLangText "Account" .Lang }}</label>
+      <select name="accounts_id" id="default_accounts_id" class="form-select">
+        {{ with .Accounts }}{{ range . }}
+          <option {{ if eq .Id $accountid }}selected{{ end }} value="{{ .Id }}">{{ .Description }}</option>
+        {{ end }}{{ end }}
+      </select>
+      <noscript><button type="submit" class="btn btn-outline-secondary mt-2">OK</button></noscript>
+    </form>
+    <a class="btn btn-outline-primary" href="/accounts/show">{{ GetLangText "New account" .Lang }}</a>
+  </div>
+  <span class="exchange-rate">1 € = {{ .Eur }} RSD · {{ FormatDateTime .Eurdate }}</span>
+</section>
 {{ end }}

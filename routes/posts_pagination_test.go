@@ -47,6 +47,35 @@ func TestParsePostPageRequestRejectsTwoDirections(t *testing.T) {
 	}
 }
 
+func TestParsePostFilterRangeAcceptsNativeDateInput(t *testing.T) {
+	from, to, err := parsePostFilterRange("2026-09-21", "2026-09-21")
+	if err != nil {
+		t.Fatalf("parsePostFilterRange: %v", err)
+	}
+	if got := from.Format(time.RFC3339Nano); got != "2026-09-21T00:00:00Z" {
+		t.Fatalf("from = %s", got)
+	}
+	if got := to.Format(time.RFC3339Nano); got != "2026-09-21T23:59:59.999999999Z" {
+		t.Fatalf("to = %s", got)
+	}
+}
+
+func TestParsePostFilterRangeAcceptsLegacyDateInput(t *testing.T) {
+	from, to, err := parsePostFilterRange("21.09.2026", "22.09.2026")
+	if err != nil {
+		t.Fatalf("parsePostFilterRange: %v", err)
+	}
+	if from.Day() != 21 || to.Day() != 22 {
+		t.Fatalf("range = %v to %v", from, to)
+	}
+}
+
+func TestParsePostFilterRangeRejectsInvalidInput(t *testing.T) {
+	if _, _, err := parsePostFilterRange("2026-09-21", ""); err == nil {
+		t.Fatal("parsePostFilterRange accepted an incomplete range")
+	}
+}
+
 func TestLoadPostsPageUsesStableOrderAndOneExtraRow(t *testing.T) {
 	mock, _ := useMockRouteDatabase(t)
 	createdAt := time.Date(2026, time.September, 21, 12, 0, 0, 0, time.UTC)

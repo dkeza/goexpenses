@@ -1,23 +1,14 @@
 {{ define "reset" }}
-
-  {{ template "header" . }}
-
-  {{ template "navbar" . }}
-
-	<h1>{{ GetLangText "Reset password" .Lang }}</h1>
-
-	<p>{{ GetLangText "Reset link would be sent to Your E-Mail. Please click on received link to proceed." .Lang }}</p>
-
-
-	<form action="/reset" method="post">
-		<input type="hidden" name="_CSRF" value="{{ .Csrf }}">
-	    <div class="form-group">
-	    	<label class="sr-only" for="email">{{ GetLangText "E-Mail" .Lang }}</label>
-	    	<input type="email" class="form-control" name="email" placeholder="{{ GetLangText "E-Mail" .Lang }}">
-	  	</div>
-		<button type="submit" class="btn btn-success">{{ GetLangText "Reset" .Lang }}</button>
-	</form>
-
-	{{ template "footer" . }}
-
+{{ template "header" . }}
+{{ template "navbar" . }}
+<section class="auth-card surface-card">
+  <div class="page-heading"><h1>{{ GetLangText "Reset password" .Lang }}</h1></div>
+  <p class="text-body-secondary">{{ GetLangText "Reset link would be sent to Your E-Mail. Please click on received link to proceed." .Lang }}</p>
+  <form action="/reset" method="post" class="vstack gap-3">
+    <input type="hidden" name="_CSRF" value="{{ .Csrf }}">
+    <div><label class="form-label" for="email">{{ GetLangText "E-Mail" .Lang }}</label><input type="email" class="form-control" id="email" name="email" required autocomplete="email"></div>
+    <button type="submit" class="btn btn-primary">{{ GetLangText "Reset" .Lang }}</button>
+  </form>
+</section>
+{{ template "footer" . }}
 {{ end }}
