@@ -3,7 +3,6 @@ package routes
 import (
 	"fmt"
 	"net/http"
-	"strconv"
 	"time"
 
 	"goexpenses/database"
@@ -232,27 +231,24 @@ func DefinePosts() {
 		amount := c.FormValue("amount")
 		amounte := c.FormValue("amounte")
 		date := c.FormValue("date")
-		if data.Eur <= 0 {
+		amountnum, err := parseAmountInputs(amount, amounte, data.Eur)
+		if err != nil {
 			util.Flash(`Changes not saved, because of invalid input data!`, data, 0, "", 0)
 			return c.Redirect(http.StatusSeeOther, "/posts")
 		}
 
-		createdAt := time.Now()
-		currentDate, errDate := time.Parse("2006-01-02", date)
-		if errDate == nil {
-			now := time.Now()
-			createdAt = time.Date(currentDate.Year(), currentDate.Month(), currentDate.Day(), now.Hour(), now.Minute(), now.Second(), now.Nanosecond(), now.Location())
+		createdAt, err := dateWithTime(date, time.Now())
+		if err != nil {
+			util.Flash(`Invalid date!`, data, 0, description, 0)
+			return c.Redirect(http.StatusSeeOther, "/posts")
+		}
+		if amountnum == 0 {
+			util.Flash(`Invalid amount!`, data, 0, description, 0)
+			return c.Redirect(http.StatusSeeOther, "/posts")
 		}
 
 		expenses_pid := expenses_id
 		incomes_pid := incomes_id
-		amountnum, _ := strconv.ParseFloat(amount, 64)
-		if amountnum == 0.00 {
-			amounte, _ := strconv.ParseFloat(amounte, 64)
-			if amounte != 0.00 {
-				amountnum = util.ToFixed(amounte*data.Eur, 2)
-			}
-		}
 
 		expenses := []util.Expense{}
 
@@ -286,10 +282,6 @@ func DefinePosts() {
 				return c.Redirect(http.StatusSeeOther, "/posts")
 			}
 
-			if amountnum == 0.00 {
-				util.Flash(`Invalid amount!`, data, 0, description, expenses_idnum)
-				return c.Redirect(http.StatusSeeOther, "/posts")
-			}
 		}
 
 		incomes_idnum := 0
@@ -447,15 +439,14 @@ func DefinePosts() {
 			break
 		}
 
-		createdAt := storedDate
-		enteredDate, errDate := time.Parse("2006-01-02", dateOnly)
-		if errDate == nil {
-			createdAt = time.Date(enteredDate.Year(), enteredDate.Month(), enteredDate.Day(), storedDate.Hour(), storedDate.Minute(), storedDate.Second(), storedDate.Nanosecond(), storedDate.Location())
-		}
-
-		amountNumber, err := strconv.ParseFloat(amount, 64)
-		if err != nil {
+		amountNumber, err := parseDatabaseAmount(amount)
+		if err != nil || amountNumber == 0 {
 			util.Flash(`Invalid amount!`, data, 0, description, 0)
+			return c.Redirect(http.StatusSeeOther, "/posts")
+		}
+		createdAt, err := dateWithTime(dateOnly, storedDate)
+		if err != nil {
+			util.Flash(`Invalid date!`, data, 0, description, 0)
 			return c.Redirect(http.StatusSeeOther, "/posts")
 		}
 		sql = fmt.Sprintf(`UPDATE posts SET description = %v, amount = %v, created_at = %v WHERE p_id = %v AND accounts_id = %v AND deleted = 0`, util.SqlParam(1), util.SqlParam(2), util.SqlParam(3), util.SqlParam(4), util.SqlParam(5))

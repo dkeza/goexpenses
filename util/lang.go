@@ -67,6 +67,7 @@ func init() {
 	AppLang["My account"] = LangText{"Moj račun", "Мој рачун", "Mein Konto"}
 	AppLang["Invalid description!"] = LangText{"Neispravan opis!", "Неисправан опис!", "Ungültige Beschreibung!"}
 	AppLang["Invalid amount!"] = LangText{"Neispravan iznos!", "Неисправан износ!", "Ungültiger Betrag!"}
+	AppLang["Invalid date!"] = LangText{"Neispravan datum!", "Неисправан датум!", "Ungültiges Datum!"}
 	AppLang["Do You really want delete this record?"] = LangText{"Da li si siguran da želiš da obrišeš ovu stavku?", "Да ли си сигуран да желиш да обришеш ову ставку?", "Bist du sicher, dass du willst diese Buchung löschen?"}
 	AppLang["Yes"] = LangText{"Da", "Да", "Ja"}
 	AppLang["No"] = LangText{"Ne", "Не", "Nein"}
