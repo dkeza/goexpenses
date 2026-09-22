@@ -1,7 +1,7 @@
 package routes
 
 import (
-	"errors"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -12,8 +12,22 @@ import (
 	"testing"
 	"time"
 
+	"goexpenses/util"
+
 	"github.com/labstack/echo/v4"
 )
+
+type capturingRateLimitRenderer struct {
+	template string
+	data     *util.Data
+}
+
+func (renderer *capturingRateLimitRenderer) Render(w io.Writer, name string, data interface{}, _ echo.Context) error {
+	renderer.template = name
+	renderer.data = data.(*util.Data)
+	_, err := io.WriteString(w, "friendly rate limit page")
+	return err
+}
 
 func TestRequestLimiterBlocksUntilWindowExpires(t *testing.T) {
 	limiter := newRequestLimiter()
@@ -135,6 +149,8 @@ func TestClientIPExtractorTrustsOnlyLoopbackProxy(t *testing.T) {
 func TestRateLimitMiddlewareReturnsRetryAfter(t *testing.T) {
 	limiter := newRequestLimiter()
 	e := echo.New()
+	renderer := &capturingRateLimitRenderer{}
+	e.Renderer = renderer
 	form := url.Values{"username": {"limited-user"}}
 	rules := func(c echo.Context) []rateLimitRule {
 		return []rateLimitRule{{key: rateLimitIdentifierKey("test", "username", c.FormValue("username")), limit: 1, window: time.Minute}}
@@ -152,13 +168,32 @@ func TestRateLimitMiddlewareReturnsRetryAfter(t *testing.T) {
 	recorder := httptest.NewRecorder()
 	secondRequest := httptest.NewRequest(http.MethodPost, "/auth", strings.NewReader(form.Encode()))
 	secondRequest.Header.Set(echo.HeaderContentType, echo.MIMEApplicationForm)
-	err := handler(e.NewContext(secondRequest, recorder))
-	var httpError *echo.HTTPError
-	if !errors.As(err, &httpError) || httpError.Code != http.StatusTooManyRequests {
-		t.Fatalf("second request error = %v; want HTTP 429", err)
+	context := e.NewContext(secondRequest, recorder)
+	context.Set("data", &util.Data{Lang: "RS"})
+	if err := handler(context); err != nil {
+		t.Fatalf("second request: %v", err)
+	}
+	if recorder.Code != http.StatusTooManyRequests || recorder.Body.String() != "friendly rate limit page" {
+		t.Fatalf("second response = %d %q; want friendly HTTP 429", recorder.Code, recorder.Body.String())
 	}
 	retryAfter, conversionErr := strconv.Atoi(recorder.Header().Get("Retry-After"))
 	if conversionErr != nil || retryAfter < 1 || retryAfter > 60 {
 		t.Fatalf("Retry-After = %q; want 1..60 seconds", recorder.Header().Get("Retry-After"))
+	}
+	if renderer.template != "rate-limit" || renderer.data.RateLimitRetryAfter != retryAfter || renderer.data.RateLimitBackURL != "/login" {
+		t.Fatalf("rendered template = %q with data %#v", renderer.template, renderer.data)
+	}
+}
+
+func TestRateLimitBackURL(t *testing.T) {
+	tests := map[string]string{
+		"/auth":     "/login",
+		"/register": "/register",
+		"/reset":    "/reset",
+	}
+	for path, want := range tests {
+		if got := rateLimitBackURL(path); got != want {
+			t.Errorf("rateLimitBackURL(%q) = %q, want %q", path, got, want)
+		}
 	}
 }
