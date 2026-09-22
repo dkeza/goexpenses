@@ -105,6 +105,20 @@ func TestFetchExchangeRateTimesOutWithoutExposingAPIKey(t *testing.T) {
 	}
 }
 
+func TestFetchExchangeRatePreservesCancellation(t *testing.T) {
+	client := &http.Client{Transport: roundTripFunc(func(request *http.Request) (*http.Response, error) {
+		<-request.Context().Done()
+		return nil, request.Context().Err()
+	})}
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	_, _, err := fetchExchangeRate(ctx, client, "https://rates.example.com/latest.json", "secret-key", 1024)
+	if !errors.Is(err, context.Canceled) {
+		t.Fatalf("fetchExchangeRate error = %v, want context cancellation", err)
+	}
+}
+
 func TestFetchExchangeRateHidesAPIKeyOnTransportError(t *testing.T) {
 	client := &http.Client{Transport: roundTripFunc(func(*http.Request) (*http.Response, error) {
 		return nil, errors.New("transport failed")
@@ -162,5 +176,49 @@ func TestUpdateExchangeRatesDoesNotWriteInvalidResponse(t *testing.T) {
 	}
 	if err := mock.ExpectationsWereMet(); err != nil {
 		t.Fatalf("invalid response changed the database: %v", err)
+	}
+}
+
+func TestExchangeRateRefreshWorkerCancelsAndWaitsForRefresh(t *testing.T) {
+	originalClient := exchangeRateHTTPClient
+	originalLastAttempt := exchangeRateLastAttempt.Load()
+	exchangeRateLastAttempt.Store(0)
+	exchangeRateRefreshing.Store(false)
+	t.Cleanup(func() {
+		exchangeRateHTTPClient = originalClient
+		exchangeRateLastAttempt.Store(originalLastAttempt)
+		exchangeRateRefreshing.Store(false)
+	})
+
+	requestStarted := make(chan struct{})
+	requestFinished := make(chan struct{})
+	exchangeRateHTTPClient = &http.Client{Transport: roundTripFunc(func(request *http.Request) (*http.Response, error) {
+		close(requestStarted)
+		<-request.Context().Done()
+		close(requestFinished)
+		return nil, request.Context().Err()
+	})}
+
+	stopWorker, err := StartExchangeRateRefreshWorker(context.Background())
+	if err != nil {
+		t.Fatalf("StartExchangeRateRefreshWorker: %v", err)
+	}
+	defer stopWorker()
+	if _, err := StartExchangeRateRefreshWorker(context.Background()); err == nil {
+		t.Fatal("started a second exchange rate refresh worker")
+	}
+
+	RefreshExchangeRatesAsync()
+	select {
+	case <-requestStarted:
+	case <-time.After(time.Second):
+		t.Fatal("asynchronous exchange rate refresh did not start")
+	}
+
+	stopWorker()
+	select {
+	case <-requestFinished:
+	default:
+		t.Fatal("worker stopped before the active refresh finished")
 	}
 }
