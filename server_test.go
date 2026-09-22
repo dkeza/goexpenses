@@ -101,6 +101,30 @@ func TestStaticAssetURLsIncludeBuildVersion(t *testing.T) {
 	}
 }
 
+func TestRateLimitTemplateRendersFriendlyResponse(t *testing.T) {
+	templates, err := parseTemplates()
+	if err != nil {
+		t.Fatalf("parse templates: %v", err)
+	}
+
+	data := &util.Data{
+		Lang:                "RS",
+		RateLimitRetryAfter: 42,
+		RateLimitBackURL:    "/login",
+	}
+	var rendered bytes.Buffer
+	if err := templates.ExecuteTemplate(&rendered, "rate-limit", data); err != nil {
+		t.Fatalf("render rate-limit template: %v", err)
+	}
+
+	html := rendered.String()
+	for _, expected := range []string{"Previše zahteva", "Približno vreme čekanja:", ">42<", "sekundi", `href="/login"`} {
+		if !strings.Contains(html, expected) {
+			t.Errorf("rate-limit template does not contain %q", expected)
+		}
+	}
+}
+
 func TestServeUntilShutdownStopsServerAfterContextCancellation(t *testing.T) {
 	server := newFakeApplicationServer()
 	ctx, cancel := context.WithCancel(context.Background())

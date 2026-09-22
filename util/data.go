@@ -23,6 +23,8 @@ type Data struct {
 	Expenses_id           string
 	Last_post_description string
 	Message_success       int
+	RateLimitRetryAfter   int
+	RateLimitBackURL      string
 	Date                  string
 	Accounts              []Account
 	Posts                 []Post

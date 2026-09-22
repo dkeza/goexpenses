@@ -1,0 +1,13 @@
+{{ define "rate-limit" }}
+{{ template "header" . }}
+{{ template "navbar" . }}
+<section class="auth-card surface-card text-center">
+  <div class="page-heading"><h1>{{ GetLangText "Too many requests" .Lang }}</h1></div>
+  <p>{{ GetLangText "You have made too many attempts. Please wait before trying again." .Lang }}</p>
+  <p class="text-body-secondary" role="status">
+    {{ GetLangText "Approximate wait:" .Lang }} <strong>{{ .RateLimitRetryAfter }}</strong> {{ GetLangText "seconds" .Lang }}
+  </p>
+  <a class="btn btn-primary w-100" href="{{ .RateLimitBackURL }}">{{ GetLangText "Back" .Lang }}</a>
+</section>
+{{ template "footer" . }}
+{{ end }}

@@ -30,6 +30,11 @@ func init() {
 	AppLang["Main navigation"] = LangText{"Glavna navigacija", "Главна навигација", "Hauptnavigation"}
 	AppLang["Toggle navigation"] = LangText{"Otvori ili zatvori navigaciju", "Отвори или затвори навигацију", "Navigation ein- oder ausblenden"}
 	AppLang["Toggle color theme"] = LangText{"Promeni temu", "Промени тему", "Farbschema wechseln"}
+	AppLang["Too many requests"] = LangText{"Previše zahteva", "Превише захтева", "Zu viele Anfragen"}
+	AppLang["You have made too many attempts. Please wait before trying again."] = LangText{"Napravili ste previše pokušaja. Sačekajte pre nego što pokušate ponovo.", "Направили сте превише покушаја. Сачекајте пре него што покушате поново.", "Sie haben zu viele Versuche unternommen. Bitte warten Sie, bevor Sie es erneut versuchen."}
+	AppLang["Approximate wait:"] = LangText{"Približno vreme čekanja:", "Приближно време чекања:", "Ungefähre Wartezeit:"}
+	AppLang["seconds"] = LangText{"sekundi", "секунди", "Sekunden"}
+	AppLang["Back"] = LangText{"Nazad", "Назад", "Zurück"}
 	AppLang["Confirm deletion"] = LangText{"Potvrda brisanja", "Потврда брисања", "Löschen bestätigen"}
 	AppLang["Actions"] = LangText{"Akcije", "Радње", "Aktionen"}
 	AppLang["Summary"] = LangText{"Pregled", "Преглед", "Übersicht"}

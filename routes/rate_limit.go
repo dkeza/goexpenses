@@ -9,6 +9,8 @@ import (
 	"sync"
 	"time"
 
+	"goexpenses/util"
+
 	"github.com/labstack/echo/v4"
 )
 
@@ -155,10 +157,26 @@ func rateLimitMiddleware(limiter *requestLimiter, rules func(echo.Context) []rat
 			if !allowed {
 				seconds := int((retryAfter + time.Second - 1) / time.Second)
 				c.Response().Header().Set("Retry-After", strconv.Itoa(seconds))
+				if data, ok := c.Get("data").(*util.Data); ok && c.Echo().Renderer != nil {
+					data.RateLimitRetryAfter = seconds
+					data.RateLimitBackURL = rateLimitBackURL(c.Path())
+					return c.Render(http.StatusTooManyRequests, "rate-limit", data)
+				}
 				return echo.NewHTTPError(http.StatusTooManyRequests, "too many requests; please try again later")
 			}
 			return next(c)
 		}
+	}
+}
+
+func rateLimitBackURL(path string) string {
+	switch path {
+	case "/register":
+		return "/register"
+	case "/reset":
+		return "/reset"
+	default:
+		return "/login"
 	}
 }
 
