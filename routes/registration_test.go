@@ -54,9 +54,9 @@ func TestRegistrationConflictMessage(t *testing.T) {
 		err  error
 		want string
 	}{
-		{name: "username", err: &pq.Error{Code: "23505", Constraint: "users_username_lower_uidx"}, want: "User name is already in use."},
-		{name: "email", err: &pq.Error{Code: "23505", Constraint: "users_email_lower_uidx"}, want: "E-Mail is already in use."},
-		{name: "wrapped", err: errors.Join(errors.New("insert user"), &pq.Error{Code: "23505", Constraint: "users_email_lower_uidx"}), want: "E-Mail is already in use."},
+		{name: "username", err: &pq.Error{Code: "23505", Constraint: "users_username_lower_uidx"}, want: registrationResponseMessage},
+		{name: "email", err: &pq.Error{Code: "23505", Constraint: "users_email_lower_uidx"}, want: registrationResponseMessage},
+		{name: "wrapped", err: errors.Join(errors.New("insert user"), &pq.Error{Code: "23505", Constraint: "users_email_lower_uidx"}), want: registrationResponseMessage},
 		{name: "other constraint", err: &pq.Error{Code: "23505", Constraint: "other"}},
 		{name: "other error", err: errors.New("database unavailable")},
 	}

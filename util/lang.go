@@ -91,8 +91,7 @@ func init() {
 	AppLang["Invalid E-Mail!"] = LangText{"Neispravna E-Mail adresa!", "Неисправна Е-Пошта адреса!", "Ungültige E-Mail-Adresse!"}
 	AppLang["Invalid user name!"] = LangText{"Korisničko ime mora imati 3–64 slova, broja ili znaka . _ -", "Корисничко име мора имати 3–64 слова, броја или знака . _ -", "Der Benutzername muss aus 3–64 Buchstaben, Zahlen oder . _ - bestehen."}
 	AppLang["Password must contain between 10 and 72 characters."] = LangText{"Lozinka mora imati između 10 i 72 znaka.", "Лозинка мора имати између 10 и 72 знака.", "Das Kennwort muss zwischen 10 und 72 Zeichen enthalten."}
-	AppLang["User name is already in use."] = LangText{"Korisničko ime je već zauzeto.", "Корисничко име је већ заузето.", "Der Benutzername wird bereits verwendet."}
-	AppLang["E-Mail is already in use."] = LangText{"E-Mail adresa je već u upotrebi.", "Е-Пошта адреса је већ у употреби.", "Die E-Mail-Adresse wird bereits verwendet."}
+	AppLang["If the user name and E-Mail are available, registration has been completed. You can now try to sign in."] = LangText{"Ako su korisničko ime i E-Mail dostupni, registracija je završena. Sada možete pokušati da se prijavite.", "Ако су корисничко име и Е-Пошта доступни, регистрација је завршена. Сада можете покушати да се пријавите.", "Wenn Benutzername und E-Mail verfügbar sind, wurde die Registrierung abgeschlossen. Sie können jetzt versuchen, sich anzumelden."}
 	AppLang["From"] = LangText{"Od", "Од", "Von"}
 	AppLang["To"] = LangText{"Do", "До", "Bis"}
 	AppLang["Filter"] = LangText{"Filter", "Филтер", "Filter"}

@@ -148,7 +148,7 @@ func TestPostgresRegistrationLoginAndPost(t *testing.T) {
 	}
 
 	duplicateErr := createUserWithAccount("Duplicate", "other@example.com", "INTEGRATION-USER", passwordHash, "EN")
-	if registrationConflictMessage(duplicateErr) != "User name is already in use." {
+	if registrationConflictMessage(duplicateErr) != registrationResponseMessage {
 		t.Fatalf("duplicate username error = %v", duplicateErr)
 	}
 
