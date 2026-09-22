@@ -21,7 +21,6 @@ import (
 	"goexpenses/routes"
 	"goexpenses/util"
 
-	"github.com/jasonlvhit/gocron"
 	"github.com/labstack/echo/v4"
 	_ "github.com/lib/pq"
 )
@@ -133,11 +132,21 @@ func runApplication(ctx context.Context) error {
 	}
 	defer database.Db.Close()
 
-	// Refresh in the background so an unavailable rates service cannot delay startup.
-	util.RefreshExchangeRatesAsync()
-	util.DeleteOldSessions()
-	gocron.Every(1).Day().At("07:00").Do(util.RefreshExchangeRatesAsync)
-	gocron.Every(1).Day().At("05:00").Do(util.DeleteOldSessions)
+	stopRateRefreshWorker, err := util.StartExchangeRateRefreshWorker(ctx)
+	if err != nil {
+		return err
+	}
+	defer stopRateRefreshWorker()
+
+	jobLocation, err := time.LoadLocation(backgroundJobsTimezone)
+	if err != nil {
+		return fmt.Errorf("load background job timezone: %w", err)
+	}
+	jobScheduler := startBackgroundScheduler(ctx, jobLocation, []backgroundJob{
+		{name: "delete old sessions", hour: 5, run: util.DeleteOldSessions},
+		{name: "refresh exchange rates", hour: 7, run: util.RefreshExchangeRates},
+	})
+	defer jobScheduler.Stop()
 
 	e := routes.E
 
@@ -158,11 +167,6 @@ func runApplication(ctx context.Context) error {
 	e.FileFS("/ads.txt", "ads.txt", staticFiles)
 
 	routes.DefineRoutes()
-
-	stopScheduler := gocron.Start()
-	defer func() {
-		stopScheduler <- true
-	}()
 
 	e.Logger.Info("Listening on port " + util.Settings.Port)
 	if err := serveUntilShutdown(ctx, e, ":"+util.Settings.Port); err != nil {

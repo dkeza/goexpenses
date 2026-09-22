@@ -10,6 +10,7 @@ import (
 	"math"
 	"net/http"
 	"net/url"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -35,6 +36,14 @@ var (
 	}
 	exchangeRateRefreshing  atomic.Bool
 	exchangeRateLastAttempt atomic.Int64
+	exchangeRateAsyncState  struct {
+		mu        sync.Mutex
+		ctx       context.Context
+		cancel    context.CancelFunc
+		accepting bool
+		running   bool
+		wg        sync.WaitGroup
+	}
 )
 
 type exchangeRatesResponse struct {
@@ -42,32 +51,77 @@ type exchangeRatesResponse struct {
 	Rates     map[string]float64 `json:"rates"`
 }
 
-func GetExchangeRates() (float64, string) {
-	ctx, cancel := context.WithTimeout(context.Background(), exchangeRateTimeout)
-	defer cancel()
-
-	rate, date, err := updateExchangeRates(ctx, exchangeRateHTTPClient, exchangeRatesEndpoint, Settings.OpenExchangeRatesId, database.Db)
-	if err != nil {
-		log.Printf("Could not update exchange rates: %v", err)
-		return 0, ""
+func RefreshExchangeRates(ctx context.Context) error {
+	if !exchangeRateRefreshing.CompareAndSwap(false, true) {
+		return nil
 	}
-	log.Printf("Updated EUR exchange rate: %.4f", rate)
-	return rate, date
-}
+	defer exchangeRateRefreshing.Store(false)
 
-func RefreshExchangeRatesAsync() {
 	now := time.Now()
 	lastAttempt := exchangeRateLastAttempt.Load()
 	if lastAttempt != 0 && now.Sub(time.Unix(0, lastAttempt)) < exchangeRateRetryDelay {
-		return
-	}
-	if !exchangeRateRefreshing.CompareAndSwap(false, true) {
-		return
+		return nil
 	}
 	exchangeRateLastAttempt.Store(now.UnixNano())
+
+	requestContext, cancel := context.WithTimeout(ctx, exchangeRateTimeout)
+	defer cancel()
+
+	rate, _, err := updateExchangeRates(requestContext, exchangeRateHTTPClient, exchangeRatesEndpoint, Settings.OpenExchangeRatesId, database.Db)
+	if err != nil {
+		return err
+	}
+	log.Printf("Updated EUR exchange rate: %.4f", rate)
+	return nil
+}
+
+func StartExchangeRateRefreshWorker(parent context.Context) (func(), error) {
+	exchangeRateAsyncState.mu.Lock()
+	defer exchangeRateAsyncState.mu.Unlock()
+	if exchangeRateAsyncState.running {
+		return nil, errors.New("exchange rate refresh worker is already running")
+	}
+
+	ctx, cancel := context.WithCancel(parent)
+	exchangeRateAsyncState.ctx = ctx
+	exchangeRateAsyncState.cancel = cancel
+	exchangeRateAsyncState.accepting = true
+	exchangeRateAsyncState.running = true
+
+	var stopOnce sync.Once
+	return func() {
+		stopOnce.Do(func() {
+			exchangeRateAsyncState.mu.Lock()
+			exchangeRateAsyncState.accepting = false
+			exchangeRateAsyncState.cancel()
+			exchangeRateAsyncState.mu.Unlock()
+
+			exchangeRateAsyncState.wg.Wait()
+
+			exchangeRateAsyncState.mu.Lock()
+			exchangeRateAsyncState.ctx = nil
+			exchangeRateAsyncState.cancel = nil
+			exchangeRateAsyncState.running = false
+			exchangeRateAsyncState.mu.Unlock()
+		})
+	}, nil
+}
+
+func RefreshExchangeRatesAsync() {
+	exchangeRateAsyncState.mu.Lock()
+	if !exchangeRateAsyncState.accepting {
+		exchangeRateAsyncState.mu.Unlock()
+		return
+	}
+	ctx := exchangeRateAsyncState.ctx
+	exchangeRateAsyncState.wg.Add(1)
+	exchangeRateAsyncState.mu.Unlock()
+
 	go func() {
-		defer exchangeRateRefreshing.Store(false)
-		GetExchangeRates()
+		defer exchangeRateAsyncState.wg.Done()
+		if err := RefreshExchangeRates(ctx); err != nil && ctx.Err() == nil {
+			log.Printf("Could not update exchange rates: %v", err)
+		}
 	}()
 }
 
@@ -106,6 +160,9 @@ func fetchExchangeRate(ctx context.Context, client *http.Client, endpoint, apiKe
 	if err != nil {
 		if response != nil && response.Body != nil {
 			response.Body.Close()
+		}
+		if errors.Is(err, context.Canceled) || errors.Is(ctx.Err(), context.Canceled) {
+			return 0, time.Time{}, context.Canceled
 		}
 		if errors.Is(err, context.DeadlineExceeded) || errors.Is(ctx.Err(), context.DeadlineExceeded) {
 			return 0, time.Time{}, errors.New("exchange rate request timed out")

@@ -1,6 +1,7 @@
 package util
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"strconv"
@@ -24,11 +25,12 @@ func SqlParam(param int) string {
 	}
 }
 
-func DeleteOldSessions() {
+func DeleteOldSessions(ctx context.Context) error {
 	currentTime := time.Now()
 	oneMonthBefore := currentTime.AddDate(0, -1, 0)
 	sql := fmt.Sprintf(`DELETE FROM sessions WHERE created_at < %v`, SqlParam(1))
-	if _, err := database.Db.Exec(sql, oneMonthBefore); err != nil {
-		log.Printf("Could not delete expired sessions: %v", err)
+	if _, err := database.Db.ExecContext(ctx, sql, oneMonthBefore); err != nil {
+		return fmt.Errorf("delete old sessions: %w", err)
 	}
+	return nil
 }

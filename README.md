@@ -92,6 +92,11 @@ Exchange rates are refreshed in the background, so an unavailable rates service
 does not block application startup or user requests. Failed or invalid responses
 leave the last successfully stored rate unchanged.
 
+Exchange-rate refreshes run daily at 07:00 and expired sessions are removed at
+05:00 in the `Europe/Belgrade` time zone. Background jobs start once immediately,
+observe application cancellation, and finish before the database connection is
+closed during graceful shutdown.
+
 Session cookies are secure by default. Set `COOKIE_SECURE=false` (or
 `cookiesecure=false` in `goexpenses.ini`) only for local development over HTTP.
 
