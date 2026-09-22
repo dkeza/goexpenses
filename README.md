@@ -95,6 +95,11 @@ leave the last successfully stored rate unchanged.
 Session cookies are secure by default. Set `COOKIE_SECURE=false` (or
 `cookiesecure=false` in `goexpenses.ini`) only for local development over HTTP.
 
+Browser responses include a nonce-based Content Security Policy compatible with
+Google Analytics and AdSense, along with MIME-sniffing, framing, referrer, and
+browser-permission protections. HSTS is enabled whenever secure cookies are
+enabled, and is therefore omitted only in explicitly insecure local development.
+
 Public authentication endpoints are protected by in-memory sliding-window rate
 limits per client IP and normalized account identifier. Login allows 30 attempts
 per IP and 5 per user name in 15 minutes; password reset allows 10 per IP and 3

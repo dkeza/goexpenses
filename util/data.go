@@ -15,6 +15,7 @@ type Data struct {
 	Expensesume           string
 	Lang                  string
 	Csrf                  string
+	CSPNonce              string
 	Token                 string
 	Flash                 string
 	Filter                string

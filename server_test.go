@@ -101,6 +101,25 @@ func TestStaticAssetURLsIncludeBuildVersion(t *testing.T) {
 	}
 }
 
+func TestTemplatesApplyCSPNonceToEveryScript(t *testing.T) {
+	templates, err := parseTemplates()
+	if err != nil {
+		t.Fatalf("parse templates: %v", err)
+	}
+
+	const nonce = "response-specific-nonce"
+	var rendered bytes.Buffer
+	if err := templates.ExecuteTemplate(&rendered, "index", &util.Data{CSPNonce: nonce}); err != nil {
+		t.Fatalf("render index template: %v", err)
+	}
+
+	html := rendered.String()
+	scriptCount := strings.Count(html, "<script")
+	if scriptCount == 0 || strings.Count(html, `nonce="`+nonce+`"`) != scriptCount {
+		t.Fatalf("rendered %d scripts without applying nonce to every script", scriptCount)
+	}
+}
+
 func TestRateLimitTemplateRendersFriendlyResponse(t *testing.T) {
 	templates, err := parseTemplates()
 	if err != nil {

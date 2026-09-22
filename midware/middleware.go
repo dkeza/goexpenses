@@ -19,6 +19,7 @@ func SetMiddleware() {
 
 	e := routes.E
 
+	e.Use(SecurityHeaders)
 	e.Use(middleware.CSRFWithConfig(middleware.CSRFConfig{
 		Skipper: func(c echo.Context) bool {
 			return c.Request().URL.Path == routes.HealthPath
@@ -56,6 +57,7 @@ func CheckCookie(next echo.HandlerFunc) echo.HandlerFunc {
 		}
 
 		data := new(util.Data)
+		data.CSPNonce, _ = c.Get(cspNonceContextKey).(string)
 
 		session, sessionHash, err := getOrCreateSession(c)
 		if err != nil {
