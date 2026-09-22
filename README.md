@@ -95,6 +95,15 @@ leave the last successfully stored rate unchanged.
 Session cookies are secure by default. Set `COOKIE_SECURE=false` (or
 `cookiesecure=false` in `goexpenses.ini`) only for local development over HTTP.
 
+Public authentication endpoints are protected by in-memory sliding-window rate
+limits per client IP and normalized account identifier. Login allows 30 attempts
+per IP and 5 per user name in 15 minutes; password reset allows 10 per IP and 3
+per e-mail address per hour; registration allows 5 per IP and 3 per submitted
+user name or e-mail address per hour. A successful login clears the user-name
+limit. Registration conflicts use the same response as successful registration
+so they do not expose existing user names or e-mail addresses. Limits reset when
+the application process restarts.
+
 Start binary exe
 
 Database would be automatically created. EUR and RSD currency exchange rates would be automatically updated on start, and then once a day.

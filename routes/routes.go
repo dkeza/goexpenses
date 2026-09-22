@@ -35,6 +35,7 @@ const (
 
 func init() {
 	E = echo.New()
+	E.IPExtractor = clientIPExtractor()
 }
 
 func MainRoute() {
@@ -504,13 +505,14 @@ func DefineRoutes() {
 		}
 		if err := createUserWithAccount(input.Name, input.Email, input.Username, passwordHash, data.Lang); err != nil {
 			if message := registrationConflictMessage(err); message != "" {
-				util.Flash(message, data, 0, ``, 0)
-				return c.Redirect(http.StatusSeeOther, "/register")
+				util.Flash(message, data, 1, ``, 0)
+				return c.Redirect(http.StatusSeeOther, "/login")
 			}
 			return databaseWriteError(c, "register user", err)
 		}
+		util.Flash(registrationResponseMessage, data, 1, ``, 0)
 		return c.Redirect(http.StatusSeeOther, "/login")
-	})
+	}, rateLimitMiddleware(publicRequestLimiter, registrationRateLimitRules))
 
 	e.GET("/changepassword", func(c echo.Context) error {
 		data := c.Get("data").(*util.Data)
@@ -529,6 +531,7 @@ func DefineRoutes() {
 
 		user, err := authenticateUser(username, password)
 		if err == nil {
+			publicRequestLimiter.reset(rateLimitIdentifierKey("login", "username", username))
 			if err := rotateSession(c, user.Id); err != nil {
 				return echo.NewHTTPError(http.StatusInternalServerError, "could not rotate session").SetInternal(err)
 			}
@@ -545,7 +548,7 @@ func DefineRoutes() {
 		}
 
 		return c.Redirect(http.StatusSeeOther, "/posts")
-	})
+	}, rateLimitMiddleware(publicRequestLimiter, loginRateLimitRules))
 
 	e.GET("/reset", func(c echo.Context) error {
 		data := c.Get("data").(*util.Data)
@@ -568,7 +571,7 @@ func DefineRoutes() {
 		util.Flash(passwordResetResponseMessage, data, 1, "", 0)
 
 		return c.Redirect(http.StatusSeeOther, "/login")
-	})
+	}, rateLimitMiddleware(publicRequestLimiter, passwordResetRateLimitRules))
 
 	e.GET("/resetpassword", func(c echo.Context) error {
 		data := c.Get("data").(*util.Data)

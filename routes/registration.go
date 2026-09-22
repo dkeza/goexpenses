@@ -16,6 +16,7 @@ const (
 	registrationEmailMaxLength    = 254
 	registrationPasswordMinLength = 10
 	registrationPasswordMaxBytes  = 72
+	registrationResponseMessage   = "If the user name and E-Mail are available, registration has been completed. You can now try to sign in."
 )
 
 var registrationUsernamePattern = regexp.MustCompile(`^[a-z0-9._-]{3,64}$`)
@@ -66,10 +67,8 @@ func registrationConflictMessage(err error) string {
 	}
 
 	switch postgresError.Constraint {
-	case "users_username_lower_uidx":
-		return "User name is already in use."
-	case "users_email_lower_uidx":
-		return "E-Mail is already in use."
+	case "users_username_lower_uidx", "users_email_lower_uidx":
+		return registrationResponseMessage
 	default:
 		return ""
 	}
