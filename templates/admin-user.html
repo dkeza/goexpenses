@@ -1,0 +1,21 @@
+{{ define "admin-user" }}
+{{ template "header" . }}
+{{ template "navbar" . }}
+<section class="py-4">
+  <a href="/admin" class="btn btn-link px-0 mb-2">← {{ GetLangText "All users" .Lang }}</a>
+  <h1 class="h2">{{ .SelectedUser.Username }}</h1>
+  <div class="surface-card p-4 mb-4">
+    <dl class="row mb-0"><dt class="col-sm-3">{{ GetLangText "Name" .Lang }}</dt><dd class="col-sm-9">{{ .SelectedUser.Name }}</dd><dt class="col-sm-3">{{ GetLangText "E-Mail" .Lang }}</dt><dd class="col-sm-9">{{ .SelectedUser.Email }}</dd><dt class="col-sm-3">{{ GetLangText "Registered" .Lang }}</dt><dd class="col-sm-9">{{ FormatAdminTime .SelectedUser.CreatedAt }}</dd><dt class="col-sm-3">{{ GetLangText "Status" .Lang }}</dt><dd class="col-sm-9">{{ if .SelectedUser.BlockedAt }}{{ GetLangText "Blocked" .Lang }}{{ else if not .SelectedUser.EmailVerified }}{{ GetLangText "Pending" .Lang }}{{ else }}{{ GetLangText "Active" .Lang }}{{ end }}</dd>{{ if .SelectedUser.BlockedReason }}<dt class="col-sm-3">{{ GetLangText "Reason" .Lang }}</dt><dd class="col-sm-9">{{ .SelectedUser.BlockedReason }}</dd>{{ end }}</dl>
+  </div>
+  {{ if not .SelectedUser.IsAdmin }}
+    {{ if .SelectedUser.BlockedAt }}
+      <form action="/admin/users/{{ .SelectedUser.ID }}/unblock" method="post" class="mb-4 js-confirm-admin" data-confirm-message="{{ GetLangText "Confirm unblock user" .Lang }}"><input type="hidden" name="_CSRF" value="{{ .Csrf }}"><button class="btn btn-success" type="submit">{{ GetLangText "Unblock user" .Lang }}</button></form>
+    {{ else }}
+      <form action="/admin/users/{{ .SelectedUser.ID }}/block" method="post" class="surface-card p-4 mb-4 js-confirm-admin" data-confirm-message="{{ GetLangText "Confirm block user" .Lang }}"><input type="hidden" name="_CSRF" value="{{ .Csrf }}"><label class="form-label" for="block-reason">{{ GetLangText "Reason for blocking" .Lang }}</label><textarea class="form-control mb-3" id="block-reason" name="reason" maxlength="500" required></textarea><button class="btn btn-danger" type="submit">{{ GetLangText "Block user" .Lang }}</button></form>
+    {{ end }}
+  {{ end }}
+  <h2 class="h4">{{ GetLangText "Recent events" .Lang }}</h2>
+  {{ template "admin-event-table" . }}
+</section>
+{{ template "footer" . }}
+{{ end }}

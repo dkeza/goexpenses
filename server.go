@@ -42,7 +42,13 @@ type Template struct {
 }
 
 func templateFunctions() template.FuncMap {
+	belgrade, _ := time.LoadLocation("Europe/Belgrade")
 	return template.FuncMap{
+		"add": func(a, b int) int { return a + b },
+		"sub": func(a, b int) int { return a - b },
+		"FormatAdminTime": func(dt time.Time) string {
+			return dt.In(belgrade).Format("02.01.2006 15:04:05")
+		},
 		"FormatCurrency": func(c float64) string {
 			return fmt.Sprintf("%.2f", c)
 		},

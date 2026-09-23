@@ -8,6 +8,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"goexpenses/util"
 )
@@ -74,6 +75,57 @@ func TestEmbeddedPostgresSchemaIsCurrentAndNonDestructive(t *testing.T) {
 func TestTemplatesParse(t *testing.T) {
 	if _, err := parseTemplates(); err != nil {
 		t.Fatalf("parse embedded templates: %v", err)
+	}
+}
+
+func TestAdminTemplatesRender(t *testing.T) {
+	templates, err := parseTemplates()
+	if err != nil {
+		t.Fatal(err)
+	}
+	data := struct {
+		*util.Data
+		Users        []struct{}
+		Events       []struct{}
+		Alerts       []struct{}
+		SelectedUser struct {
+			ID            int
+			Username      string
+			Name          string
+			Email         string
+			CreatedAt     time.Time
+			EmailVerified bool
+			IsAdmin       bool
+			BlockedAt     *time.Time
+			BlockedReason *string
+		}
+		Query        string
+		Status       string
+		Kind         string
+		EventStatus  string
+		UserFilter   string
+		FromDate     string
+		ToDate       string
+		Page         int
+		HasNext      bool
+		TotalUsers   int
+		NewUsers     int
+		BlockedUsers int
+		PendingUsers int
+	}{Data: &util.Data{Lang: "RS", Active: "admin", User: util.User{Id: 1, Name: "Admin", IsAdmin: true}}, Page: 1}
+	data.SelectedUser.Username = "example"
+	data.SelectedUser.CreatedAt = time.Now()
+	for _, name := range []string{"admin", "admin-user", "admin-events"} {
+		var rendered bytes.Buffer
+		if err := templates.ExecuteTemplate(&rendered, name, data); err != nil {
+			t.Fatalf("render %s: %v", name, err)
+		}
+		if !strings.Contains(rendered.String(), "Administracija") {
+			t.Fatalf("%s is missing the admin navigation link", name)
+		}
+		if strings.Contains(rendered.String(), "googletagmanager.com") || strings.Contains(rendered.String(), "googlesyndication.com") {
+			t.Fatalf("%s loads third-party scripts", name)
+		}
 	}
 }
 

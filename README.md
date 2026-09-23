@@ -119,6 +119,30 @@ Start binary exe
 Database would be automatically created. EUR and RSD currency exchange rates would be automatically updated on start, and then once a day.
 User must register with valid E-Mail. When reseting password, activation link is sent to E-Mail.
 
+### Administration
+
+The admin panel is available at `/admin` after normal sign-in. Its user list can
+be searched and filtered; user details allow blocking and unblocking accounts.
+Blocking immediately deletes the user's active sessions. The panel also shows
+new audit events for exchange-rate refreshes, expired-session cleanup, SMTP
+handoff attempts, sign-ins, explicit sign-outs, and block/unblock actions.
+An `smtp_accepted` event means the configured SMTP server accepted the message;
+it does not prove delivery to the recipient's mailbox. A pending event means
+the process stopped before the result could be recorded. Events start being
+recorded when this version is deployed; older history cannot be reconstructed.
+
+Migration 21 grants admin access to an **existing, verified** account whose
+normalized username is `keza`. On a fresh installation, register and verify
+that account first, then promote it using a restricted database session:
+
+```sql
+UPDATE users SET is_admin = true
+WHERE lower(btrim(username)) = 'keza' AND email_verified = true;
+```
+
+Registration never grants admin access. The panel refuses to block admin
+accounts, and every admin request checks the role stored in the database.
+
 New registrations require E-Mail confirmation before sign-in. Confirmation links
 expire after 24 hours and can be requested again from the sign-in page, at most
 once every 15 minutes per unconfirmed account. Existing accounts remain verified

@@ -16,6 +16,7 @@ import (
 	"goexpenses/database"
 	"goexpenses/util"
 
+	"github.com/jmoiron/sqlx"
 	"github.com/labstack/echo/v4"
 	gomail "gopkg.in/gomail.v2"
 )
@@ -84,7 +85,7 @@ func healthCheck(c echo.Context) error {
 
 func authenticateUser(username, password string) (util.User, error) {
 	user := util.User{}
-	query := fmt.Sprintf(`SELECT id, name, username, email, password FROM users WHERE lower(btrim(username)) = %v AND email_verified = true`, util.SqlParam(1))
+	query := fmt.Sprintf(`SELECT id, name, username, email, password FROM users WHERE lower(btrim(username)) = %v AND email_verified = true AND blocked_at IS NULL`, util.SqlParam(1))
 	if err := database.Db.Get(&user, query, strings.ToLower(strings.TrimSpace(username))); err != nil {
 		if errors.Is(err, stdsql.ErrNoRows) {
 			return util.User{}, errInvalidCredentials
@@ -121,7 +122,7 @@ func authenticateUser(username, password string) (util.User, error) {
 	return user, nil
 }
 
-func rotateSession(c echo.Context, userID int) error {
+func rotateSession(c echo.Context, userID int, recordLogin ...bool) error {
 	currentHash, ok := c.Get("_id").(string)
 	if !ok || currentHash == "" {
 		return errors.New("current session is missing")
@@ -132,16 +133,33 @@ func rotateSession(c echo.Context, userID int) error {
 		return err
 	}
 	query := fmt.Sprintf(`UPDATE sessions SET uuid = %v, user_id = %v, created_at = %v WHERE uuid = %v`, util.SqlParam(1), util.SqlParam(2), util.SqlParam(3), util.SqlParam(4))
-	result, err := database.Db.Exec(query, tokenHash, userID, time.Now(), currentHash)
+	updateSession := func(execer sqlExecer) error {
+		result, err := execer.Exec(query, tokenHash, userID, time.Now(), currentHash)
+		if err != nil {
+			return err
+		}
+		rowsAffected, err := result.RowsAffected()
+		if err != nil {
+			return err
+		}
+		if rowsAffected != 1 {
+			return errors.New("current session no longer exists")
+		}
+		return nil
+	}
+	if len(recordLogin) > 0 && recordLogin[0] {
+		err = runTransaction(database.Db, func(tx *sqlx.Tx) error {
+			if err := updateSession(tx); err != nil {
+				return err
+			}
+			_, err := tx.Exec(`INSERT INTO admin_events (kind, status, user_id) VALUES ('auth_login', 'success', $1)`, userID)
+			return err
+		})
+	} else {
+		err = updateSession(database.Db)
+	}
 	if err != nil {
 		return err
-	}
-	rowsAffected, err := result.RowsAffected()
-	if err != nil {
-		return err
-	}
-	if rowsAffected != 1 {
-		return errors.New("current session no longer exists")
 	}
 
 	c.Set("_id", tokenHash)
@@ -158,8 +176,19 @@ func logout(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusUnauthorized, "authentication required")
 	}
 
+	userID, _ := c.Get("id").(int)
 	query := fmt.Sprintf(`DELETE FROM sessions WHERE uuid = %v`, util.SqlParam(1))
-	if _, err := database.Db.Exec(query, sessionHash); err != nil {
+	err := runTransaction(database.Db, func(tx *sqlx.Tx) error {
+		if _, err := tx.Exec(query, sessionHash); err != nil {
+			return err
+		}
+		if userID > 0 {
+			_, err := tx.Exec(`INSERT INTO admin_events (kind, status, user_id) VALUES ('auth_logout', 'success', $1)`, userID)
+			return err
+		}
+		return nil
+	})
+	if err != nil {
 		return echo.NewHTTPError(http.StatusInternalServerError, "could not end session").SetInternal(err)
 	}
 	c.SetCookie(util.ExpiredSessionCookie())
@@ -214,7 +243,7 @@ func createPasswordReset(email string, now time.Time) (recipient string, token s
 	defer tx.Rollback()
 
 	user := util.User{}
-	query := fmt.Sprintf(`SELECT id, email FROM users WHERE lower(btrim(email)) = %v AND email_verified = true`, util.SqlParam(1))
+	query := fmt.Sprintf(`SELECT id, email FROM users WHERE lower(btrim(email)) = %v AND email_verified = true AND blocked_at IS NULL`, util.SqlParam(1))
 	if util.Settings.DatabaseType == "postgres" {
 		query += " FOR UPDATE"
 	}
@@ -296,7 +325,7 @@ func resetPasswordWithToken(token, passwordHash string, now time.Time) (bool, er
 	}
 
 	user := util.User{}
-	query = fmt.Sprintf(`SELECT id FROM users WHERE email = %v`, util.SqlParam(1))
+	query = fmt.Sprintf(`SELECT id FROM users WHERE email = %v AND blocked_at IS NULL`, util.SqlParam(1))
 	if err = tx.Get(&user, query, reset.Email); err != nil {
 		if errors.Is(err, stdsql.ErrNoRows) {
 			return false, nil
@@ -363,7 +392,7 @@ func sendPasswordResetEmail(recipient, token, lang string) error {
 	message.SetHeader("Subject", "Goexpenses "+util.GetLangText("reset password", lang))
 	message.SetBody("text/html", util.GetLangText(`Click to this link to reset password:`, lang)+` <a href="`+html.EscapeString(resetURL)+`">Reset</a>`)
 
-	return newPasswordResetDialer().DialAndSend(message)
+	return sendTrackedEmail("password_reset", recipient, message)
 }
 
 func changePassword(c echo.Context) error {
@@ -467,12 +496,16 @@ func DefineRoutes() {
 	DefinePosts()
 
 	DefineExpenses()
+	DefineAdminRoutes()
 
 	e := E
 
 	e.GET("/login", func(c echo.Context) error {
 		data := c.Get("data").(*util.Data)
 		data.Active = "login"
+		if c.QueryParam("next") == "/admin" {
+			data.LoginNext = "/admin"
+		}
 		return c.Render(http.StatusOK, "login", data)
 	})
 
@@ -589,7 +622,7 @@ func DefineRoutes() {
 		user, err := authenticateUser(username, password)
 		if err == nil {
 			publicRequestLimiter.reset(rateLimitIdentifierKey("login", "username", username))
-			if err := rotateSession(c, user.Id); err != nil {
+			if err := rotateSession(c, user.Id, true); err != nil {
 				return echo.NewHTTPError(http.StatusInternalServerError, "could not rotate session").SetInternal(err)
 			}
 			c.Set("id", user.Id)
@@ -599,11 +632,17 @@ func DefineRoutes() {
 
 		} else if errors.Is(err, errInvalidCredentials) {
 			util.Flash(`Unknown user or invalid password!`, data, 0, "", 0)
+			if c.FormValue("next") == "/admin" {
+				return c.Redirect(http.StatusSeeOther, "/login?next=/admin")
+			}
 			return c.Redirect(http.StatusSeeOther, "/login")
 		} else {
 			return echo.NewHTTPError(http.StatusInternalServerError, "could not authenticate user").SetInternal(err)
 		}
 
+		if c.FormValue("next") == "/admin" {
+			return c.Redirect(http.StatusSeeOther, "/admin")
+		}
 		return c.Redirect(http.StatusSeeOther, "/posts")
 	}, rateLimitMiddleware(publicRequestLimiter, loginRateLimitRules))
 

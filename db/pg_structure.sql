@@ -22,6 +22,9 @@ CREATE TABLE public.users
   default_accounts_id integer NOT NULL DEFAULT 0,
   lang character varying NOT NULL DEFAULT 'EN'::character varying,
   email_verified boolean NOT NULL DEFAULT true,
+  is_admin boolean NOT NULL DEFAULT false,
+  blocked_at timestamp with time zone,
+  blocked_reason text,
   verification_token character varying,
   verification_sent_at timestamp,
   CONSTRAINT users_name_not_blank CHECK (btrim(name) <> ''),
@@ -45,6 +48,22 @@ CREATE TABLE public.sessions
   message_success integer NOT NULL DEFAULT 0,
   created_at timestamp NOT NULL DEFAULT NOW()
 );
+
+CREATE TABLE public.admin_events
+(
+  id BIGSERIAL PRIMARY KEY,
+  kind character varying(40) NOT NULL,
+  status character varying(30) NOT NULL,
+  user_id integer,
+  actor_user_id integer,
+  subject character varying(254) NOT NULL DEFAULT '',
+  detail text NOT NULL DEFAULT '',
+  item_count integer,
+  created_at timestamp with time zone NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX admin_events_created_idx ON public.admin_events (created_at DESC, id DESC);
+CREATE INDEX admin_events_user_created_idx ON public.admin_events (user_id, created_at DESC);
 
 -- Table: public.posts
 

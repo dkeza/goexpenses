@@ -54,7 +54,7 @@ func TestCreatePasswordResetStoresOnlyTokenHash(t *testing.T) {
 	now := time.Date(2026, time.September, 12, 12, 0, 0, 0, time.UTC)
 
 	mock.ExpectBegin()
-	mock.ExpectQuery(regexp.QuoteMeta("SELECT id, email FROM users WHERE lower(btrim(email)) = $1 AND email_verified = true FOR UPDATE")).
+	mock.ExpectQuery(regexp.QuoteMeta("SELECT id, email FROM users WHERE lower(btrim(email)) = $1 AND email_verified = true AND blocked_at IS NULL FOR UPDATE")).
 		WithArgs(email).
 		WillReturnRows(sqlmock.NewRows([]string{"id", "email"}).AddRow(42, email))
 	mock.ExpectQuery(regexp.QuoteMeta("SELECT COUNT(*) FROM passwordresets WHERE email = $1 AND created_at >= $2")).
@@ -92,7 +92,7 @@ func TestCreatePasswordResetIsRateLimited(t *testing.T) {
 	now := time.Date(2026, time.September, 12, 12, 0, 0, 0, time.UTC)
 
 	mock.ExpectBegin()
-	mock.ExpectQuery(regexp.QuoteMeta("SELECT id, email FROM users WHERE lower(btrim(email)) = $1 AND email_verified = true FOR UPDATE")).
+	mock.ExpectQuery(regexp.QuoteMeta("SELECT id, email FROM users WHERE lower(btrim(email)) = $1 AND email_verified = true AND blocked_at IS NULL FOR UPDATE")).
 		WithArgs(email).
 		WillReturnRows(sqlmock.NewRows([]string{"id", "email"}).AddRow(42, email))
 	mock.ExpectQuery(regexp.QuoteMeta("SELECT COUNT(*) FROM passwordresets WHERE email = $1 AND created_at >= $2")).
@@ -114,7 +114,7 @@ func TestCreatePasswordResetDoesNotRevealUnknownEmail(t *testing.T) {
 	defer cleanup()
 
 	mock.ExpectBegin()
-	mock.ExpectQuery(regexp.QuoteMeta("SELECT id, email FROM users WHERE lower(btrim(email)) = $1 AND email_verified = true FOR UPDATE")).
+	mock.ExpectQuery(regexp.QuoteMeta("SELECT id, email FROM users WHERE lower(btrim(email)) = $1 AND email_verified = true AND blocked_at IS NULL FOR UPDATE")).
 		WithArgs("unknown@example.com").
 		WillReturnRows(sqlmock.NewRows([]string{"id", "email"}))
 	mock.ExpectRollback()
@@ -147,7 +147,7 @@ func TestResetPasswordConsumesTokenAndDeletesSessions(t *testing.T) {
 	mock.ExpectQuery(regexp.QuoteMeta("SELECT id, email FROM passwordresets WHERE token = $1 AND created_at >= $2 AND done = 0 FOR UPDATE")).
 		WithArgs(tokenHash, now.Add(-passwordResetDuration)).
 		WillReturnRows(sqlmock.NewRows([]string{"id", "email"}).AddRow(7, email))
-	mock.ExpectQuery(regexp.QuoteMeta("SELECT id FROM users WHERE email = $1")).
+	mock.ExpectQuery(regexp.QuoteMeta("SELECT id FROM users WHERE email = $1 AND blocked_at IS NULL")).
 		WithArgs(email).
 		WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(userID))
 	mock.ExpectExec(regexp.QuoteMeta("UPDATE passwordresets SET done = 1 WHERE token = $1 AND done = 0")).
