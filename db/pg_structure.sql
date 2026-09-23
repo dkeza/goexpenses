@@ -21,6 +21,9 @@ CREATE TABLE public.users
   username character varying NOT NULL DEFAULT ''::character varying,
   default_accounts_id integer NOT NULL DEFAULT 0,
   lang character varying NOT NULL DEFAULT 'EN'::character varying,
+  email_verified boolean NOT NULL DEFAULT true,
+  verification_token character varying,
+  verification_sent_at timestamp,
   CONSTRAINT users_name_not_blank CHECK (btrim(name) <> ''),
   CONSTRAINT users_username_not_blank CHECK (btrim(username) <> ''),
   CONSTRAINT users_email_not_blank CHECK (btrim(email) <> ''),
@@ -138,6 +141,8 @@ CREATE UNIQUE INDEX users_username_lower_uidx
 CREATE UNIQUE INDEX users_email_lower_uidx
   ON public.users (lower(btrim(email)))
   WHERE btrim(email) <> '';
+CREATE UNIQUE INDEX users_verification_token_uidx ON public.users (verification_token)
+  WHERE verification_token IS NOT NULL;
 CREATE UNIQUE INDEX posts_public_id_uidx ON public.posts (p_id) WHERE p_id <> '';
 CREATE UNIQUE INDEX expenses_public_id_uidx ON public.expenses (p_id) WHERE p_id <> '';
 CREATE UNIQUE INDEX incomes_public_id_uidx ON public.incomes (p_id) WHERE p_id <> '';

@@ -150,6 +150,13 @@ func registrationRateLimitRules(c echo.Context) []rateLimitRule {
 	}
 }
 
+func verificationRateLimitRules(c echo.Context) []rateLimitRule {
+	return []rateLimitRule{
+		{key: rateLimitIPKey("verification", c), limit: passwordResetIPRateLimit, window: passwordResetRateLimitWindow},
+		{key: rateLimitIdentifierKey("verification", "email", c.FormValue("email")), limit: passwordResetAccountRateLimit, window: passwordResetRateLimitWindow},
+	}
+}
+
 func rateLimitMiddleware(limiter *requestLimiter, rules func(echo.Context) []rateLimitRule) echo.MiddlewareFunc {
 	return func(next echo.HandlerFunc) echo.HandlerFunc {
 		return func(c echo.Context) error {
@@ -173,6 +180,8 @@ func rateLimitBackURL(path string) string {
 	switch path {
 	case "/register":
 		return "/register"
+	case "/resend-verification":
+		return "/resend-verification"
 	case "/reset":
 		return "/reset"
 	default:

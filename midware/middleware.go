@@ -114,7 +114,7 @@ func CheckCookie(next echo.HandlerFunc) echo.HandlerFunc {
 		data.CookieId = sessionHash
 		if session.User_id > 0 {
 			user := util.User{}
-			sql := fmt.Sprintf(`SELECT id, name, username, email, default_accounts_id, lang FROM users WHERE id = %v`, util.SqlParam(1))
+			sql := fmt.Sprintf(`SELECT id, name, username, email, default_accounts_id, lang FROM users WHERE id = %v AND email_verified = true`, util.SqlParam(1))
 			if err := database.Db.Get(&user, sql, session.User_id); err != nil {
 				if !errors.Is(err, stdsql.ErrNoRows) {
 					return databaseReadError(c, "load session user", "could not load user", err)

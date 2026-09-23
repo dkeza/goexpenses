@@ -69,6 +69,20 @@ func databaseRecordReadError(c echo.Context, operation string, err error) error 
 }
 
 func createUserWithAccount(name, email, username, passwordHash, lang string) error {
+	return insertUserWithAccount(name, email, username, passwordHash, lang, true, "", time.Time{})
+}
+
+func createUnverifiedUserWithAccount(name, email, username, passwordHash, lang, tokenHash string, now time.Time) error {
+	return insertUserWithAccount(name, email, username, passwordHash, lang, false, tokenHash, now)
+}
+
+func insertUserWithAccount(name, email, username, passwordHash, lang string, verified bool, tokenHash string, now time.Time) error {
+	var sentAt interface{}
+	var storedToken interface{}
+	if !verified {
+		sentAt = now
+		storedToken = tokenHash
+	}
 	return runTransaction(database.Db, func(transaction *sqlx.Tx) error {
 		accountID := 0
 		if err := transaction.QueryRowx(
@@ -80,10 +94,10 @@ func createUserWithAccount(name, email, username, passwordHash, lang string) err
 
 		userID := 0
 		if err := transaction.QueryRowx(`
-			INSERT INTO users (name, email, username, password, default_accounts_id, lang)
-			VALUES ($1, $2, $3, $4, $5, $6)
+			INSERT INTO users (name, email, username, password, default_accounts_id, lang, email_verified, verification_token, verification_sent_at)
+			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
 			RETURNING id`,
-			strings.TrimSpace(name), strings.TrimSpace(email), strings.TrimSpace(username), passwordHash, accountID, lang,
+			strings.TrimSpace(name), strings.TrimSpace(email), strings.TrimSpace(username), passwordHash, accountID, lang, verified, storedToken, sentAt,
 		).Scan(&userID); err != nil {
 			return err
 		}
