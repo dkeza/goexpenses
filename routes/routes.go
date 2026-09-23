@@ -647,8 +647,12 @@ func DefineRoutes() {
 			util.Flash(`Invalid description!`, data, 0, ``, 0)
 			return c.Redirect(http.StatusSeeOther, "/incomes")
 		}
+		publicID, err := util.NewPublicID()
+		if err != nil {
+			return databaseWriteError(c, "generate income public ID", err)
+		}
 		sql := fmt.Sprintf(`INSERT INTO incomes (description, accounts_id, p_id) VALUES (%v, %v, %v)`, util.SqlParam(1), util.SqlParam(2), util.SqlParam(3))
-		if err := executeExactlyOne(database.Db, sql, strings.TrimSpace(description), data.User.Default_accounts_id, util.Encrypt(util.CreateUUID())); err != nil {
+		if err := executeExactlyOne(database.Db, sql, strings.TrimSpace(description), data.User.Default_accounts_id, publicID); err != nil {
 			return databaseWriteError(c, "create income", err)
 		}
 

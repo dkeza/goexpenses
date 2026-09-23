@@ -408,6 +408,10 @@ func DefinePosts() {
 			incomes_idnum = incomes[0].Id
 			amountnum = amountnum * -1
 		}
+		publicID, err := util.NewPublicID()
+		if err != nil {
+			return databaseWriteError(c, "generate post public ID", err)
+		}
 
 		records := []postWrite{{
 			Description: description,
@@ -416,7 +420,7 @@ func DefinePosts() {
 			Amount:      amountnum,
 			Exchange:    data.Eur,
 			AccountID:   data.User.Default_accounts_id,
-			PublicID:    util.Encrypt(util.CreateUUID()),
+			PublicID:    publicID,
 			CreatedAt:   createdAt,
 		}}
 		if expenses_idnum > 0 && expenses[0].ExpensesId > 0 {
@@ -434,13 +438,17 @@ func DefinePosts() {
 			addexp := expenses[0].ExpensesId
 			addamount := expensesadd[0].Amount
 			if addexp != 0 {
+				linkedPublicID, err := util.NewPublicID()
+				if err != nil {
+					return databaseWriteError(c, "generate linked post public ID", err)
+				}
 				records = append(records, postWrite{
 					Description: description,
 					ExpenseID:   addexp,
 					Amount:      addamount,
 					Exchange:    data.Eur,
 					AccountID:   data.User.Default_accounts_id,
-					PublicID:    util.Encrypt(util.CreateUUID()),
+					PublicID:    linkedPublicID,
 					CreatedAt:   time.Now(),
 				})
 			}

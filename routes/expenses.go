@@ -155,9 +155,13 @@ func DefineExpenses() {
 			util.Flash(`Invalid amount!`, data, 0, description, 0)
 			return c.Redirect(http.StatusSeeOther, "/expenses")
 		}
+		publicID, err := util.NewPublicID()
+		if err != nil {
+			return databaseWriteError(c, "generate expense public ID", err)
+		}
 
 		sql := fmt.Sprintf(`INSERT INTO expenses (description, accounts_id, amount, exchange, expenses_id, p_id) VALUES (%v,%v,%v,%v,%v,%v)`, util.SqlParam(1), util.SqlParam(2), util.SqlParam(3), util.SqlParam(4), util.SqlParam(5), util.SqlParam(6))
-		if err := executeExactlyOne(database.Db, sql, strings.TrimSpace(description), data.User.Default_accounts_id, amountnum, data.Eur, expenses_idnum, util.Encrypt(util.CreateUUID())); err != nil {
+		if err := executeExactlyOne(database.Db, sql, strings.TrimSpace(description), data.User.Default_accounts_id, amountnum, data.Eur, expenses_idnum, publicID); err != nil {
 			return databaseWriteError(c, "create expense", err)
 		}
 		return c.Redirect(http.StatusSeeOther, "/expenses")
