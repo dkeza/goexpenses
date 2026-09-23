@@ -29,8 +29,15 @@ func DeleteOldSessions(ctx context.Context) error {
 	currentTime := time.Now()
 	oneMonthBefore := currentTime.AddDate(0, -1, 0)
 	sql := fmt.Sprintf(`DELETE FROM sessions WHERE created_at < %v`, SqlParam(1))
-	if _, err := database.Db.ExecContext(ctx, sql, oneMonthBefore); err != nil {
+	result, err := database.Db.ExecContext(ctx, sql, oneMonthBefore)
+	if err != nil {
+		_ = RecordAdminEvent(ctx, AdminEvent{Kind: "session_cleanup", Status: "failed", Detail: "Database delete failed"})
 		return fmt.Errorf("delete old sessions: %w", err)
 	}
-	return nil
+	count, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("count deleted sessions: %w", err)
+	}
+	deleted := int(count)
+	return RecordAdminEvent(ctx, AdminEvent{Kind: "session_cleanup", Status: "success", ItemCount: &deleted})
 }

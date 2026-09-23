@@ -5,6 +5,7 @@
   <div class="page-heading"><h1>{{ GetLangText "Login" .Lang }}</h1></div>
   <form action="/auth" method="post" class="vstack gap-3">
     <input type="hidden" name="_CSRF" value="{{ .Csrf }}">
+    {{ if .LoginNext }}<input type="hidden" name="next" value="{{ .LoginNext }}">{{ end }}
     <div><label class="form-label" for="username">{{ GetLangText "User name" .Lang }}</label><input type="text" class="form-control" id="username" name="username" required autocomplete="username"></div>
     <div><label class="form-label" for="password">{{ GetLangText "Password" .Lang }}</label><input type="password" class="form-control" id="password" name="password" required autocomplete="current-password"></div>
     <button type="submit" class="btn btn-primary">{{ GetLangText "Login me in" .Lang }}</button>

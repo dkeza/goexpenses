@@ -1,6 +1,7 @@
 package routes
 
 import (
+	"database/sql"
 	"errors"
 	"regexp"
 	"testing"
@@ -11,6 +12,18 @@ import (
 	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/jmoiron/sqlx"
 )
+
+func TestAuthenticateUserExcludesBlockedAccounts(t *testing.T) {
+	mock, _ := useMockRouteDatabase(t)
+	query := `SELECT id, name, username, email, password FROM users WHERE lower(btrim(username)) = $1 AND email_verified = true AND blocked_at IS NULL`
+	mock.ExpectQuery(regexp.QuoteMeta(query)).WithArgs("blocked-user").WillReturnError(sql.ErrNoRows)
+	if _, err := authenticateUser("blocked-user", "password"); !errors.Is(err, errInvalidCredentials) {
+		t.Fatalf("blocked login = %v, want invalid credentials", err)
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatal(err)
+	}
+}
 
 func TestAuthenticateUserMigratesLegacyPassword(t *testing.T) {
 	db, mock, err := sqlmock.New()
@@ -28,7 +41,7 @@ func TestAuthenticateUserMigratesLegacyPassword(t *testing.T) {
 		userID   = 17
 	)
 	legacyHash := util.Encrypt(password)
-	selectQuery := `SELECT id, name, username, email, password FROM users WHERE lower(btrim(username)) = $1 AND email_verified = true`
+	selectQuery := `SELECT id, name, username, email, password FROM users WHERE lower(btrim(username)) = $1 AND email_verified = true AND blocked_at IS NULL`
 	updateQuery := `UPDATE users SET password = $1 WHERE id = $2 AND password = $3`
 
 	mock.ExpectQuery(regexp.QuoteMeta(selectQuery)).
@@ -71,7 +84,7 @@ func TestAuthenticateUserAcceptsBcryptPassword(t *testing.T) {
 		t.Fatalf("HashPassword: %v", err)
 	}
 
-	const selectQuery = `SELECT id, name, username, email, password FROM users WHERE lower(btrim(username)) = $1 AND email_verified = true`
+	const selectQuery = `SELECT id, name, username, email, password FROM users WHERE lower(btrim(username)) = $1 AND email_verified = true AND blocked_at IS NULL`
 	mock.ExpectQuery(regexp.QuoteMeta(selectQuery)).
 		WithArgs(username).
 		WillReturnRows(sqlmock.NewRows([]string{"id", "name", "username", "email", "password"}).
@@ -104,7 +117,7 @@ func TestAuthenticateUserRejectsWrongPassword(t *testing.T) {
 		t.Fatalf("HashPassword: %v", err)
 	}
 
-	const selectQuery = `SELECT id, name, username, email, password FROM users WHERE lower(btrim(username)) = $1 AND email_verified = true`
+	const selectQuery = `SELECT id, name, username, email, password FROM users WHERE lower(btrim(username)) = $1 AND email_verified = true AND blocked_at IS NULL`
 	mock.ExpectQuery(regexp.QuoteMeta(selectQuery)).
 		WithArgs("bcrypt-user").
 		WillReturnRows(sqlmock.NewRows([]string{"id", "name", "username", "email", "password"}).

@@ -29,7 +29,7 @@ func TestUnverifiedRegistrationPersistsTokenAndCannotSignIn(t *testing.T) {
 	if err := createUnverifiedUserWithAccount("Test User", "test@example.com", "tester", "password-hash", "EN", hash, now); err != nil {
 		t.Fatal(err)
 	}
-	mock.ExpectQuery(regexp.QuoteMeta(`SELECT id, name, username, email, password FROM users WHERE lower(btrim(username)) = $1 AND email_verified = true`)).
+	mock.ExpectQuery(regexp.QuoteMeta(`SELECT id, name, username, email, password FROM users WHERE lower(btrim(username)) = $1 AND email_verified = true AND blocked_at IS NULL`)).
 		WithArgs("tester").WillReturnError(sql.ErrNoRows)
 	if _, err := authenticateUser("tester", "password-hash"); !errors.Is(err, errInvalidCredentials) {
 		t.Fatalf("unconfirmed login error = %v", err)

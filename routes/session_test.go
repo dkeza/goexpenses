@@ -57,6 +57,33 @@ func TestRotateSession(t *testing.T) {
 	}
 }
 
+func TestRotateLoginSessionRecordsEventBeforeCookie(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	database.Db = sqlx.NewDb(db, "sqlmock")
+	util.Settings.DatabaseType = "postgres"
+	mock.ExpectBegin()
+	mock.ExpectExec(regexp.QuoteMeta("UPDATE sessions SET uuid = $1, user_id = $2, created_at = $3 WHERE uuid = $4")).
+		WithArgs(sqlmock.AnyArg(), 12, sqlmock.AnyArg(), "old-hash").WillReturnResult(sqlmock.NewResult(0, 1))
+	mock.ExpectExec(regexp.QuoteMeta(`INSERT INTO admin_events (kind, status, user_id) VALUES ('auth_login', 'success', $1)`)).
+		WithArgs(12).WillReturnResult(sqlmock.NewResult(1, 1))
+	mock.ExpectCommit()
+	c := echo.New().NewContext(httptest.NewRequest(http.MethodPost, "/auth", nil), httptest.NewRecorder())
+	c.Set("_id", "old-hash")
+	if err := rotateSession(c, 12, true); err != nil {
+		t.Fatal(err)
+	}
+	if len(c.Response().Header().Values(echo.HeaderSetCookie)) != 1 {
+		t.Fatal("login did not issue a rotated session cookie")
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestLogoutDeletesSessionAndCookie(t *testing.T) {
 	db, mock, err := sqlmock.New()
 	if err != nil {
@@ -68,14 +95,19 @@ func TestLogoutDeletesSessionAndCookie(t *testing.T) {
 	util.Settings.DatabaseType = "postgres"
 	util.Settings.CookieSecure = true
 	const sessionHash = "current-session-hash"
+	mock.ExpectBegin()
 	mock.ExpectExec(regexp.QuoteMeta("DELETE FROM sessions WHERE uuid = $1")).
 		WithArgs(sessionHash).
 		WillReturnResult(sqlmock.NewResult(0, 1))
+	mock.ExpectExec(regexp.QuoteMeta(`INSERT INTO admin_events (kind, status, user_id) VALUES ('auth_logout', 'success', $1)`)).
+		WithArgs(12).WillReturnResult(sqlmock.NewResult(1, 1))
+	mock.ExpectCommit()
 
 	req := httptest.NewRequest(http.MethodPost, "/logout", nil)
 	recorder := httptest.NewRecorder()
 	context := echo.New().NewContext(req, recorder)
 	context.Set("_id", sessionHash)
+	context.Set("id", 12)
 
 	if err := logout(context); err != nil {
 		t.Fatalf("logout: %v", err)

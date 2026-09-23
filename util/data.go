@@ -17,6 +17,7 @@ type Data struct {
 	Csrf                  string
 	CSPNonce              string
 	Token                 string
+	LoginNext             string
 	Flash                 string
 	Filter                string
 	Eur                   float64
@@ -105,6 +106,7 @@ type Param struct {
 
 type User struct {
 	Id                  int    `db:"id"`
+	IsAdmin             bool   `db:"is_admin"`
 	Name                string `db:"name"`
 	Username            string `db:"username"`
 	Email               string `db:"email"`

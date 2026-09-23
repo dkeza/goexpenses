@@ -104,5 +104,5 @@ func sendVerificationEmail(recipient, token, lang string) error {
 	message.SetHeader("To", recipient)
 	message.SetHeader("Subject", "Goexpenses "+util.GetLangText("Confirm your E-Mail", lang))
 	message.SetBody("text/html", util.GetLangText("Click this link to confirm your E-Mail:", lang)+` <a href="`+html.EscapeString(link)+`">`+util.GetLangText("Confirm E-Mail", lang)+`</a>`)
-	return newPasswordResetDialer().DialAndSend(message)
+	return sendTrackedEmail("email_verification", recipient, message)
 }

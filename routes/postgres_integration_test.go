@@ -83,6 +83,7 @@ func TestPostgresRegistrationLoginAndPost(t *testing.T) {
 		DROP INDEX sessions_created_at_idx;
 		DROP INDEX passwordresets_active_email_created_idx;
 		DROP INDEX accountsusers_user_idx;
+		DROP TABLE admin_events;
 		ALTER TABLE users
 			DROP CONSTRAINT users_name_not_blank,
 			DROP CONSTRAINT users_username_not_blank,
@@ -91,6 +92,10 @@ func TestPostgresRegistrationLoginAndPost(t *testing.T) {
 			DROP COLUMN email_verified,
 			DROP COLUMN verification_token,
 			DROP COLUMN verification_sent_at;
+		ALTER TABLE users
+			DROP COLUMN is_admin,
+			DROP COLUMN blocked_at,
+			DROP COLUMN blocked_reason;
 		ALTER TABLE posts
 			DROP CONSTRAINT posts_public_id_not_blank,
 			DROP CONSTRAINT posts_account_fk;

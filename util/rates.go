@@ -69,7 +69,13 @@ func RefreshExchangeRates(ctx context.Context) error {
 
 	rate, _, err := updateExchangeRates(requestContext, exchangeRateHTTPClient, exchangeRatesEndpoint, Settings.OpenExchangeRatesId, database.Db)
 	if err != nil {
+		if logErr := RecordAdminEvent(ctx, AdminEvent{Kind: "exchange_rate", Status: "failed", Detail: "Rate fetch or save failed"}); logErr != nil {
+			log.Printf("Could not record exchange rate event: %v", logErr)
+		}
 		return err
+	}
+	if err := RecordAdminEvent(ctx, AdminEvent{Kind: "exchange_rate", Status: "success", Detail: fmt.Sprintf("EUR %.4f RSD", rate)}); err != nil {
+		return fmt.Errorf("record exchange rate event: %w", err)
 	}
 	log.Printf("Updated EUR exchange rate: %.4f", rate)
 	return nil

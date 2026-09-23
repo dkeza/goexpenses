@@ -1,0 +1,27 @@
+{{ define "admin" }}
+{{ template "header" . }}
+{{ template "navbar" . }}
+<section class="py-4">
+  <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-4">
+    <div><h1 class="h2 mb-1">{{ GetLangText "Administration" .Lang }}</h1><p class="text-body-secondary mb-0">{{ GetLangText "User overview" .Lang }}</p></div>
+    <a class="btn btn-outline-primary" href="/admin/events">{{ GetLangText "System events" .Lang }}</a>
+  </div>
+  <div class="row g-3 mb-4">
+    <div class="col-md-3"><div class="surface-card p-3"><div class="text-body-secondary">{{ GetLangText "All users" .Lang }}</div><div class="fs-2 fw-semibold">{{ .TotalUsers }}</div></div></div>
+    <div class="col-md-3"><div class="surface-card p-3"><div class="text-body-secondary">{{ GetLangText "New users (7 days)" .Lang }}</div><div class="fs-2 fw-semibold">{{ .NewUsers }}</div></div></div>
+    <div class="col-md-3"><div class="surface-card p-3"><div class="text-body-secondary">{{ GetLangText "Blocked users" .Lang }}</div><div class="fs-2 fw-semibold">{{ .BlockedUsers }}</div></div></div>
+    <div class="col-md-3"><div class="surface-card p-3"><div class="text-body-secondary">{{ GetLangText "Pending verification" .Lang }}</div><div class="fs-2 fw-semibold">{{ .PendingUsers }}</div></div></div>
+  </div>
+  {{ if .Alerts }}<div class="alert alert-warning" role="status"><strong>{{ GetLangText "Recent problems" .Lang }}</strong><ul class="mb-0 mt-2">{{ range .Alerts }}<li>{{ FormatAdminTime .CreatedAt }} · {{ GetLangText .Kind $.Lang }} · {{ GetLangText .Status $.Lang }}</li>{{ end }}</ul><a href="/admin/events" class="alert-link">{{ GetLangText "System events" .Lang }}</a></div>{{ end }}
+  <form class="row g-2 mb-3" action="/admin" method="get">
+    <div class="col-md-7"><label class="visually-hidden" for="admin-query">{{ GetLangText "Search users" .Lang }}</label><input class="form-control" id="admin-query" name="q" value="{{ .Query }}" placeholder="{{ GetLangText "Search users" .Lang }}"></div>
+    <div class="col-md-3"><label class="visually-hidden" for="admin-status">{{ GetLangText "Status" .Lang }}</label><select class="form-select" id="admin-status" name="status"><option value="all"{{ if eq .Status "all" }} selected{{ end }}>{{ GetLangText "All statuses" .Lang }}</option><option value="active"{{ if eq .Status "active" }} selected{{ end }}>{{ GetLangText "Active" .Lang }}</option><option value="pending"{{ if eq .Status "pending" }} selected{{ end }}>{{ GetLangText "Pending" .Lang }}</option><option value="blocked"{{ if eq .Status "blocked" }} selected{{ end }}>{{ GetLangText "Blocked" .Lang }}</option></select></div>
+    <div class="col-md-2"><button class="btn btn-primary w-100" type="submit">{{ GetLangText "Filter" .Lang }}</button></div>
+  </form>
+  <div class="table-responsive surface-card"><table class="table table-hover align-middle mb-0"><thead><tr><th>{{ GetLangText "User name" .Lang }}</th><th>{{ GetLangText "Name" .Lang }}</th><th>{{ GetLangText "E-Mail" .Lang }}</th><th>{{ GetLangText "Status" .Lang }}</th><th>{{ GetLangText "Registered" .Lang }}</th><th></th></tr></thead><tbody>
+  {{ range .Users }}<tr><td>{{ .Username }}</td><td>{{ .Name }}</td><td>{{ .Email }}</td><td>{{ if .BlockedAt }}<span class="badge text-bg-danger">{{ GetLangText "Blocked" $.Lang }}</span>{{ else if not .EmailVerified }}<span class="badge text-bg-warning">{{ GetLangText "Pending" $.Lang }}</span>{{ else }}<span class="badge text-bg-success">{{ GetLangText "Active" $.Lang }}</span>{{ end }}{{ if .IsAdmin }} <span class="badge text-bg-secondary">Admin</span>{{ end }}</td><td>{{ FormatAdminTime .CreatedAt }}</td><td><a class="btn btn-sm btn-outline-primary" href="/admin/users/{{ .ID }}">{{ GetLangText "Details" $.Lang }}</a></td></tr>{{ else }}<tr><td colspan="6" class="text-center py-4">{{ GetLangText "No users found" .Lang }}</td></tr>{{ end }}
+  </tbody></table></div>
+  <nav class="d-flex justify-content-between mt-3" aria-label="Pages"><div>{{ if gt .Page 1 }}<a class="btn btn-outline-secondary" href="/admin?page={{ sub .Page 1 }}&amp;q={{ .Query | urlquery }}&amp;status={{ .Status }}">{{ GetLangText "Newer" .Lang }}</a>{{ end }}</div><div>{{ if .HasNext }}<a class="btn btn-outline-secondary" href="/admin?page={{ add .Page 1 }}&amp;q={{ .Query | urlquery }}&amp;status={{ .Status }}">{{ GetLangText "Older" .Lang }}</a>{{ end }}</div></nav>
+</section>
+{{ template "footer" . }}
+{{ end }}

@@ -114,7 +114,7 @@ func CheckCookie(next echo.HandlerFunc) echo.HandlerFunc {
 		data.CookieId = sessionHash
 		if session.User_id > 0 {
 			user := util.User{}
-			sql := fmt.Sprintf(`SELECT id, name, username, email, default_accounts_id, lang FROM users WHERE id = %v AND email_verified = true`, util.SqlParam(1))
+			sql := fmt.Sprintf(`SELECT id, name, username, email, default_accounts_id, lang, is_admin FROM users WHERE id = %v AND email_verified = true AND blocked_at IS NULL`, util.SqlParam(1))
 			if err := database.Db.Get(&user, sql, session.User_id); err != nil {
 				if !errors.Is(err, stdsql.ErrNoRows) {
 					return databaseReadError(c, "load session user", "could not load user", err)
@@ -137,6 +137,7 @@ func CheckCookie(next echo.HandlerFunc) echo.HandlerFunc {
 				data.User.Username = user.Username
 				data.User.Default_accounts_id = user.Default_accounts_id
 				data.User.Lang = user.Lang
+				data.User.IsAdmin = user.IsAdmin
 				data.Lang = user.Lang
 				accounts := []util.Account{}
 				sql = fmt.Sprintf(`SELECT a.id, a.description FROM accountsusers au INNER JOIN accounts a ON au.accounts_id = a.id WHERE au.users_id = %v ORDER BY description ASC`, util.SqlParam(1))

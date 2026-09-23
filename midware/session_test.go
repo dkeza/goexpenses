@@ -185,7 +185,7 @@ func TestCheckCookieClearsSessionForMissingUser(t *testing.T) {
 		WithArgs(tokenHash, sqlmock.AnyArg()).
 		WillReturnRows(sqlmock.NewRows([]string{"id", "uuid", "user_id", "lang", "message", "expenses_id", "last_post_description", "message_success"}).
 			AddRow(9, tokenHash, 404, "EN", "", 0, "", 0))
-	userQuery := "SELECT id, name, username, email, default_accounts_id, lang FROM users WHERE id = $1 AND email_verified = true"
+	userQuery := "SELECT id, name, username, email, default_accounts_id, lang, is_admin FROM users WHERE id = $1 AND email_verified = true AND blocked_at IS NULL"
 	mock.ExpectQuery(regexp.QuoteMeta(userQuery)).
 		WithArgs(404).
 		WillReturnRows(sqlmock.NewRows([]string{"id", "name", "username", "email", "default_accounts_id", "lang"}))

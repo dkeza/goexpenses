@@ -8,6 +8,14 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   const accountSelector = document.querySelector('#default_accounts_id');
+
+  document.querySelectorAll('.js-confirm-admin').forEach((form) => {
+    form.addEventListener('submit', (event) => {
+      if (!window.confirm(form.dataset.confirmMessage || 'Confirm this action?')) {
+        event.preventDefault();
+      }
+    });
+  });
   accountSelector?.addEventListener('change', () => {
     document.querySelector('#account-selector')?.requestSubmit();
   });
