@@ -21,7 +21,17 @@ import (
 func TestPostgresRegistrationLoginAndPost(t *testing.T) {
 	databaseURL := os.Getenv("TEST_DATABASE_URL")
 	if databaseURL == "" {
-		t.Skip("TEST_DATABASE_URL is not set")
+		localURL, err := os.ReadFile("../.test-db-url")
+		if errors.Is(err, os.ErrNotExist) {
+			t.Skip("TEST_DATABASE_URL is not set and .test-db-url is absent")
+		}
+		if err != nil {
+			t.Fatalf("read local test database URL: %v", err)
+		}
+		databaseURL = strings.TrimSpace(string(localURL))
+		if databaseURL == "" {
+			t.Fatal(".test-db-url is empty")
+		}
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)

@@ -7,3 +7,4 @@ database.db
 goexpenses
 /.vscode
 /startgoexpenses.bat
+/.test-db-url
