@@ -70,9 +70,16 @@ to keep cannot be done safely without an operator. Resolve the reported
 duplicates and restart the application to retry the transactional migration.
 
 The normal test suite skips the PostgreSQL integration test unless
-`TEST_DATABASE_URL` is set. CI supplies a disposable PostgreSQL service and
-tests fresh schema creation, the version 14 to current upgrade, registration, login,
-posting, and database constraint enforcement.
+`TEST_DATABASE_URL` is set or a local, Git-ignored `.test-db-url` file exists.
+The environment variable takes precedence. A local file can contain a URL
+without a password, for example
+`postgresql://goexpenses_test@127.0.0.1:5432/goexpenses_test?sslmode=disable`;
+the PostgreSQL password can be kept in `~/.pgpass` (mode `0600`). The test user
+must be able to create schemas in the test database. The test creates a uniquely
+named temporary schema and drops it afterward; it does not alter existing
+schemas. CI supplies a disposable PostgreSQL service and tests fresh schema
+creation, the version 14 to current upgrade, registration, login, posting, and
+database constraint enforcement.
 
 Version bump
 
