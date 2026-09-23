@@ -24,8 +24,8 @@
       <tbody>
         {{ with .Expenses }}{{ range . }}
         <tr>
-          <td>{{ FormatVisibleId .Pid }}</td><td>{{ .Description }}</td><td class="amount">{{ printf "%.2f" .Amount }}</td><td class="amount">{{ printf "%.2f" .Amounte }}</td><td>{{ .ExpenseDescription }}</td>
-          <td><div class="table-actions">
+          <td data-label="#">{{ FormatVisibleId .Pid }}</td><td data-label="{{ GetLangText "Description" $.Lang }}">{{ .Description }}</td><td class="amount" data-label="{{ GetLangText "Amount" $.Lang }} RSD">{{ printf "%.2f" .Amount }}</td><td class="amount" data-label="{{ GetLangText "Amount" $.Lang }} EUR">{{ printf "%.2f" .Amounte }}</td><td data-label="{{ GetLangText "Fee" $.Lang }}">{{ .ExpenseDescription }}</td>
+          <td data-label="{{ GetLangText "Actions" $.Lang }}"><div class="table-actions">
             <form action="/expenses/show" method="get"><input type="hidden" name="id" value="{{ .Pid }}"><button type="submit" class="btn btn-outline-primary btn-sm">{{ GetLangText "Edit" $.Lang }}</button></form>
             <form class="js-confirm-delete" action="/expenses/delete" method="post" data-confirm-detail="{{ .Description }}"><input type="hidden" name="_CSRF" value="{{ $.Csrf }}"><input type="hidden" name="id" value="{{ .Pid }}"><button type="submit" class="btn btn-outline-danger btn-sm">{{ GetLangText "Delete" $.Lang }}</button></form>
           </div></td>

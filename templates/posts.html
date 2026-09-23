@@ -41,8 +41,8 @@
       <tbody>
         {{ with .Posts }}{{ range . }}
         <tr{{ if lt .Amount 0.00 }} class="expense-row"{{ end }}>
-          <td>{{ FormatVisibleId .Pid }}</td><td>{{ .Description }}</td><td>{{ .Expense }}</td><td>{{ .Income }}</td><td>{{ FormatDate .Date }}</td><td>{{ FormatDateTime .Timestamp }}</td><td class="amount">{{ printf "%.2f" .Amount }}</td><td class="amount">{{ printf "%.2f" .Amounte }}</td>
-          <td><div class="table-actions">
+          <td data-label="#">{{ FormatVisibleId .Pid }}</td><td data-label="{{ GetLangText "Description" $.Lang }}">{{ .Description }}</td><td data-label="{{ GetLangText "Expense" $.Lang }}">{{ .Expense }}</td><td data-label="{{ GetLangText "Income" $.Lang }}">{{ .Income }}</td><td data-label="{{ GetLangText "Date" $.Lang }}">{{ FormatDate .Date }}</td><td data-label="{{ GetLangText "Timestamp" $.Lang }}">{{ FormatDateTime .Timestamp }}</td><td class="amount" data-label="{{ GetLangText "Amount" $.Lang }} RSD">{{ printf "%.2f" .Amount }}</td><td class="amount" data-label="{{ GetLangText "Amount" $.Lang }} EUR">{{ printf "%.2f" .Amounte }}</td>
+          <td data-label="{{ GetLangText "Actions" $.Lang }}"><div class="table-actions">
             <form action="/posts/show" method="get"><input type="hidden" name="id" value="{{ .Pid }}"><button type="submit" class="btn btn-outline-primary btn-sm">{{ GetLangText "Edit" $.Lang }}</button></form>
             <form class="js-confirm-delete" action="/posts/delete" method="post" data-confirm-detail="{{ .Description }} · ID {{ FormatVisibleId .Pid }}"><input type="hidden" name="_CSRF" value="{{ $.Csrf }}"><input type="hidden" name="id" value="{{ .Pid }}"><button type="submit" class="btn btn-outline-danger btn-sm">{{ GetLangText "Delete" $.Lang }}</button></form>
           </div></td>
