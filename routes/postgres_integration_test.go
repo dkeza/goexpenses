@@ -72,6 +72,7 @@ func TestPostgresRegistrationLoginAndPost(t *testing.T) {
 	const removeDataIntegrityMigration = `
 		DROP INDEX users_username_lower_uidx;
 		DROP INDEX users_email_lower_uidx;
+		DROP INDEX users_verification_token_uidx;
 		DROP INDEX posts_public_id_uidx;
 		DROP INDEX expenses_public_id_uidx;
 		DROP INDEX incomes_public_id_uidx;
@@ -86,7 +87,10 @@ func TestPostgresRegistrationLoginAndPost(t *testing.T) {
 			DROP CONSTRAINT users_name_not_blank,
 			DROP CONSTRAINT users_username_not_blank,
 			DROP CONSTRAINT users_email_not_blank,
-			DROP CONSTRAINT users_default_account_fk;
+			DROP CONSTRAINT users_default_account_fk,
+			DROP COLUMN email_verified,
+			DROP COLUMN verification_token,
+			DROP COLUMN verification_sent_at;
 		ALTER TABLE posts
 			DROP CONSTRAINT posts_public_id_not_blank,
 			DROP CONSTRAINT posts_account_fk;
@@ -130,6 +134,37 @@ func TestPostgresRegistrationLoginAndPost(t *testing.T) {
 	}
 	if user.Id == 0 {
 		t.Fatal("authenticated user has no ID")
+	}
+
+	verificationNow := time.Now().UTC()
+	verificationToken, verificationHash, err := newVerificationToken()
+	if err != nil {
+		t.Fatalf("create confirmation token: %v", err)
+	}
+	if err := createUnverifiedUserWithAccount("Pending User", "pending@example.com", "pending-user", passwordHash, "EN", verificationHash, verificationNow); err != nil {
+		t.Fatalf("register pending user: %v", err)
+	}
+	if _, err := authenticateUser("pending-user", "integration-password"); !errors.Is(err, errInvalidCredentials) {
+		t.Fatalf("pending user signed in: %v", err)
+	}
+	valid, err := verificationTokenValid(verificationToken, verificationNow.Add(verificationTokenDuration+time.Second))
+	if err != nil || valid {
+		t.Fatalf("expired confirmation link = %v, %v", valid, err)
+	}
+	valid, err = verificationTokenValid(verificationToken, verificationNow)
+	if err != nil || !valid {
+		t.Fatalf("fresh confirmation link = %v, %v", valid, err)
+	}
+	confirmed, err := confirmEmail(verificationToken, verificationNow)
+	if err != nil || !confirmed {
+		t.Fatalf("confirm pending user = %v, %v", confirmed, err)
+	}
+	confirmed, err = confirmEmail(verificationToken, verificationNow)
+	if err != nil || confirmed {
+		t.Fatalf("reused confirmation link = %v, %v", confirmed, err)
+	}
+	if _, err := authenticateUser("pending-user", "integration-password"); err != nil {
+		t.Fatalf("confirmed user cannot sign in: %v", err)
 	}
 
 	var accountID int

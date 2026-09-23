@@ -16,7 +16,7 @@ const (
 	registrationEmailMaxLength    = 254
 	registrationPasswordMinLength = 10
 	registrationPasswordMaxBytes  = 72
-	registrationResponseMessage   = "If the user name and E-Mail are available, registration has been completed. You can now try to sign in."
+	registrationResponseMessage   = "If the user name and E-Mail are available, a confirmation link has been sent. Check your inbox before signing in."
 )
 
 var registrationUsernamePattern = regexp.MustCompile(`^[a-z0-9._-]{3,64}$`)

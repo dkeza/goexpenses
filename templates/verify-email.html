@@ -1,0 +1,24 @@
+{{ define "verify-email" }}
+<!doctype html>
+<html lang="{{ if eq .Lang "DE" }}de{{ else if eq .Lang "RS" }}sr-Latn{{ else if eq .Lang "SR" }}sr-Cyrl{{ else }}en{{ end }}">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{ GetLangText "Confirm E-Mail" .Lang }}</title>
+  <link rel="stylesheet" href="/static/css/bootstrap.min.css?v={{ ShowBuildVersion }}">
+  <link rel="stylesheet" href="/static/css/main.css?v={{ ShowBuildVersion }}">
+</head>
+<body>
+  <main class="container py-5">
+    <section class="auth-card surface-card">
+      <div class="page-heading"><h1>{{ GetLangText "Confirm E-Mail" .Lang }}</h1></div>
+      <form action="/verify-email" method="post">
+        <input type="hidden" name="_CSRF" value="{{ .Csrf }}">
+        <input type="hidden" name="t" value="{{ .Token }}">
+        <button type="submit" class="btn btn-primary">{{ GetLangText "Confirm E-Mail" .Lang }}</button>
+      </form>
+    </section>
+  </main>
+</body>
+</html>
+{{ end }}

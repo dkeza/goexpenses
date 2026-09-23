@@ -54,7 +54,7 @@ func TestCreatePasswordResetStoresOnlyTokenHash(t *testing.T) {
 	now := time.Date(2026, time.September, 12, 12, 0, 0, 0, time.UTC)
 
 	mock.ExpectBegin()
-	mock.ExpectQuery(regexp.QuoteMeta("SELECT id, email FROM users WHERE lower(btrim(email)) = $1 FOR UPDATE")).
+	mock.ExpectQuery(regexp.QuoteMeta("SELECT id, email FROM users WHERE lower(btrim(email)) = $1 AND email_verified = true FOR UPDATE")).
 		WithArgs(email).
 		WillReturnRows(sqlmock.NewRows([]string{"id", "email"}).AddRow(42, email))
 	mock.ExpectQuery(regexp.QuoteMeta("SELECT COUNT(*) FROM passwordresets WHERE email = $1 AND created_at >= $2")).
@@ -92,7 +92,7 @@ func TestCreatePasswordResetIsRateLimited(t *testing.T) {
 	now := time.Date(2026, time.September, 12, 12, 0, 0, 0, time.UTC)
 
 	mock.ExpectBegin()
-	mock.ExpectQuery(regexp.QuoteMeta("SELECT id, email FROM users WHERE lower(btrim(email)) = $1 FOR UPDATE")).
+	mock.ExpectQuery(regexp.QuoteMeta("SELECT id, email FROM users WHERE lower(btrim(email)) = $1 AND email_verified = true FOR UPDATE")).
 		WithArgs(email).
 		WillReturnRows(sqlmock.NewRows([]string{"id", "email"}).AddRow(42, email))
 	mock.ExpectQuery(regexp.QuoteMeta("SELECT COUNT(*) FROM passwordresets WHERE email = $1 AND created_at >= $2")).
@@ -114,7 +114,7 @@ func TestCreatePasswordResetDoesNotRevealUnknownEmail(t *testing.T) {
 	defer cleanup()
 
 	mock.ExpectBegin()
-	mock.ExpectQuery(regexp.QuoteMeta("SELECT id, email FROM users WHERE lower(btrim(email)) = $1 FOR UPDATE")).
+	mock.ExpectQuery(regexp.QuoteMeta("SELECT id, email FROM users WHERE lower(btrim(email)) = $1 AND email_verified = true FOR UPDATE")).
 		WithArgs("unknown@example.com").
 		WillReturnRows(sqlmock.NewRows([]string{"id", "email"}))
 	mock.ExpectRollback()

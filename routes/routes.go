@@ -84,7 +84,7 @@ func healthCheck(c echo.Context) error {
 
 func authenticateUser(username, password string) (util.User, error) {
 	user := util.User{}
-	query := fmt.Sprintf(`SELECT id, name, username, email, password FROM users WHERE lower(btrim(username)) = %v`, util.SqlParam(1))
+	query := fmt.Sprintf(`SELECT id, name, username, email, password FROM users WHERE lower(btrim(username)) = %v AND email_verified = true`, util.SqlParam(1))
 	if err := database.Db.Get(&user, query, strings.ToLower(strings.TrimSpace(username))); err != nil {
 		if errors.Is(err, stdsql.ErrNoRows) {
 			return util.User{}, errInvalidCredentials
@@ -214,7 +214,7 @@ func createPasswordReset(email string, now time.Time) (recipient string, token s
 	defer tx.Rollback()
 
 	user := util.User{}
-	query := fmt.Sprintf(`SELECT id, email FROM users WHERE lower(btrim(email)) = %v`, util.SqlParam(1))
+	query := fmt.Sprintf(`SELECT id, email FROM users WHERE lower(btrim(email)) = %v AND email_verified = true`, util.SqlParam(1))
 	if util.Settings.DatabaseType == "postgres" {
 		query += " FOR UPDATE"
 	}
@@ -503,16 +503,73 @@ func DefineRoutes() {
 			util.Flash(`Invalid password!`, data, 0, ``, 0)
 			return c.Redirect(http.StatusSeeOther, "/register")
 		}
-		if err := createUserWithAccount(input.Name, input.Email, input.Username, passwordHash, data.Lang); err != nil {
+		token, tokenHash, err := newVerificationToken()
+		if err != nil {
+			return echo.NewHTTPError(http.StatusInternalServerError, "could not prepare email verification").SetInternal(err)
+		}
+		if err := createUnverifiedUserWithAccount(input.Name, input.Email, input.Username, passwordHash, data.Lang, tokenHash, time.Now()); err != nil {
 			if message := registrationConflictMessage(err); message != "" {
 				util.Flash(message, data, 1, ``, 0)
 				return c.Redirect(http.StatusSeeOther, "/login")
 			}
 			return databaseWriteError(c, "register user", err)
 		}
+		if err := sendVerificationEmail(input.Email, token, data.Lang); err != nil {
+			c.Logger().Errorf("could not send verification email: %v", err)
+		}
 		util.Flash(registrationResponseMessage, data, 1, ``, 0)
 		return c.Redirect(http.StatusSeeOther, "/login")
 	}, rateLimitMiddleware(publicRequestLimiter, registrationRateLimitRules))
+
+	e.GET("/verify-email", func(c echo.Context) error {
+		c.Response().Header().Set("Cache-Control", "no-store")
+		c.Response().Header().Set("Referrer-Policy", "no-referrer")
+		data := c.Get("data").(*util.Data)
+		token := c.QueryParam("t")
+		valid, err := verificationTokenValid(token, time.Now())
+		if err != nil {
+			return databaseReadError(c, "check verification token", err)
+		}
+		if !valid {
+			util.Flash("Invalid or expired confirmation link. Request a new one.", data, 0, "", 0)
+			return c.Redirect(http.StatusSeeOther, "/resend-verification")
+		}
+		data.Token = token
+		return c.Render(http.StatusOK, "verify-email", data)
+	})
+
+	e.POST("/verify-email", func(c echo.Context) error {
+		data := c.Get("data").(*util.Data)
+		confirmed, err := confirmEmail(c.FormValue("t"), time.Now())
+		if err != nil {
+			return databaseWriteError(c, "confirm email", err)
+		}
+		if !confirmed {
+			util.Flash("Invalid or expired confirmation link. Request a new one.", data, 0, "", 0)
+			return c.Redirect(http.StatusSeeOther, "/resend-verification")
+		}
+		util.Flash("E-Mail confirmed. You can now sign in.", data, 1, "", 0)
+		return c.Redirect(http.StatusSeeOther, "/login")
+	})
+
+	e.GET("/resend-verification", func(c echo.Context) error {
+		return c.Render(http.StatusOK, "resend-verification", c.Get("data").(*util.Data))
+	})
+
+	e.POST("/resend-verification", func(c echo.Context) error {
+		data := c.Get("data").(*util.Data)
+		recipient, token, created, err := requestVerification(c.FormValue("email"), time.Now())
+		if err != nil {
+			return databaseWriteError(c, "request verification", err)
+		}
+		if created {
+			if err := sendVerificationEmail(recipient, token, data.Lang); err != nil {
+				c.Logger().Errorf("could not resend verification email: %v", err)
+			}
+		}
+		util.Flash(verificationResponseMessage, data, 1, "", 0)
+		return c.Redirect(http.StatusSeeOther, "/login")
+	}, rateLimitMiddleware(publicRequestLimiter, verificationRateLimitRules))
 
 	e.GET("/changepassword", func(c echo.Context) error {
 		data := c.Get("data").(*util.Data)

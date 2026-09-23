@@ -1,0 +1,13 @@
+{{ define "resend-verification" }}
+{{ template "header" . }}
+{{ template "navbar" . }}
+<section class="auth-card surface-card">
+  <div class="page-heading"><h1>{{ GetLangText "Resend confirmation link" .Lang }}</h1></div>
+  <form action="/resend-verification" method="post" class="vstack gap-3">
+    <input type="hidden" name="_CSRF" value="{{ .Csrf }}">
+    <div><label class="form-label" for="email">{{ GetLangText "E-Mail" .Lang }}</label><input type="email" class="form-control" id="email" name="email" maxlength="254" required autocomplete="email"></div>
+    <button type="submit" class="btn btn-primary">{{ GetLangText "Send confirmation link" .Lang }}</button>
+  </form>
+</section>
+{{ template "footer" . }}
+{{ end }}

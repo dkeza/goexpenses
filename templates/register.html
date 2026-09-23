@@ -3,6 +3,7 @@
 {{ template "navbar" . }}
 <section class="auth-card surface-card">
   <div class="page-heading"><h1>{{ GetLangText "Register" .Lang }}</h1></div>
+  <p class="text-body-secondary">{{ GetLangText "We will send a confirmation link to your E-Mail. Confirm it before signing in." .Lang }}</p>
   <form action="/register" method="post" class="vstack gap-3">
     <input type="hidden" name="_CSRF" value="{{ .Csrf }}">
     <div><label class="form-label" for="name">{{ GetLangText "Name" .Lang }}</label><input type="text" class="form-control" id="name" name="name" maxlength="100" required autocomplete="name"></div>
@@ -11,6 +12,7 @@
     <div><label class="form-label" for="password">{{ GetLangText "Password" .Lang }}</label><input type="password" class="form-control" id="password" name="password" minlength="10" maxlength="72" required autocomplete="new-password"></div>
     <button type="submit" class="btn btn-primary">{{ GetLangText "Register" .Lang }}</button>
   </form>
+  <p class="mt-3"><a href="/resend-verification">{{ GetLangText "Resend confirmation link" .Lang }}</a></p>
 </section>
 {{ template "footer" . }}
 {{ end }}

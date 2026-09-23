@@ -107,10 +107,10 @@ func TestCreateUserWithAccountRollsBackWhenUserInsertFails(t *testing.T) {
 		WithArgs("My account").
 		WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(21))
 	mock.ExpectQuery(regexp.QuoteMeta(`
-			INSERT INTO users (name, email, username, password, default_accounts_id, lang)
-			VALUES ($1, $2, $3, $4, $5, $6)
+			INSERT INTO users (name, email, username, password, default_accounts_id, lang, email_verified, verification_token, verification_sent_at)
+			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
 			RETURNING id`)).
-		WithArgs("Test User", "test@example.com", "tester", "password-hash", 21, "EN").
+		WithArgs("Test User", "test@example.com", "tester", "password-hash", 21, "EN", true, nil, nil).
 		WillReturnError(errors.New("user insert failed"))
 	mock.ExpectRollback()
 

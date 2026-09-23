@@ -119,6 +119,12 @@ Start binary exe
 Database would be automatically created. EUR and RSD currency exchange rates would be automatically updated on start, and then once a day.
 User must register with valid E-Mail. When reseting password, activation link is sent to E-Mail.
 
+New registrations require E-Mail confirmation before sign-in. Confirmation links
+expire after 24 hours and can be requested again from the sign-in page, at most
+once every 15 minutes per unconfirmed account. Existing accounts remain verified
+when upgrading to schema version 20. Configure working SMTP delivery and a public
+`HOST` so new users can receive and open their confirmation links.
+
 Working example:
 https://goexpenses.kezic.net/
 
