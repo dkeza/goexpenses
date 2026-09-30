@@ -374,6 +374,35 @@ func resetPasswordWithToken(token, passwordHash string, now time.Time) (bool, er
 	return true, nil
 }
 
+// changeOwnPassword replaces a signed-in user's password after verifying the
+// current one and revokes every other session of that user.
+func changeOwnPassword(userID int, currentPassword, newPasswordHash, currentSessionHash string) error {
+	storedHash := ""
+	if err := database.Db.Get(&storedHash, `SELECT password FROM users WHERE id = $1 AND blocked_at IS NULL`, userID); err != nil {
+		if errors.Is(err, stdsql.ErrNoRows) {
+			return errInvalidCredentials
+		}
+		return err
+	}
+	if valid, _ := util.VerifyPassword(storedHash, currentPassword); !valid {
+		return errInvalidCredentials
+	}
+
+	return runTransaction(database.Db, func(tx *sqlx.Tx) error {
+		// Matching the old hash keeps a concurrent password change from being
+		// overwritten after the current password was verified.
+		err := executeExactlyOne(tx, `UPDATE users SET password = $1 WHERE id = $2 AND password = $3`, newPasswordHash, userID, storedHash)
+		if errors.Is(err, errRecordNotFound) {
+			return errInvalidCredentials
+		}
+		if err != nil {
+			return err
+		}
+		_, err = tx.Exec(`DELETE FROM sessions WHERE user_id = $1 AND uuid <> $2`, userID, currentSessionHash)
+		return err
+	})
+}
+
 func newPasswordResetDialer() *gomail.Dialer {
 	dialer := gomail.NewDialer(util.Settings.MailHost, util.Settings.MailHostPort, util.Settings.MailFrom, util.Settings.MailPassword)
 	dialer.TLSConfig = &tls.Config{
@@ -441,17 +470,12 @@ func changePassword(c echo.Context) error {
 		return c.Redirect(http.StatusSeeOther, "/changepassword")
 	}
 
-	tx, err := database.Db.Begin()
-	if err != nil {
-		return echo.NewHTTPError(http.StatusInternalServerError, "could not change password").SetInternal(err)
-	}
-	defer tx.Rollback()
-
-	query := fmt.Sprintf(`UPDATE users SET password = %v WHERE id = %v`, util.SqlParam(1), util.SqlParam(2))
-	if _, err = tx.Exec(query, passwordHash, data.User.Id); err != nil {
-		return echo.NewHTTPError(http.StatusInternalServerError, "could not change password").SetInternal(err)
-	}
-	if err = tx.Commit(); err != nil {
+	sessionHash, _ := c.Get("_id").(string)
+	if err := changeOwnPassword(data.User.Id, c.FormValue("currentpassword"), passwordHash, sessionHash); err != nil {
+		if errors.Is(err, errInvalidCredentials) {
+			util.Flash(`Current password is incorrect!`, data, 0, ``, 0)
+			return c.Redirect(http.StatusSeeOther, "/changepassword")
+		}
 		return echo.NewHTTPError(http.StatusInternalServerError, "could not change password").SetInternal(err)
 	}
 	if err := rotateSession(c, data.User.Id); err != nil {

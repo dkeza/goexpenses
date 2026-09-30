@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"strings"
 	"time"
 
 	"goexpenses/database"
@@ -22,7 +23,7 @@ func SetMiddleware() {
 	e.Use(SecurityHeaders)
 	e.Use(middleware.CSRFWithConfig(middleware.CSRFConfig{
 		Skipper: func(c echo.Context) bool {
-			return c.Request().URL.Path == routes.HealthPath
+			return skipsSession(c.Request().URL.Path)
 		},
 		TokenLookup:    "form:_CSRF",
 		CookiePath:     "/",
@@ -50,9 +51,19 @@ func databaseReadError(c echo.Context, operation, message string, err error) err
 	return echo.NewHTTPError(http.StatusInternalServerError, message).SetInternal(err)
 }
 
+// skipsSession reports whether a request path needs neither a session nor a
+// CSRF token. Static assets and health checks must not touch the database.
+func skipsSession(path string) bool {
+	switch path {
+	case routes.HealthPath, "/favicon.ico", "/ads.txt":
+		return true
+	}
+	return strings.HasPrefix(path, "/static/")
+}
+
 func CheckCookie(next echo.HandlerFunc) echo.HandlerFunc {
 	return func(c echo.Context) error {
-		if c.Request().URL.Path == routes.HealthPath {
+		if skipsSession(c.Request().URL.Path) {
 			return next(c)
 		}
 
