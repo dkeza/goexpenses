@@ -9,13 +9,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
   const accountSelector = document.querySelector('#default_accounts_id');
 
-  document.querySelectorAll('.js-confirm-admin').forEach((form) => {
-    form.addEventListener('submit', (event) => {
-      if (!window.confirm(form.dataset.confirmMessage || 'Confirm this action?')) {
-        event.preventDefault();
-      }
-    });
-  });
   accountSelector?.addEventListener('change', () => {
     document.querySelector('#account-selector')?.requestSubmit();
   });
@@ -30,16 +23,28 @@ document.addEventListener('DOMContentLoaded', () => {
 
   const modalElement = document.querySelector('#delete-confirmation');
   const confirmButton = document.querySelector('#delete-confirmation-submit');
+  const title = document.querySelector('#delete-confirmation-title');
+  const message = document.querySelector('#delete-confirmation-message');
   const detail = document.querySelector('#delete-confirmation-detail');
   let pendingForm = null;
 
   if (modalElement && confirmButton) {
     const modal = bootstrap.Modal.getOrCreateInstance(modalElement);
-    document.querySelectorAll('.js-confirm-delete').forEach((form) => {
+    const defaultTitle = title?.textContent || '';
+    const defaultMessage = message?.textContent || '';
+    const defaultButtonText = confirmButton.textContent;
+    document.querySelectorAll('.js-confirm-delete, .js-confirm-admin').forEach((form) => {
       form.addEventListener('submit', (event) => {
         event.preventDefault();
         pendingForm = form;
+        if (title) title.textContent = form.dataset.confirmTitle || defaultTitle;
+        if (message) message.textContent = form.dataset.confirmMessage || defaultMessage;
         if (detail) detail.textContent = form.dataset.confirmDetail || '';
+        confirmButton.textContent = form.classList.contains('js-confirm-admin')
+          ? form.querySelector('button[type="submit"]')?.textContent || defaultButtonText
+          : defaultButtonText;
+        confirmButton.classList.toggle('btn-success', form.dataset.confirmTone === 'success');
+        confirmButton.classList.toggle('btn-danger', form.dataset.confirmTone !== 'success');
         modal.show();
       });
     });
