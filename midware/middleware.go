@@ -81,44 +81,23 @@ func CheckCookie(next echo.HandlerFunc) echo.HandlerFunc {
 		if session.Id == 0 {
 			data.Lang = "EN"
 		} else {
-			if session.Message != "" {
-				data.Flash = session.Message
-				sql := `UPDATE sessions SET message = $1 WHERE uuid = $2`
-				if _, err := database.Db.Exec(sql, "", sessionHash); err != nil {
-					return echo.NewHTTPError(http.StatusInternalServerError, "could not update session").SetInternal(err)
-				}
-			}
+			// Flash values are shown once; clear them all with a single update.
+			hasFlash := session.Message != "" || session.Expenses_id != 0 ||
+				session.Last_post_description != "" || session.Message_success != 0
+			data.Flash = session.Message
+			data.Last_post_description = session.Last_post_description
+			data.Message_success = session.Message_success
 			if session.Expenses_id != 0 {
-
-				expenses := []util.Expense{}
-				sql := `
-				SELECT id, p_id, description 
-					FROM expenses 
-					WHERE id = $1 
-					ORDER BY description ASC
-				`
-				if err := database.Db.Select(&expenses, sql, session.Expenses_id); err != nil {
+				expense := util.Expense{}
+				sql := `SELECT p_id FROM expenses WHERE id = $1`
+				if err := database.Db.Get(&expense, sql, session.Expenses_id); err != nil && !errors.Is(err, stdsql.ErrNoRows) {
 					return databaseReadError(c, "load session expense", "could not load session data", err)
 				}
-				if len(expenses) > 0 && expenses[0].Pid != "" {
-					data.Expenses_id = expenses[0].Pid
-				}
-				sql = `UPDATE sessions SET expenses_id = $1 WHERE uuid = $2`
-				if _, err := database.Db.Exec(sql, 0, sessionHash); err != nil {
-					return echo.NewHTTPError(http.StatusInternalServerError, "could not update session").SetInternal(err)
-				}
+				data.Expenses_id = expense.Pid
 			}
-			if session.Last_post_description != "" {
-				data.Last_post_description = session.Last_post_description
-				sql := `UPDATE sessions SET last_post_description = $1 WHERE uuid = $2`
-				if _, err := database.Db.Exec(sql, "", sessionHash); err != nil {
-					return echo.NewHTTPError(http.StatusInternalServerError, "could not update session").SetInternal(err)
-				}
-			}
-			if session.Message_success != 0 {
-				data.Message_success = session.Message_success
-				sql := `UPDATE sessions SET message_success = $1 WHERE uuid = $2`
-				if _, err := database.Db.Exec(sql, 0, sessionHash); err != nil {
+			if hasFlash {
+				sql := `UPDATE sessions SET message = '', expenses_id = 0, last_post_description = '', message_success = 0 WHERE uuid = $1`
+				if _, err := database.Db.Exec(sql, sessionHash); err != nil {
 					return echo.NewHTTPError(http.StatusInternalServerError, "could not update session").SetInternal(err)
 				}
 			}
@@ -174,9 +153,8 @@ func CheckCookie(next echo.HandlerFunc) echo.HandlerFunc {
 
 		data.Csrf = c.Get("csrf").(string)
 
-		currency := util.Currency{}
-		sql := `SELECT id, code, rate, date FROM currencies WHERE code = $1`
-		if err := database.Db.Get(&currency, sql, `EUR`); err != nil && !errors.Is(err, stdsql.ErrNoRows) {
+		currency, err := util.CurrentEURRate(c.Request().Context())
+		if err != nil {
 			return databaseReadError(c, "load exchange rate", "could not load exchange rate", err)
 		}
 		data.Eur = util.ToFixed(currency.Rate, 4)
