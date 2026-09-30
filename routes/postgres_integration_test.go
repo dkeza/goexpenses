@@ -197,6 +197,30 @@ func TestPostgresRegistrationLoginAndPost(t *testing.T) {
 		t.Fatalf("create post: %v", err)
 	}
 
+	filterFrom := time.Now().AddDate(0, 0, -7)
+	filterTo := time.Now().AddDate(0, 0, 1)
+	if err := createPosts([]postWrite{
+		{Description: "Totals expense", ExpenseID: 1, Amount: 200, Exchange: 100, AccountID: accountID, PublicID: "totals-expense", CreatedAt: time.Now()},
+		{Description: "Totals income", IncomeID: 1, Amount: -50, Exchange: 100, AccountID: accountID, PublicID: "totals-income", CreatedAt: time.Now()},
+		{Description: "Old expense", ExpenseID: 1, Amount: 30, Exchange: 100, AccountID: accountID, PublicID: "totals-old-expense", CreatedAt: time.Now().AddDate(0, -2, 0)},
+	}); err != nil {
+		t.Fatalf("create totals posts: %v", err)
+	}
+	totals, err := loadPostTotals(accountID, nil, nil)
+	if err != nil {
+		t.Fatalf("load post totals: %v", err)
+	}
+	if want := (postTotals{Saldo: 54.5, Saldoe: 0.73, IncomeSaldo: -50, IncomeSaldoe: -0.5, ExpenseSaldo: 230, ExpenseSaldoe: 2.3}); totals != want {
+		t.Fatalf("post totals = %+v, want %+v", totals, want)
+	}
+	totals, err = loadPostTotals(accountID, &filterFrom, &filterTo)
+	if err != nil {
+		t.Fatalf("load filtered post totals: %v", err)
+	}
+	if want := (postTotals{Saldo: 24.5, Saldoe: 0.43, IncomeSaldo: -50, IncomeSaldoe: -0.5, ExpenseSaldo: 200, ExpenseSaldoe: 2}); totals != want {
+		t.Fatalf("filtered post totals = %+v, want %+v", totals, want)
+	}
+
 	duplicateErr := createUserWithAccount("Duplicate", "other@example.com", "INTEGRATION-USER", passwordHash, "EN")
 	if registrationConflictMessage(duplicateErr) != registrationResponseMessage {
 		t.Fatalf("duplicate username error = %v", duplicateErr)

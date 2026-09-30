@@ -115,6 +115,38 @@ func setPostPagination(data *util.Data, posts []util.Post, request postPageReque
 	return nil
 }
 
+type postTotals struct {
+	Saldo         float64 `db:"saldo"`
+	Saldoe        float64 `db:"saldoe"`
+	IncomeSaldo   float64 `db:"income_saldo"`
+	IncomeSaldoe  float64 `db:"income_saldoe"`
+	ExpenseSaldo  float64 `db:"expense_saldo"`
+	ExpenseSaldoe float64 `db:"expense_saldoe"`
+}
+
+// loadPostTotals sums all, income and expense posts of an account in one
+// query, optionally limited to a date range. Each sum is rounded like before.
+func loadPostTotals(accountID int, filterDateFrom, filterDateTo *time.Time) (postTotals, error) {
+	queryArgs := []any{accountID}
+	where := "accounts_id = $1 AND deleted = 0"
+	if filterDateFrom != nil && filterDateTo != nil {
+		queryArgs = append(queryArgs, *filterDateFrom, *filterDateTo)
+		where += " AND created_at BETWEEN $2 AND $3"
+	}
+	totals := postTotals{}
+	err := database.Db.Get(&totals, `
+		SELECT
+			COALESCE(CAST(SUM(amount) AS Numeric(12,2)), 0) AS saldo,
+			COALESCE(CAST(SUM(amount/NULLIF(exchange, 0)) AS Numeric(12,2)), 0) AS saldoe,
+			COALESCE(CAST(SUM(amount) FILTER (WHERE incomes_id > 0) AS Numeric(12,2)), 0) AS income_saldo,
+			COALESCE(CAST(SUM(amount/NULLIF(exchange, 0)) FILTER (WHERE incomes_id > 0) AS Numeric(12,2)), 0) AS income_saldoe,
+			COALESCE(CAST(SUM(amount) FILTER (WHERE expenses_id > 0) AS Numeric(12,2)), 0) AS expense_saldo,
+			COALESCE(CAST(SUM(amount/NULLIF(exchange, 0)) FILTER (WHERE expenses_id > 0) AS Numeric(12,2)), 0) AS expense_saldoe
+		FROM posts
+		WHERE `+where, queryArgs...)
+	return totals, err
+}
+
 func loadPostsPage(accountID int, filterDateFrom, filterDateTo *time.Time, request postPageRequest) ([]util.Post, bool, error) {
 	posts := []util.Post{}
 	queryArgs := []any{accountID}
@@ -241,78 +273,20 @@ func DefinePosts() {
 			}
 		}
 
-		postsum := util.Postsum{}
-		var errsql error
+		var totalsFrom, totalsTo *time.Time
 		if ldatefilter {
-			sql := `
-			SELECT COALESCE(CAST(SUM(amount) AS Numeric(12,2)), 0) AS saldo,
-				COALESCE(CAST(SUM(amount/NULLIF(exchange, 0)) AS Numeric(12,2)), 0) AS saldoe
-				FROM posts 
-				WHERE accounts_id = $1 AND deleted = 0 AND created_at 
-				BETWEEN $2 AND $3
-			`
-			errsql = database.Db.Get(&postsum, sql, data.User.Default_accounts_id, filterdatefrom, filterdateto)
-		} else {
-			sql := `
-			SELECT COALESCE(CAST(SUM(amount) AS Numeric(12,2)), 0) AS saldo,
-				COALESCE(CAST(SUM(amount/NULLIF(exchange, 0)) AS Numeric(12,2)), 0) AS saldoe
-				FROM posts 
-				WHERE accounts_id = $1 AND deleted = 0
-			`
-			errsql = database.Db.Get(&postsum, sql, data.User.Default_accounts_id)
+			totalsFrom, totalsTo = &filterdatefrom, &filterdateto
 		}
-		if errsql != nil {
-			return databaseReadError(c, "load post totals", errsql)
+		totals, err := loadPostTotals(data.User.Default_accounts_id, totalsFrom, totalsTo)
+		if err != nil {
+			return databaseReadError(c, "load post totals", err)
 		}
-		data.Saldo = fmt.Sprintf("%.2f", postsum.Saldo)
-		data.Saldoe = fmt.Sprintf("%.2f", postsum.Saldoe)
-
-		incomesum := util.Incomessum{}
-		if ldatefilter {
-			sql := `
-			SELECT COALESCE(CAST(SUM(amount) AS Numeric(12,2)), 0) AS saldo,
-				COALESCE(CAST(SUM(amount/NULLIF(exchange, 0)) AS Numeric(12,2)), 0) AS saldoe
-				FROM posts 
-				WHERE incomes_id > 0 AND accounts_id = $1 AND deleted = 0 AND created_at BETWEEN $2 AND $3
-			`
-			errsql = database.Db.Get(&incomesum, sql, data.User.Default_accounts_id, filterdatefrom, filterdateto)
-		} else {
-			sql := `
-			SELECT COALESCE(CAST(SUM(amount) AS Numeric(12,2)), 0) AS saldo,
-				COALESCE(CAST(SUM(amount/NULLIF(exchange, 0)) AS Numeric(12,2)), 0) AS saldoe
-				FROM posts 
-				WHERE incomes_id > 0 AND accounts_id = $1 AND deleted = 0
-			`
-			errsql = database.Db.Get(&incomesum, sql, data.User.Default_accounts_id)
-		}
-		if errsql != nil {
-			return databaseReadError(c, "load income totals", errsql)
-		}
-		data.Incomesum = fmt.Sprintf("%.2f", incomesum.Saldo)
-		data.Incomesume = fmt.Sprintf("%.2f", incomesum.Saldoe)
-
-		expensesum := util.Expensessum{}
-		if ldatefilter {
-			sql := `
-			SELECT COALESCE(CAST(SUM(amount) AS Numeric(12,2)), 0) AS saldo,
-				COALESCE(CAST(SUM(amount/NULLIF(exchange, 0)) AS Numeric(12,2)), 0) AS saldoe
-				FROM posts 
-				WHERE expenses_id > 0 AND accounts_id = $1 AND deleted = 0 AND created_at BETWEEN $2 AND $3
-			`
-			errsql = database.Db.Get(&expensesum, sql, data.User.Default_accounts_id, filterdatefrom, filterdateto)
-		} else {
-			sql := `
-			SELECT COALESCE(CAST(SUM(amount) AS Numeric(12,2)), 0) AS saldo,
-				COALESCE(CAST(SUM(amount/NULLIF(exchange, 0)) AS Numeric(12,2)), 0) AS saldoe
-				FROM posts WHERE expenses_id > 0 AND accounts_id = $1 AND deleted = 0
-			`
-			errsql = database.Db.Get(&expensesum, sql, data.User.Default_accounts_id)
-		}
-		if errsql != nil {
-			return databaseReadError(c, "load expense totals", errsql)
-		}
-		data.Expensesum = fmt.Sprintf("%.2f", expensesum.Saldo)
-		data.Expensesume = fmt.Sprintf("%.2f", expensesum.Saldoe)
+		data.Saldo = fmt.Sprintf("%.2f", totals.Saldo)
+		data.Saldoe = fmt.Sprintf("%.2f", totals.Saldoe)
+		data.Incomesum = fmt.Sprintf("%.2f", totals.IncomeSaldo)
+		data.Incomesume = fmt.Sprintf("%.2f", totals.IncomeSaldoe)
+		data.Expensesum = fmt.Sprintf("%.2f", totals.ExpenseSaldo)
+		data.Expensesume = fmt.Sprintf("%.2f", totals.ExpenseSaldoe)
 
 		expenses := []util.Expense{}
 		sql := `
