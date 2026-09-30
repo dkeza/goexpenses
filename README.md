@@ -133,6 +133,8 @@ be searched and filtered; user details allow blocking, unblocking, and permanent
 deleting non-admin users. Deletion requires typing the exact user name and
 removes sessions, password reset requests, and accounts used only by that user
 with their financial records. Shared accounts and their records are retained.
+User details show row counts for linked accounts, posts, expenses, and incomes,
+including how many would be removed with the user.
 Blocking immediately deletes the user's active sessions. The panel also shows
 new audit events for exchange-rate refreshes, expired-session cleanup, SMTP
 handoff attempts, sign-ins, explicit sign-outs, and block/unblock actions.

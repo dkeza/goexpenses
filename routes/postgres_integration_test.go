@@ -222,6 +222,15 @@ func TestPostgresRegistrationLoginAndPost(t *testing.T) {
 	if _, err := testDB.ExecContext(ctx, `INSERT INTO accountsusers (accounts_id, users_id) VALUES ($1, $2)`, sharedAccountID, user.Id); err != nil {
 		t.Fatalf("share account: %v", err)
 	}
+	if _, err := testDB.ExecContext(ctx, `INSERT INTO posts (description, accounts_id, p_id, deleted) VALUES ('shared post', $1, 'shared-post', 1)`, sharedAccountID); err != nil {
+		t.Fatalf("create shared post: %v", err)
+	}
+	if _, err := testDB.ExecContext(ctx, `INSERT INTO expenses (description, accounts_id, p_id) VALUES ('shared expense', $1, 'shared-expense')`, sharedAccountID); err != nil {
+		t.Fatalf("create shared expense: %v", err)
+	}
+	if _, err := testDB.ExecContext(ctx, `INSERT INTO incomes (description, accounts_id, p_id) VALUES ('shared income', $1, 'shared-income')`, sharedAccountID); err != nil {
+		t.Fatalf("create shared income: %v", err)
+	}
 	if err := createAccount(targetID, "Private account"); err != nil {
 		t.Fatalf("create private account: %v", err)
 	}
@@ -236,6 +245,18 @@ func TestPostgresRegistrationLoginAndPost(t *testing.T) {
 	}
 	if _, err := testDB.ExecContext(ctx, `INSERT INTO incomes (description, accounts_id, p_id) VALUES ('private income', $1, 'private-income')`, privateAccountID); err != nil {
 		t.Fatalf("create private income: %v", err)
+	}
+	counts, err := loadAdminUserCounts(targetID)
+	if err != nil {
+		t.Fatalf("load user data counts: %v", err)
+	}
+	if counts != (adminUserCounts{
+		Accounts: 2, DeletedAccounts: 1,
+		Posts: 2, DeletedPosts: 1,
+		Expenses: 2, DeletedExpenses: 1,
+		Incomes: 2, DeletedIncomes: 1,
+	}) {
+		t.Fatalf("user data counts = %+v", counts)
 	}
 	if _, err := testDB.ExecContext(ctx, `INSERT INTO passwordresets (email, token) VALUES ('pending@example.com', 'test-reset')`); err != nil {
 		t.Fatalf("create reset token: %v", err)
@@ -258,6 +279,9 @@ func TestPostgresRegistrationLoginAndPost(t *testing.T) {
 		{"target user", `SELECT COUNT(*) FROM users WHERE id = $1`, []any{targetID}, 0},
 		{"shared account", `SELECT COUNT(*) FROM accounts WHERE id = $1`, []any{sharedAccountID}, 1},
 		{"shared membership", `SELECT COUNT(*) FROM accountsusers WHERE accounts_id = $1 AND users_id = $2`, []any{sharedAccountID, user.Id}, 1},
+		{"shared posts", `SELECT COUNT(*) FROM posts WHERE accounts_id = $1`, []any{sharedAccountID}, 1},
+		{"shared expenses", `SELECT COUNT(*) FROM expenses WHERE accounts_id = $1`, []any{sharedAccountID}, 1},
+		{"shared incomes", `SELECT COUNT(*) FROM incomes WHERE accounts_id = $1`, []any{sharedAccountID}, 1},
 		{"private account", `SELECT COUNT(*) FROM accounts WHERE id = $1`, []any{privateAccountID}, 0},
 		{"private posts", `SELECT COUNT(*) FROM posts WHERE accounts_id = $1`, []any{privateAccountID}, 0},
 		{"private expenses", `SELECT COUNT(*) FROM expenses WHERE accounts_id = $1`, []any{privateAccountID}, 0},
