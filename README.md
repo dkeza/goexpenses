@@ -129,7 +129,10 @@ User must register with valid E-Mail. When reseting password, activation link is
 ### Administration
 
 The admin panel is available at `/admin` after normal sign-in. Its user list can
-be searched and filtered; user details allow blocking and unblocking accounts.
+be searched and filtered; user details allow blocking, unblocking, and permanently
+deleting non-admin users. Deletion requires typing the exact user name and
+removes sessions, password reset requests, and accounts used only by that user
+with their financial records. Shared accounts and their records are retained.
 Blocking immediately deletes the user's active sessions. The panel also shows
 new audit events for exchange-rate refreshes, expired-session cleanup, SMTP
 handoff attempts, sign-ins, explicit sign-outs, and block/unblock actions.
@@ -147,7 +150,7 @@ UPDATE users SET is_admin = true
 WHERE lower(btrim(username)) = 'keza' AND email_verified = true;
 ```
 
-Registration never grants admin access. The panel refuses to block admin
+Registration never grants admin access. The panel refuses to block or delete admin
 accounts, and every admin request checks the role stored in the database.
 
 New registrations require E-Mail confirmation before sign-in. Confirmation links
