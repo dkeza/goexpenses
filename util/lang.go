@@ -150,6 +150,8 @@ func init() {
 	AppLang["Change password"] = LangText{"Promeni lozinku", "Промени лозинку", "Kennwort ändern"}
 	AppLang["Repeat password"] = LangText{"Ponovi lozinku", "Понови лозинку", "Kennwort wiederholen"}
 	AppLang["Invalid password!"] = LangText{"Neispravna lozinka", "Неисправна лозинка", "Ungültiges Kennwort"}
+	AppLang["Current password"] = LangText{"Trenutna lozinka", "Тренутна лозинка", "Aktuelles Kennwort"}
+	AppLang["Current password is incorrect!"] = LangText{"Trenutna lozinka nije ispravna!", "Тренутна лозинка није исправна!", "Das aktuelle Kennwort ist falsch!"}
 	AppLang["Invalid name!"] = LangText{"Neispravno ime!", "Неисправно име!", "Ungültiger Name!"}
 	AppLang["Invalid E-Mail!"] = LangText{"Neispravna E-Mail adresa!", "Неисправна Е-Пошта адреса!", "Ungültige E-Mail-Adresse!"}
 	AppLang["Invalid user name!"] = LangText{"Korisničko ime mora imati 3–64 slova, broja ili znaka . _ -", "Корисничко име мора имати 3–64 слова, броја или знака . _ -", "Der Benutzername muss aus 3–64 Buchstaben, Zahlen oder . _ - bestehen."}
