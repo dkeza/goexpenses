@@ -9,11 +9,11 @@
   </div>
   {{ if not .SelectedUser.IsAdmin }}
     {{ if .SelectedUser.BlockedAt }}
-      <form action="/admin/users/{{ .SelectedUser.ID }}/unblock" method="post" class="mb-4 js-confirm-admin" data-confirm-message="{{ GetLangText "Confirm unblock user" .Lang }}"><input type="hidden" name="_CSRF" value="{{ .Csrf }}"><button class="btn btn-success" type="submit">{{ GetLangText "Unblock user" .Lang }}</button></form>
+      <form action="/admin/users/{{ .SelectedUser.ID }}/unblock" method="post" class="mb-4 js-confirm-admin" data-confirm-title="{{ GetLangText "Unblock user" .Lang }}" data-confirm-message="{{ GetLangText "Confirm unblock user" .Lang }}" data-confirm-detail="{{ .SelectedUser.Username }}" data-confirm-tone="success"><input type="hidden" name="_CSRF" value="{{ .Csrf }}"><button class="btn btn-success" type="submit">{{ GetLangText "Unblock user" .Lang }}</button></form>
     {{ else }}
-      <form action="/admin/users/{{ .SelectedUser.ID }}/block" method="post" class="surface-card p-4 mb-4 js-confirm-admin" data-confirm-message="{{ GetLangText "Confirm block user" .Lang }}"><input type="hidden" name="_CSRF" value="{{ .Csrf }}"><label class="form-label" for="block-reason">{{ GetLangText "Reason for blocking" .Lang }}</label><textarea class="form-control mb-3" id="block-reason" name="reason" maxlength="500" required></textarea><button class="btn btn-danger" type="submit">{{ GetLangText "Block user" .Lang }}</button></form>
+      <form action="/admin/users/{{ .SelectedUser.ID }}/block" method="post" class="surface-card p-4 mb-4 js-confirm-admin" data-confirm-title="{{ GetLangText "Block user" .Lang }}" data-confirm-message="{{ GetLangText "Confirm block user" .Lang }}" data-confirm-detail="{{ .SelectedUser.Username }}"><input type="hidden" name="_CSRF" value="{{ .Csrf }}"><label class="form-label" for="block-reason">{{ GetLangText "Reason for blocking" .Lang }}</label><textarea class="form-control mb-3" id="block-reason" name="reason" maxlength="500" required></textarea><button class="btn btn-danger" type="submit">{{ GetLangText "Block user" .Lang }}</button></form>
     {{ end }}
-    <form action="/admin/users/{{ .SelectedUser.ID }}/delete" method="post" class="surface-card p-4 mb-4 js-confirm-admin" data-confirm-message="{{ GetLangText "Confirm delete user" .Lang }}">
+    <form action="/admin/users/{{ .SelectedUser.ID }}/delete" method="post" class="surface-card p-4 mb-4 js-confirm-admin" data-confirm-title="{{ GetLangText "Delete user" .Lang }}" data-confirm-message="{{ GetLangText "Confirm delete user" .Lang }}" data-confirm-detail="{{ .SelectedUser.Username }}">
       <input type="hidden" name="_CSRF" value="{{ .Csrf }}">
       <h2 class="h4">{{ GetLangText "Delete user" .Lang }}</h2>
       <p>{{ GetLangText "Delete user warning" .Lang }}</p>
