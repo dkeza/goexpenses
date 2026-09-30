@@ -28,8 +28,7 @@ func init() {
 
 func MainRoute() {
 	E.GET("/", func(c echo.Context) error {
-		var data *util.Data
-		data = c.Get("data").(*util.Data)
+		data := c.Get("data").(*util.Data)
 		data.Active = "home"
 		l := c.QueryParam("lang")
 		if l != "" {
