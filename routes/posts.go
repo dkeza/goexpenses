@@ -169,6 +169,20 @@ func loadPostsPage(accountID int, filterDateFrom, filterDateTo *time.Time, reque
 	return posts, hasMore, nil
 }
 
+// linkedPostWrite builds the automatic post for an expense's linked expense.
+// It shares the primary post's description, account, rate and date.
+func linkedPostWrite(primary postWrite, expenseID int, amount float64, publicID string) postWrite {
+	return postWrite{
+		Description: primary.Description,
+		ExpenseID:   expenseID,
+		Amount:      amount,
+		Exchange:    primary.Exchange,
+		AccountID:   primary.AccountID,
+		PublicID:    publicID,
+		CreatedAt:   primary.CreatedAt,
+	}
+}
+
 func DefinePosts() {
 	e := E
 	auth := Auth
@@ -442,15 +456,7 @@ func DefinePosts() {
 				if err != nil {
 					return databaseWriteError(c, "generate linked post public ID", err)
 				}
-				records = append(records, postWrite{
-					Description: description,
-					ExpenseID:   addexp,
-					Amount:      addamount,
-					Exchange:    data.Eur,
-					AccountID:   data.User.Default_accounts_id,
-					PublicID:    linkedPublicID,
-					CreatedAt:   time.Now(),
-				})
+				records = append(records, linkedPostWrite(records[0], addexp, addamount, linkedPublicID))
 			}
 		}
 		if err := createPosts(records); err != nil {
