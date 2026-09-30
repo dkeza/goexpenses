@@ -14,8 +14,10 @@ import (
 
 const advisoryLockID int64 = 6754112174613617249
 
-// CurrentVersion is the application and database schema version.
-const CurrentVersion = 25
+// SchemaVersion is the database schema version: the number of the latest
+// migration. Change it only together with a new migration that alters the
+// schema; the application version is assigned by CI at build time.
+const SchemaVersion = 25
 
 //go:embed sql/*.sql
 var migrationFiles embed.FS

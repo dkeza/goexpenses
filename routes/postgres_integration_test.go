@@ -74,7 +74,7 @@ func TestPostgresRegistrationLoginAndPost(t *testing.T) {
 		t.Fatalf("read initial schema: %v", err)
 	}
 	initialSchema = []byte(strings.ReplaceAll(string(initialSchema), "public.", quotedSchema+"."))
-	if err := migrations.Apply(ctx, testDB, initialSchema, migrations.CurrentVersion); err != nil {
+	if err := migrations.Apply(ctx, testDB, initialSchema, migrations.SchemaVersion); err != nil {
 		t.Fatalf("apply schema: %v", err)
 	}
 	// Recreate the version-14 shape so CI executes the upgrade SQL as well as
@@ -122,7 +122,7 @@ func TestPostgresRegistrationLoginAndPost(t *testing.T) {
 	if _, err := testDB.ExecContext(ctx, removeDataIntegrityMigration); err != nil {
 		t.Fatalf("prepare version-14 schema: %v", err)
 	}
-	if err := migrations.Apply(ctx, testDB, initialSchema, migrations.CurrentVersion); err != nil {
+	if err := migrations.Apply(ctx, testDB, initialSchema, migrations.SchemaVersion); err != nil {
 		t.Fatalf("upgrade version-14 schema: %v", err)
 	}
 

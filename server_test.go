@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"goexpenses/util"
+	"goexpenses/version"
 )
 
 type fakeApplicationServer struct {
@@ -146,10 +147,10 @@ func TestStaticAssetURLsIncludeBuildVersion(t *testing.T) {
 		t.Fatalf("parse embedded templates: %v", err)
 	}
 
-	originalBuild := util.Settings.Build
-	util.Settings.Build = 123
+	originalNumber, originalCommit := version.Number, version.Commit
+	version.Number, version.Commit = "123", "abc1234"
 	t.Cleanup(func() {
-		util.Settings.Build = originalBuild
+		version.Number, version.Commit = originalNumber, originalCommit
 	})
 
 	data := &util.Data{}
@@ -158,7 +159,7 @@ func TestStaticAssetURLsIncludeBuildVersion(t *testing.T) {
 		if err := templates.ExecuteTemplate(&rendered, name, data); err != nil {
 			t.Fatalf("render %s template: %v", name, err)
 		}
-		if count := strings.Count(rendered.String(), "?v=123"); count != 2 {
+		if count := strings.Count(rendered.String(), "?v=123-abc1234"); count != 2 {
 			t.Fatalf("%s template has %d versioned asset URLs, want 2", name, count)
 		}
 	}
