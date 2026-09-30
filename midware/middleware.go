@@ -3,7 +3,6 @@ package midware
 import (
 	stdsql "database/sql"
 	"errors"
-	"fmt"
 	"net/http"
 	"strings"
 	"time"
@@ -84,7 +83,7 @@ func CheckCookie(next echo.HandlerFunc) echo.HandlerFunc {
 		} else {
 			if session.Message != "" {
 				data.Flash = session.Message
-				sql := fmt.Sprintf(`UPDATE sessions SET message = %v WHERE uuid = %v`, util.SqlParam(1), util.SqlParam(2))
+				sql := `UPDATE sessions SET message = $1 WHERE uuid = $2`
 				if _, err := database.Db.Exec(sql, "", sessionHash); err != nil {
 					return echo.NewHTTPError(http.StatusInternalServerError, "could not update session").SetInternal(err)
 				}
@@ -92,33 +91,33 @@ func CheckCookie(next echo.HandlerFunc) echo.HandlerFunc {
 			if session.Expenses_id != 0 {
 
 				expenses := []util.Expense{}
-				sql := fmt.Sprintf(`
+				sql := `
 				SELECT id, p_id, description 
 					FROM expenses 
-					WHERE id = %v 
+					WHERE id = $1 
 					ORDER BY description ASC
-				`, util.SqlParam(1))
+				`
 				if err := database.Db.Select(&expenses, sql, session.Expenses_id); err != nil {
 					return databaseReadError(c, "load session expense", "could not load session data", err)
 				}
 				if len(expenses) > 0 && expenses[0].Pid != "" {
 					data.Expenses_id = expenses[0].Pid
 				}
-				sql = fmt.Sprintf(`UPDATE sessions SET expenses_id = %v WHERE uuid = %v`, util.SqlParam(1), util.SqlParam(2))
+				sql = `UPDATE sessions SET expenses_id = $1 WHERE uuid = $2`
 				if _, err := database.Db.Exec(sql, 0, sessionHash); err != nil {
 					return echo.NewHTTPError(http.StatusInternalServerError, "could not update session").SetInternal(err)
 				}
 			}
 			if session.Last_post_description != "" {
 				data.Last_post_description = session.Last_post_description
-				sql := fmt.Sprintf(`UPDATE sessions SET last_post_description = %v WHERE uuid = %v`, util.SqlParam(1), util.SqlParam(2))
+				sql := `UPDATE sessions SET last_post_description = $1 WHERE uuid = $2`
 				if _, err := database.Db.Exec(sql, "", sessionHash); err != nil {
 					return echo.NewHTTPError(http.StatusInternalServerError, "could not update session").SetInternal(err)
 				}
 			}
 			if session.Message_success != 0 {
 				data.Message_success = session.Message_success
-				sql := fmt.Sprintf(`UPDATE sessions SET message_success = %v WHERE uuid = %v`, util.SqlParam(1), util.SqlParam(2))
+				sql := `UPDATE sessions SET message_success = $1 WHERE uuid = $2`
 				if _, err := database.Db.Exec(sql, 0, sessionHash); err != nil {
 					return echo.NewHTTPError(http.StatusInternalServerError, "could not update session").SetInternal(err)
 				}
@@ -129,12 +128,12 @@ func CheckCookie(next echo.HandlerFunc) echo.HandlerFunc {
 		data.CookieId = sessionHash
 		if session.User_id > 0 {
 			user := util.User{}
-			sql := fmt.Sprintf(`SELECT id, name, username, email, default_accounts_id, lang, is_admin FROM users WHERE id = %v AND email_verified = true AND blocked_at IS NULL`, util.SqlParam(1))
+			sql := `SELECT id, name, username, email, default_accounts_id, lang, is_admin FROM users WHERE id = $1 AND email_verified = true AND blocked_at IS NULL`
 			if err := database.Db.Get(&user, sql, session.User_id); err != nil {
 				if !errors.Is(err, stdsql.ErrNoRows) {
 					return databaseReadError(c, "load session user", "could not load user", err)
 				}
-				sql = fmt.Sprintf(`UPDATE sessions SET user_id = %v WHERE uuid = %v`, util.SqlParam(1), util.SqlParam(2))
+				sql = `UPDATE sessions SET user_id = $1 WHERE uuid = $2`
 				if _, err := database.Db.Exec(sql, 0, sessionHash); err != nil {
 					return echo.NewHTTPError(http.StatusInternalServerError, "could not clear stale session").SetInternal(err)
 				}
@@ -155,7 +154,7 @@ func CheckCookie(next echo.HandlerFunc) echo.HandlerFunc {
 				data.User.IsAdmin = user.IsAdmin
 				data.Lang = user.Lang
 				accounts := []util.Account{}
-				sql = fmt.Sprintf(`SELECT a.id, a.description FROM accountsusers au INNER JOIN accounts a ON au.accounts_id = a.id WHERE au.users_id = %v ORDER BY description ASC`, util.SqlParam(1))
+				sql = `SELECT a.id, a.description FROM accountsusers au INNER JOIN accounts a ON au.accounts_id = a.id WHERE au.users_id = $1 ORDER BY description ASC`
 				if err := database.Db.Select(&accounts, sql, data.User.Id); err != nil {
 					return databaseReadError(c, "load user accounts", "could not load accounts", err)
 				}
@@ -176,7 +175,7 @@ func CheckCookie(next echo.HandlerFunc) echo.HandlerFunc {
 		data.Csrf = c.Get("csrf").(string)
 
 		currency := util.Currency{}
-		sql := fmt.Sprintf(`SELECT id, code, rate, date FROM currencies WHERE code = %v`, util.SqlParam(1))
+		sql := `SELECT id, code, rate, date FROM currencies WHERE code = $1`
 		if err := database.Db.Get(&currency, sql, `EUR`); err != nil && !errors.Is(err, stdsql.ErrNoRows) {
 			return databaseReadError(c, "load exchange rate", "could not load exchange rate", err)
 		}
@@ -200,7 +199,7 @@ func getOrCreateSession(c echo.Context) (util.Session, string, error) {
 	if cookie, err := c.Cookie(util.SessionCookieName); err == nil {
 		if tokenHash, err := util.HashSessionToken(cookie.Value); err == nil {
 			sessionHash = tokenHash
-			query := fmt.Sprintf(`SELECT id, uuid, user_id, lang, message, expenses_id, last_post_description, message_success FROM sessions WHERE uuid = %v AND created_at >= %v`, util.SqlParam(1), util.SqlParam(2))
+			query := `SELECT id, uuid, user_id, lang, message, expenses_id, last_post_description, message_success FROM sessions WHERE uuid = $1 AND created_at >= $2`
 			err = database.Db.Get(&session, query, sessionHash, time.Now().Add(-util.SessionDuration))
 			if err != nil && !errors.Is(err, stdsql.ErrNoRows) {
 				return util.Session{}, "", err
@@ -216,7 +215,7 @@ func getOrCreateSession(c echo.Context) (util.Session, string, error) {
 	if err != nil {
 		return util.Session{}, "", err
 	}
-	query := fmt.Sprintf(`INSERT INTO sessions (uuid) VALUES (%v)`, util.SqlParam(1))
+	query := `INSERT INTO sessions (uuid) VALUES ($1)`
 	if _, err := database.Db.Exec(query, tokenHash); err != nil {
 		return util.Session{}, "", err
 	}

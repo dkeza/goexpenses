@@ -1,7 +1,6 @@
 package routes
 
 import (
-	"fmt"
 	"net/http"
 	"strings"
 
@@ -20,32 +19,32 @@ func DefineExpenses() {
 		data.Active = "expenses"
 
 		expenses := []util.Expense{}
-		sql := fmt.Sprintf(`
+		sql := `
 		SELECT e1.id, e1.description, e1.amount, 
 			CAST(case when e1.amount > 0 AND e1.exchange > 0 then e1.amount/e1.exchange else 0 end  AS Numeric(12,2)) AS amounte, 
 			e1.expenses_id, coalesce(e2.description,'') AS expensedescription, e1.p_id 
 			FROM expenses e1 
 			LEFT JOIN expenses e2 ON e1.expenses_id = e2.id 
-			WHERE e1.accounts_id = %v AND e1.deleted = 0 
+			WHERE e1.accounts_id = $1 AND e1.deleted = 0 
 			ORDER BY 2 ASC
-		`, util.SqlParam(1))
+		`
 		if err := database.Db.Select(&expenses, sql, data.User.Default_accounts_id); err != nil {
 			return databaseReadError(c, "load expenses", err)
 		}
 		data.Expenses = expenses
 
 		expensesadd := []util.Expense{}
-		sql = fmt.Sprintf(`
+		sql = `
 		SELECT e1.id, e1.description, e1.amount, 
 			CAST(case when e1.amount > 0 AND e1.exchange > 0 then e1.amount/e1.exchange else 0.00 end  AS Numeric(12,2)) AS amounte, 
 			e1.expenses_id, coalesce(e2.description,'') AS expensedescription , e1.p_id 
 			FROM expenses e1
 			LEFT JOIN expenses e2 ON e1.expenses_id = e2.id 
-			WHERE e1.accounts_id = %v AND e1.deleted = 0 
+			WHERE e1.accounts_id = $1 AND e1.deleted = 0 
 			UNION SELECT 0, ' ', 0.00, 0.00, 0 , '', ''
 			FROM expenses
 			ORDER BY 2 ASC
-		`, util.SqlParam(1))
+		`
 		if err := database.Db.Select(&expensesadd, sql, data.User.Default_accounts_id); err != nil {
 			return databaseReadError(c, "load related expenses", err)
 		}
@@ -61,13 +60,13 @@ func DefineExpenses() {
 		id := c.QueryParam("id")
 		expenses := []util.Expense{}
 
-		sql := fmt.Sprintf(`
+		sql := `
 		SELECT id, description, amount, 
 			CAST(case when amount > 0 AND exchange > 0 then amount/exchange else 0 end  AS Numeric(12,2)) AS amounte, 
 			expenses_id, p_id, '                                                        ' AS expenses_pid 
 			FROM expenses 
-			WHERE p_id = %v AND accounts_id = %v AND deleted = 0
-		`, util.SqlParam(1), util.SqlParam(2))
+			WHERE p_id = $1 AND accounts_id = $2 AND deleted = 0
+		`
 
 		errsql := database.Db.Select(&expenses, sql, id, data.User.Default_accounts_id)
 		if errsql != nil {
@@ -79,11 +78,11 @@ func DefineExpenses() {
 
 		if expenses[0].ExpensesId != 0 {
 			expensesadd := []util.Expense{}
-			sql := fmt.Sprintf(`
+			sql := `
 			SELECT p_id 
 				FROM expenses 
-				WHERE id = %v AND accounts_id = %v AND deleted = 0
-			`, util.SqlParam(1), util.SqlParam(2))
+				WHERE id = $1 AND accounts_id = $2 AND deleted = 0
+			`
 			errsql := database.Db.Select(&expensesadd, sql, expenses[0].ExpensesId, data.User.Default_accounts_id)
 			if errsql != nil {
 				return databaseReadError(c, "load selected related expense", errsql)
@@ -96,7 +95,7 @@ func DefineExpenses() {
 
 		data.Expenses = expenses
 		expensesadd := []util.Expense{}
-		sql = fmt.Sprintf(`
+		sql = `
 		SELECT e1.id, e1.description, e1.amount, 
 			CAST(case when e1.amount > 0 AND e1.exchange > 0 then e1.amount/e1.exchange else 0 end  AS Numeric(12,2)) AS amounte, 
 			e1.expenses_id, 
@@ -104,11 +103,11 @@ func DefineExpenses() {
 			e1.p_id 
 			FROM expenses e1
 			LEFT JOIN expenses e2 ON e1.expenses_id = e2.id 
-			WHERE e1.accounts_id = %v AND e1.deleted = 0 
+			WHERE e1.accounts_id = $1 AND e1.deleted = 0 
 			UNION SELECT 0, ' ', 0.00, 0.00, 0 , '', '' 
 			FROM expenses
 			ORDER BY 2 ASC
-		`, util.SqlParam(1))
+		`
 		errsql = database.Db.Select(&expensesadd, sql, data.User.Default_accounts_id)
 		if errsql != nil {
 			return databaseReadError(c, "load related expenses", errsql)
@@ -138,11 +137,11 @@ func DefineExpenses() {
 		expenses_idnum := 0
 		if expenses_id != "" {
 			expenses := []util.Expense{}
-			sql := fmt.Sprintf(`
+			sql := `
 			SELECT id 
 				FROM expenses 
-				WHERE p_id = %v AND accounts_id = %v AND deleted = 0
-			`, util.SqlParam(1), util.SqlParam(2))
+				WHERE p_id = $1 AND accounts_id = $2 AND deleted = 0
+			`
 			errsql := database.Db.Select(&expenses, sql, expenses_id, data.User.Default_accounts_id)
 			if errsql != nil {
 				return databaseReadError(c, "validate related expense", errsql)
@@ -164,7 +163,7 @@ func DefineExpenses() {
 			return databaseWriteError(c, "generate expense public ID", err)
 		}
 
-		sql := fmt.Sprintf(`INSERT INTO expenses (description, accounts_id, amount, exchange, expenses_id, p_id) VALUES (%v,%v,%v,%v,%v,%v)`, util.SqlParam(1), util.SqlParam(2), util.SqlParam(3), util.SqlParam(4), util.SqlParam(5), util.SqlParam(6))
+		sql := `INSERT INTO expenses (description, accounts_id, amount, exchange, expenses_id, p_id) VALUES ($1,$2,$3,$4,$5,$6)`
 		if err := executeExactlyOne(database.Db, sql, strings.TrimSpace(description), data.User.Default_accounts_id, amountnum, data.Eur, expenses_idnum, publicID); err != nil {
 			return databaseWriteError(c, "create expense", err)
 		}
@@ -196,11 +195,11 @@ func DefineExpenses() {
 		expenses_idnum := 0
 		if expenses_id != "" {
 			expenses := []util.Expense{}
-			sql := fmt.Sprintf(`
+			sql := `
 			SELECT id 
 				FROM expenses 
-				WHERE p_id = %v AND accounts_id = %v AND deleted = 0
-			`, util.SqlParam(1), util.SqlParam(2))
+				WHERE p_id = $1 AND accounts_id = $2 AND deleted = 0
+			`
 			errsql := database.Db.Select(&expenses, sql, expenses_id, data.User.Default_accounts_id)
 			if errsql != nil {
 				return databaseReadError(c, "validate related expense", errsql)
@@ -211,7 +210,7 @@ func DefineExpenses() {
 			}
 			expenses_idnum = expenses[0].Id
 		}
-		sql := fmt.Sprintf(`UPDATE expenses SET description = %v, amount = %v, exchange = %v, expenses_id = %v WHERE p_id = %v AND accounts_id = %v AND deleted = 0`, util.SqlParam(1), util.SqlParam(2), util.SqlParam(3), util.SqlParam(4), util.SqlParam(5), util.SqlParam(6))
+		sql := `UPDATE expenses SET description = $1, amount = $2, exchange = $3, expenses_id = $4 WHERE p_id = $5 AND accounts_id = $6 AND deleted = 0`
 		if err := executeExactlyOne(database.Db, sql, strings.TrimSpace(description), amountnum, data.Eur, expenses_idnum, id, data.User.Default_accounts_id); err != nil {
 			return databaseWriteError(c, "update expense", err)
 		}
@@ -223,7 +222,7 @@ func DefineExpenses() {
 		data := c.Get("data").(*util.Data)
 		id := c.FormValue("id")
 
-		sql := fmt.Sprintf(`UPDATE expenses SET deleted = 1 WHERE p_id = %v AND accounts_id = %v AND deleted = 0`, util.SqlParam(1), util.SqlParam(2))
+		sql := `UPDATE expenses SET deleted = 1 WHERE p_id = $1 AND accounts_id = $2 AND deleted = 0`
 		if err := executeExactlyOne(database.Db, sql, id, data.User.Default_accounts_id); err != nil {
 			return databaseWriteError(c, "delete expense", err)
 		}
