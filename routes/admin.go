@@ -41,12 +41,24 @@ type adminEventRow struct {
 	CreatedAt   time.Time `db:"created_at"`
 }
 
+type adminUserCounts struct {
+	Accounts        int `db:"accounts"`
+	DeletedAccounts int `db:"deleted_accounts"`
+	Posts           int `db:"posts"`
+	DeletedPosts    int `db:"deleted_posts"`
+	Expenses        int `db:"expenses"`
+	DeletedExpenses int `db:"deleted_expenses"`
+	Incomes         int `db:"incomes"`
+	DeletedIncomes  int `db:"deleted_incomes"`
+}
+
 type adminPage struct {
 	*util.Data
 	Users        []adminUser
 	Events       []adminEventRow
 	Alerts       []adminEventRow
 	SelectedUser adminUser
+	UserCounts   adminUserCounts
 	Query        string
 	Status       string
 	Kind         string
@@ -156,6 +168,10 @@ func adminUserDetails(c echo.Context) error {
 	if err != nil {
 		return databaseReadError(c, "load admin user", err)
 	}
+	view.UserCounts, err = loadAdminUserCounts(id)
+	if err != nil {
+		return databaseReadError(c, "count user account data", err)
+	}
 	if err := database.Db.Select(&view.Events, `
 		SELECT id, kind, status, user_id, actor_user_id, subject, detail, item_count, created_at,
 		EXISTS (SELECT 1 FROM users WHERE users.id = admin_events.user_id) AS user_exists
@@ -163,6 +179,40 @@ func adminUserDetails(c echo.Context) error {
 		return databaseReadError(c, "load user events", err)
 	}
 	return c.Render(http.StatusOK, "admin-user", view)
+}
+
+func loadAdminUserCounts(id int) (adminUserCounts, error) {
+	counts := adminUserCounts{}
+	err := database.Db.Get(&counts, `
+		WITH user_accounts AS (
+			SELECT a.id,
+				NOT EXISTS (SELECT 1 FROM accountsusers other WHERE other.accounts_id = a.id AND other.users_id <> $1)
+				AND NOT EXISTS (SELECT 1 FROM users other WHERE other.default_accounts_id = a.id AND other.id <> $1) AS exclusive
+			FROM accounts a
+			WHERE EXISTS (SELECT 1 FROM accountsusers au WHERE au.accounts_id = a.id AND au.users_id = $1)
+				OR EXISTS (SELECT 1 FROM users u WHERE u.id = $1 AND u.default_accounts_id = a.id)
+		),
+		account_counts AS (
+			SELECT COUNT(*) AS total, COUNT(*) FILTER (WHERE exclusive) AS removed FROM user_accounts
+		),
+		post_counts AS (
+			SELECT COUNT(*) AS total, COUNT(*) FILTER (WHERE ua.exclusive) AS removed
+			FROM posts p JOIN user_accounts ua ON ua.id = p.accounts_id
+		),
+		expense_counts AS (
+			SELECT COUNT(*) AS total, COUNT(*) FILTER (WHERE ua.exclusive) AS removed
+			FROM expenses e JOIN user_accounts ua ON ua.id = e.accounts_id
+		),
+		income_counts AS (
+			SELECT COUNT(*) AS total, COUNT(*) FILTER (WHERE ua.exclusive) AS removed
+			FROM incomes i JOIN user_accounts ua ON ua.id = i.accounts_id
+		)
+		SELECT a.total AS accounts, a.removed AS deleted_accounts,
+			p.total AS posts, p.removed AS deleted_posts,
+			e.total AS expenses, e.removed AS deleted_expenses,
+			i.total AS incomes, i.removed AS deleted_incomes
+		FROM account_counts a CROSS JOIN post_counts p CROSS JOIN expense_counts e CROSS JOIN income_counts i`, id)
+	return counts, err
 }
 
 func adminEvents(c echo.Context) error {

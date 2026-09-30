@@ -29,8 +29,14 @@ var AppLang = map[string]LangText{}
 func init() {
 	AppLang["Administration"] = LangText{"Administracija", "Администрација", "Verwaltung"}
 	AppLang["User overview"] = LangText{"Pregled korisnika", "Преглед корисника", "Benutzerübersicht"}
+	AppLang["User data counts"] = LangText{"Broj podataka korisnika", "Број података корисника", "Daten des Benutzers"}
+	AppLang["Data type"] = LangText{"Vrsta podataka", "Врста података", "Datentyp"}
+	AppLang["Linked to user"] = LangText{"Povezano sa korisnikom", "Повезано са корисником", "Mit Benutzer verknüpft"}
+	AppLang["Deleted with user"] = LangText{"Briše se sa korisnikom", "Брише се са корисником", "Wird mit Benutzer gelöscht"}
+	AppLang["Counts include records already marked as deleted. Data in shared accounts remains available to other users."] = LangText{"Brojevi uključuju i ranije označene kao obrisane stavke. Podaci na deljenim računima ostaju dostupni drugim korisnicima.", "Бројеви укључују и раније означене као обрисане ставке. Подаци на дељеним рачунима остају доступни другим корисницима.", "Die Zahlen enthalten auch zuvor als gelöscht markierte Einträge. Daten in geteilten Konten bleiben für andere Benutzer verfügbar."}
 	AppLang["System events"] = LangText{"Sistemski događaji", "Системски догађаји", "Systemereignisse"}
 	AppLang["All users"] = LangText{"Svi korisnici", "Сви корисници", "Alle Benutzer"}
+	AppLang["Accounts"] = LangText{"Računi", "Рачуни", "Konten"}
 	AppLang["New users (7 days)"] = LangText{"Novi korisnici (7 dana)", "Нови корисници (7 дана)", "Neue Benutzer (7 Tage)"}
 	AppLang["Blocked users"] = LangText{"Blokirani korisnici", "Блокирани корисници", "Gesperrte Benutzer"}
 	AppLang["Pending verification"] = LangText{"Čekaju potvrdu", "Чекају потврду", "Bestätigung ausstehend"}
@@ -50,8 +56,8 @@ func init() {
 	AppLang["Unblock user"] = LangText{"Odblokiraj korisnika", "Одблокирај корисника", "Benutzer entsperren"}
 	AppLang["Delete user"] = LangText{"Obriši korisnika", "Обриши корисника", "Benutzer löschen"}
 	AppLang["User deleted"] = LangText{"Korisnik je obrisan.", "Корисник је обрисан.", "Benutzer wurde gelöscht."}
-	AppLang["Confirm delete user"] = LangText{"Trajno obrisati korisnika i njegove nedeljene račune?", "Трајно обрисати корисника и његове недељене рачуне?", "Benutzer und nicht geteilte Konten dauerhaft löschen?"}
-	AppLang["Delete user warning"] = LangText{"Ova radnja trajno briše korisnika i podatke na računima koje ne koristi niko drugi. Deljeni računi ostaju dostupni ostalim korisnicima.", "Ова радња трајно брише корисника и податке на рачунима које не користи нико други. Дељени рачуни остају доступни осталим корисницима.", "Diese Aktion löscht den Benutzer und Daten in Konten, die niemand sonst nutzt, dauerhaft. Geteilte Konten bleiben für andere Benutzer verfügbar."}
+	AppLang["Permanently delete this user and their unshared accounts?"] = LangText{"Trajno obrisati korisnika i njegove nedeljene račune?", "Трајно обрисати корисника и његове недељене рачуне?", "Benutzer und nicht geteilte Konten dauerhaft löschen?"}
+	AppLang["This permanently deletes the user and data in accounts nobody else uses. Shared accounts remain available to other users."] = LangText{"Ova radnja trajno briše korisnika i podatke na računima koje ne koristi niko drugi. Deljeni računi ostaju dostupni ostalim korisnicima.", "Ова радња трајно брише корисника и податке на рачунима које не користи нико други. Дељени рачуни остају доступни осталим корисницима.", "Diese Aktion löscht den Benutzer und Daten in Konten, die niemand sonst nutzt, dauerhaft. Geteilte Konten bleiben für andere Benutzer verfügbar."}
 	AppLang["Type the user name to confirm"] = LangText{"Unesite korisničko ime za potvrdu", "Унесите корисничко име за потврду", "Benutzernamen zur Bestätigung eingeben"}
 	AppLang["Confirm block user"] = LangText{"Blokirati korisnika i prekinuti sve njegove sesije?", "Блокирати корисника и прекинути све његове сесије?", "Benutzer sperren und alle Sitzungen beenden?"}
 	AppLang["Confirm unblock user"] = LangText{"Odblokirati korisnika?", "Одблокирати корисника?", "Benutzer entsperren?"}

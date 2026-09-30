@@ -99,6 +99,16 @@ func TestAdminTemplatesRender(t *testing.T) {
 			BlockedAt     *time.Time
 			BlockedReason *string
 		}
+		UserCounts struct {
+			Accounts        int
+			DeletedAccounts int
+			Posts           int
+			DeletedPosts    int
+			Expenses        int
+			DeletedExpenses int
+			Incomes         int
+			DeletedIncomes  int
+		}
 		Query        string
 		Status       string
 		Kind         string
