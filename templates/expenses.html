@@ -8,7 +8,7 @@
   <form action="/expenses/save" method="post">
     <input type="hidden" name="_CSRF" value="{{ .Csrf }}">
     <div class="row g-3 align-items-end">
-      <div class="col-12 col-lg-4"><label class="form-label" for="description">{{ GetLangText "Description" .Lang }}</label><input type="text" class="form-control" id="description" name="description" required></div>
+      <div class="col-12 col-lg-4"><label class="form-label" for="description">{{ GetLangText "Description" .Lang }}</label><input type="text" class="form-control" id="description" name="description" maxlength="200" required></div>
       <div class="col-12 col-sm-6 col-lg-3"><label class="form-label" for="expense_id">{{ GetLangText "Expense type" .Lang }}</label><select id="expense_id" name="expense_id" class="form-select">{{ with .ExpensesAdd }}{{ range . }}<option value="{{ .Pid }}" {{ if eq .Pid $.Expenses_id }}selected{{ end }}>{{ .Description }}</option>{{ end }}{{ end }}</select></div>
       <div class="col-6 col-lg-2"><label class="form-label" for="amount">{{ GetLangText "Amount" .Lang }} RSD</label><input type="number" min="0.01" step="any" class="form-control" id="amount" name="amount"></div>
       <div class="col-6 col-lg-2"><label class="form-label" for="amounte">{{ GetLangText "Amount" .Lang }} EUR</label><input type="number" min="0.01" step="any" class="form-control" id="amounte" name="amounte"></div>

@@ -130,6 +130,10 @@ func DefineExpenses() {
 			util.Flash(`Invalid description!`, data, 0, ``, 0)
 			return c.Redirect(http.StatusSeeOther, "/expenses")
 		}
+		if descriptionTooLongFor(description) {
+			util.Flash(descriptionTooLong, data, 0, ``, 0)
+			return c.Redirect(http.StatusSeeOther, "/expenses")
+		}
 
 		expenses_idnum := 0
 		if expenses_id != "" {
@@ -176,6 +180,10 @@ func DefineExpenses() {
 		amounte := c.FormValue("amounte")
 		if id == "" || strings.TrimSpace(description) == "" {
 			util.Flash(`Invalid description!`, data, 0, ``, 0)
+			return c.Redirect(http.StatusSeeOther, "/expenses")
+		}
+		if descriptionTooLongFor(description) {
+			util.Flash(descriptionTooLong, data, 0, ``, 0)
 			return c.Redirect(http.StatusSeeOther, "/expenses")
 		}
 

@@ -8,7 +8,7 @@
   <form action="/incomes/save" method="post">
     <input type="hidden" name="_CSRF" value="{{ .Csrf }}">
     <div class="row g-3 align-items-end">
-      <div class="col-12 col-md"><label class="form-label" for="description">{{ GetLangText "Description" .Lang }}</label><input type="text" class="form-control" id="description" name="description" required></div>
+      <div class="col-12 col-md"><label class="form-label" for="description">{{ GetLangText "Description" .Lang }}</label><input type="text" class="form-control" id="description" name="description" maxlength="200" required></div>
       <div class="col-12 col-md-auto"><button type="submit" class="btn btn-primary w-100">{{ GetLangText "Save" .Lang }}</button></div>
     </div>
   </form>

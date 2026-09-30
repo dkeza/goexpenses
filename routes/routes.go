@@ -734,8 +734,12 @@ func DefineRoutes() {
 
 		description := c.FormValue("description")
 
-		if description == "" {
+		if strings.TrimSpace(description) == "" {
 			util.Flash(`Invalid description!`, data, 0, ``, 0)
+			return c.Redirect(http.StatusSeeOther, "/accounts/show")
+		}
+		if descriptionTooLongFor(description) {
+			util.Flash(descriptionTooLong, data, 0, ``, 0)
 			return c.Redirect(http.StatusSeeOther, "/accounts/show")
 		}
 
@@ -767,6 +771,10 @@ func DefineRoutes() {
 			util.Flash(`Invalid description!`, data, 0, ``, 0)
 			return c.Redirect(http.StatusSeeOther, "/incomes")
 		}
+		if descriptionTooLongFor(description) {
+			util.Flash(descriptionTooLong, data, 0, ``, 0)
+			return c.Redirect(http.StatusSeeOther, "/incomes")
+		}
 		publicID, err := util.NewPublicID()
 		if err != nil {
 			return databaseWriteError(c, "generate income public ID", err)
@@ -786,6 +794,10 @@ func DefineRoutes() {
 
 		if id == "" || strings.TrimSpace(description) == "" {
 			util.Flash(`Invalid description!`, data, 0, ``, 0)
+			return c.Redirect(http.StatusSeeOther, "/incomes")
+		}
+		if descriptionTooLongFor(description) {
+			util.Flash(descriptionTooLong, data, 0, ``, 0)
 			return c.Redirect(http.StatusSeeOther, "/incomes")
 		}
 		sql := fmt.Sprintf(`UPDATE incomes SET description = %v WHERE p_id = %v AND accounts_id = %v AND deleted = 0`, util.SqlParam(1), util.SqlParam(2), util.SqlParam(3))

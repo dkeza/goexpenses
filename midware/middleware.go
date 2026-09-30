@@ -16,11 +16,15 @@ import (
 	"github.com/labstack/echo/v4/middleware"
 )
 
+// RequestBodyLimit caps request bodies; every form in the app is far smaller.
+const RequestBodyLimit = "64K"
+
 func SetMiddleware() {
 
 	e := routes.E
 
 	e.Use(SecurityHeaders)
+	e.Use(middleware.BodyLimit(RequestBodyLimit))
 	e.Use(middleware.CSRFWithConfig(middleware.CSRFConfig{
 		Skipper: func(c echo.Context) bool {
 			return skipsSession(c.Request().URL.Path)

@@ -6,7 +6,7 @@
   <form action="/posts/save" method="post">
     <input type="hidden" name="_CSRF" value="{{ .Csrf }}"><input type="hidden" name="expense_id" value="">
     <div class="row g-3">
-      <div class="col-12 col-lg-5"><label class="form-label" for="description">{{ GetLangText "Description" .Lang }}</label><input type="text" class="form-control" id="description" name="description" required></div>
+      <div class="col-12 col-lg-5"><label class="form-label" for="description">{{ GetLangText "Description" .Lang }}</label><input type="text" class="form-control" id="description" name="description" maxlength="200" required></div>
       <div class="col-12 col-sm-6 col-lg-4"><label class="form-label" for="income_id">{{ GetLangText "Income type" .Lang }}</label><select id="income_id" name="income_id" class="form-select">{{ with .Incomes }}{{ range . }}<option value="{{ .Pid }}">{{ .Description }}</option>{{ end }}{{ end }}</select></div>
       <div class="col-12 col-sm-6 col-lg-3"><label class="form-label" for="date">{{ GetLangText "Date" .Lang }}</label><input type="date" class="form-control" id="date" name="date" value="{{ .Date }}" required></div>
       <div class="col-6"><label class="form-label" for="amount">{{ GetLangText "Amount" .Lang }} RSD</label><input type="number" min="0.01" step="any" class="form-control" id="amount" name="amount"></div>

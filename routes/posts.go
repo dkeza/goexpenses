@@ -353,6 +353,10 @@ func DefinePosts() {
 		amount := c.FormValue("amount")
 		amounte := c.FormValue("amounte")
 		date := c.FormValue("date")
+		if descriptionTooLongFor(description) {
+			util.Flash(descriptionTooLong, data, 0, "", 0)
+			return c.Redirect(http.StatusSeeOther, "/posts")
+		}
 		amountnum, err := parseAmountInputs(amount, amounte, data.Eur)
 		if err != nil {
 			util.Flash(`Changes not saved, because of invalid input data!`, data, 0, "", 0)
@@ -527,6 +531,10 @@ func DefinePosts() {
 		description := c.FormValue("description")
 		amount := c.FormValue("amount")
 		dateOnly := c.FormValue("dateonly")
+		if descriptionTooLongFor(description) {
+			util.Flash(descriptionTooLong, data, 0, "", 0)
+			return c.Redirect(http.StatusSeeOther, "/posts")
+		}
 
 		storedDate := time.Now()
 

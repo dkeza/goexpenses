@@ -6,9 +6,13 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"unicode/utf8"
 )
 
 const (
+	maximumDescriptionLength = 200
+	descriptionTooLong       = "Description may contain up to 200 characters."
+
 	dateInputLayout       = "2006-01-02"
 	maximumDatabaseAmount = 9999999999.99
 	maximumExchangeRate   = 99999999.9999
@@ -74,4 +78,10 @@ func dateWithTime(value string, clock time.Time) (time.Time, error) {
 		clock.Hour(), clock.Minute(), clock.Second(), clock.Nanosecond(),
 		clock.Location(),
 	), nil
+}
+
+// descriptionTooLongFor reports whether a trimmed description exceeds the
+// length accepted for posts, expenses, incomes and accounts.
+func descriptionTooLongFor(description string) bool {
+	return utf8.RuneCountInString(strings.TrimSpace(description)) > maximumDescriptionLength
 }

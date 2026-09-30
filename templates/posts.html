@@ -24,7 +24,7 @@
   <form action="/posts/save" method="post">
     <input type="hidden" name="_CSRF" value="{{ .Csrf }}"><input type="hidden" name="income_id" value="">
     <div class="row g-3 align-items-end">
-      <div class="col-12 col-lg-4"><label class="form-label" for="description">{{ GetLangText "Description" .Lang }}</label><input type="text" class="form-control" id="description" name="description" value="{{ .Last_post_description }}"></div>
+      <div class="col-12 col-lg-4"><label class="form-label" for="description">{{ GetLangText "Description" .Lang }}</label><input type="text" class="form-control" id="description" name="description" maxlength="200" value="{{ .Last_post_description }}"></div>
       <div class="col-12 col-sm-6 col-lg-2"><label class="form-label" for="expense_id">{{ GetLangText "Expense type" .Lang }}</label><select id="expense_id" name="expense_id" class="form-select">{{ with .Expenses }}{{ range . }}<option value="{{ .Pid }}" {{ if eq .Pid $.Expenses_id }}selected{{ end }}>{{ .Description }}</option>{{ end }}{{ end }}</select></div>
       <div class="col-12 col-sm-6 col-lg-2"><label class="form-label" for="date">{{ GetLangText "Date" .Lang }}</label><input type="date" class="form-control" id="date" name="date" value="{{ .Date }}" required></div>
       <div class="col-6 col-lg"><label class="form-label" for="amount">{{ GetLangText "Amount" .Lang }} RSD</label><input type="number" min="0.01" step="any" class="form-control" id="amount" name="amount"></div>
