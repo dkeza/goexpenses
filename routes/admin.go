@@ -33,6 +33,7 @@ type adminEventRow struct {
 	Kind        string    `db:"kind"`
 	Status      string    `db:"status"`
 	UserID      *int      `db:"user_id"`
+	UserExists  bool      `db:"user_exists"`
 	ActorUserID *int      `db:"actor_user_id"`
 	Subject     string    `db:"subject"`
 	Detail      string    `db:"detail"`
@@ -59,6 +60,7 @@ type adminPage struct {
 	NewUsers     int
 	BlockedUsers int
 	PendingUsers int
+	Deleted      bool
 }
 
 func adminOnly(next echo.HandlerFunc) echo.HandlerFunc {
@@ -94,7 +96,7 @@ func adminDashboard(c echo.Context) error {
 	if status != "blocked" && status != "pending" && status != "active" {
 		status = "all"
 	}
-	view := adminPage{Data: data, Query: query, Status: status, Page: page}
+	view := adminPage{Data: data, Query: query, Status: status, Page: page, Deleted: c.QueryParam("deleted") == "1"}
 	if err := database.Db.Get(&view.TotalUsers, `SELECT COUNT(*) FROM users`); err != nil {
 		return databaseReadError(c, "count users", err)
 	}
@@ -155,7 +157,8 @@ func adminUserDetails(c echo.Context) error {
 		return databaseReadError(c, "load admin user", err)
 	}
 	if err := database.Db.Select(&view.Events, `
-		SELECT id, kind, status, user_id, actor_user_id, subject, detail, item_count, created_at
+		SELECT id, kind, status, user_id, actor_user_id, subject, detail, item_count, created_at,
+		EXISTS (SELECT 1 FROM users WHERE users.id = admin_events.user_id) AS user_exists
 		FROM admin_events WHERE user_id = $1 ORDER BY created_at DESC, id DESC LIMIT 50`, id); err != nil {
 		return databaseReadError(c, "load user events", err)
 	}
@@ -167,7 +170,7 @@ func adminEvents(c echo.Context) error {
 	view.Active = "admin"
 	view.Kind = c.QueryParam("kind")
 	switch view.Kind {
-	case "exchange_rate", "session_cleanup", "email", "auth_login", "auth_logout", "user_block", "user_unblock":
+	case "exchange_rate", "session_cleanup", "email", "auth_login", "auth_logout", "user_block", "user_unblock", "user_delete":
 	default:
 		view.Kind = ""
 	}
@@ -216,7 +219,8 @@ func adminEvents(c echo.Context) error {
 		to = &nextDay
 	}
 	if err := database.Db.Select(&view.Events, `
-		SELECT id, kind, status, user_id, actor_user_id, subject, detail, item_count, created_at
+		SELECT id, kind, status, user_id, actor_user_id, subject, detail, item_count, created_at,
+		EXISTS (SELECT 1 FROM users WHERE users.id = admin_events.user_id) AS user_exists
 		FROM admin_events WHERE ($1 = '' OR kind = $1)
 		AND ($2 = '' OR status = $2)
 		AND ($3::integer IS NULL OR user_id = $3)
@@ -292,10 +296,102 @@ func changeUserBlock(c echo.Context, block bool) error {
 	return c.Redirect(http.StatusSeeOther, "/admin/users/"+strconv.Itoa(id))
 }
 
+func deleteUser(c echo.Context) error {
+	id, err := strconv.Atoi(c.Param("id"))
+	if err != nil || id < 1 {
+		return echo.NewHTTPError(http.StatusNotFound, "user not found")
+	}
+	actorID := c.Get("data").(*util.Data).User.Id
+	if id == actorID {
+		return echo.NewHTTPError(http.StatusForbidden, "cannot delete your own account")
+	}
+	tx, err := database.Db.Beginx()
+	if err != nil {
+		return databaseWriteError(c, "begin user deletion", err)
+	}
+	defer tx.Rollback()
+	var user struct {
+		Username string `db:"username"`
+		Email    string `db:"email"`
+		IsAdmin  bool   `db:"is_admin"`
+	}
+	if err := tx.Get(&user, `SELECT username, email, is_admin FROM users WHERE id = $1 FOR UPDATE`, id); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return echo.NewHTTPError(http.StatusNotFound, "user not found")
+		}
+		return databaseReadError(c, "load user to delete", err)
+	}
+	if user.IsAdmin {
+		return echo.NewHTTPError(http.StatusForbidden, "admin accounts cannot be deleted here")
+	}
+	if c.FormValue("confirm_username") != user.Username {
+		return echo.NewHTTPError(http.StatusBadRequest, "user name confirmation does not match")
+	}
+
+	// Lock account rows so a new membership or default account reference cannot
+	// appear while deciding which accounts belong only to this user.
+	accountIDs := []int{}
+	if err := tx.Select(&accountIDs, `SELECT id FROM accounts WHERE id IN (
+		SELECT accounts_id FROM accountsusers WHERE users_id = $1
+		UNION SELECT default_accounts_id FROM users WHERE id = $1
+	) ORDER BY id FOR UPDATE`, id); err != nil {
+		return databaseReadError(c, "load user accounts to delete", err)
+	}
+	if _, err := tx.Exec(`DELETE FROM sessions WHERE user_id = $1`, id); err != nil {
+		return databaseWriteError(c, "revoke deleted user sessions", err)
+	}
+	if _, err := tx.Exec(`DELETE FROM passwordresets WHERE lower(btrim(email)) = lower(btrim($1))`, user.Email); err != nil {
+		return databaseWriteError(c, "delete password reset tokens", err)
+	}
+	if _, err := tx.Exec(`DELETE FROM accountsusers WHERE users_id = $1`, id); err != nil {
+		return databaseWriteError(c, "remove user account memberships", err)
+	}
+	if err := executeExactlyOne(tx, `DELETE FROM users WHERE id = $1`, id); err != nil {
+		return databaseWriteError(c, "delete user", err)
+	}
+
+	deletedAccounts := 0
+	for _, accountID := range accountIDs {
+		var exclusive bool
+		if err := tx.Get(&exclusive, `SELECT NOT EXISTS (SELECT 1 FROM accountsusers WHERE accounts_id = $1)
+			AND NOT EXISTS (SELECT 1 FROM users WHERE default_accounts_id = $1)`, accountID); err != nil {
+			return databaseReadError(c, "check account membership", err)
+		}
+		if !exclusive {
+			continue
+		}
+		for _, table := range []string{"posts", "expenses", "incomes"} {
+			// Table names are fixed here; the account ID remains a query parameter.
+			if _, err := tx.Exec(`DELETE FROM `+table+` WHERE accounts_id = $1`, accountID); err != nil {
+				return databaseWriteError(c, "delete account data", err)
+			}
+		}
+		if err := executeExactlyOne(tx, `DELETE FROM accounts WHERE id = $1`, accountID); err != nil {
+			return databaseWriteError(c, "delete unused account", err)
+		}
+		deletedAccounts++
+	}
+	// E-mail events store the recipient address in subject. Keep event metadata
+	// for the audit trail, but remove identifying text from the deleted account.
+	if _, err := tx.Exec(`UPDATE admin_events SET subject = '', detail = ''
+		WHERE user_id = $1 OR (kind = 'email' AND lower(btrim(subject)) = lower(btrim($2)))`, id, user.Email); err != nil {
+		return databaseWriteError(c, "anonymize deleted user events", err)
+	}
+	if _, err := tx.Exec(`INSERT INTO admin_events (kind, status, user_id, actor_user_id, item_count)
+		VALUES ('user_delete', 'success', $1, $2, $3)`, id, actorID, deletedAccounts); err != nil {
+		return databaseWriteError(c, "record user deletion", err)
+	}
+	if err := tx.Commit(); err != nil {
+		return databaseWriteError(c, "commit user deletion", err)
+	}
+	return c.Redirect(http.StatusSeeOther, "/admin?deleted=1")
+}
+
 func DefineAdminRoutes() {
 	E.GET("/admin", adminDashboard, adminOnly)
 	E.GET("/admin/users/:id", adminUserDetails, adminOnly)
 	E.POST("/admin/users/:id/block", func(c echo.Context) error { return changeUserBlock(c, true) }, adminOnly)
 	E.POST("/admin/users/:id/unblock", func(c echo.Context) error { return changeUserBlock(c, false) }, adminOnly)
+	E.POST("/admin/users/:id/delete", deleteUser, adminOnly)
 	E.GET("/admin/events", adminEvents, adminOnly)
 }

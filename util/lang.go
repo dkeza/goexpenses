@@ -48,6 +48,11 @@ func init() {
 	AppLang["Reason for blocking"] = LangText{"Razlog blokiranja", "Разлог блокирања", "Grund der Sperrung"}
 	AppLang["Block user"] = LangText{"Blokiraj korisnika", "Блокирај корисника", "Benutzer sperren"}
 	AppLang["Unblock user"] = LangText{"Odblokiraj korisnika", "Одблокирај корисника", "Benutzer entsperren"}
+	AppLang["Delete user"] = LangText{"Obriši korisnika", "Обриши корисника", "Benutzer löschen"}
+	AppLang["User deleted"] = LangText{"Korisnik je obrisan.", "Корисник је обрисан.", "Benutzer wurde gelöscht."}
+	AppLang["Confirm delete user"] = LangText{"Trajno obrisati korisnika i njegove nedeljene račune?", "Трајно обрисати корисника и његове недељене рачуне?", "Benutzer und nicht geteilte Konten dauerhaft löschen?"}
+	AppLang["Delete user warning"] = LangText{"Ova radnja trajno briše korisnika i podatke na računima koje ne koristi niko drugi. Deljeni računi ostaju dostupni ostalim korisnicima.", "Ова радња трајно брише корисника и податке на рачунима које не користи нико други. Дељени рачуни остају доступни осталим корисницима.", "Diese Aktion löscht den Benutzer und Daten in Konten, die niemand sonst nutzt, dauerhaft. Geteilte Konten bleiben für andere Benutzer verfügbar."}
+	AppLang["Type the user name to confirm"] = LangText{"Unesite korisničko ime za potvrdu", "Унесите корисничко име за потврду", "Benutzernamen zur Bestätigung eingeben"}
 	AppLang["Confirm block user"] = LangText{"Blokirati korisnika i prekinuti sve njegove sesije?", "Блокирати корисника и прекинути све његове сесије?", "Benutzer sperren und alle Sitzungen beenden?"}
 	AppLang["Confirm unblock user"] = LangText{"Odblokirati korisnika?", "Одблокирати корисника?", "Benutzer entsperren?"}
 	AppLang["Recent events"] = LangText{"Nedavni događaji", "Недавни догађаји", "Letzte Ereignisse"}
@@ -64,6 +69,7 @@ func init() {
 	AppLang["auth_logout"] = LangText{"Odjava", "Одјава", "Abmeldung"}
 	AppLang["user_block"] = LangText{"Blokiranje", "Блокирање", "Sperrung"}
 	AppLang["user_unblock"] = LangText{"Odblokiranje", "Одблокирање", "Entsperrung"}
+	AppLang["user_delete"] = LangText{"Brisanje korisnika", "Брисање корисника", "Benutzerlöschung"}
 	AppLang["success"] = LangText{"Uspešno", "Успешно", "Erfolgreich"}
 	AppLang["failed"] = LangText{"Neuspešno", "Неуспешно", "Fehlgeschlagen"}
 	AppLang["smtp_accepted"] = LangText{"SMTP prihvatio", "SMTP прихватио", "Von SMTP angenommen"}

@@ -112,6 +112,7 @@ func TestAdminTemplatesRender(t *testing.T) {
 		NewUsers     int
 		BlockedUsers int
 		PendingUsers int
+		Deleted      bool
 	}{Data: &util.Data{Lang: "RS", Active: "admin", User: util.User{Id: 1, Name: "Admin", IsAdmin: true}}, Page: 1}
 	data.SelectedUser.Username = "example"
 	data.SelectedUser.CreatedAt = time.Now()

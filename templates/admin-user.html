@@ -13,6 +13,14 @@
     {{ else }}
       <form action="/admin/users/{{ .SelectedUser.ID }}/block" method="post" class="surface-card p-4 mb-4 js-confirm-admin" data-confirm-message="{{ GetLangText "Confirm block user" .Lang }}"><input type="hidden" name="_CSRF" value="{{ .Csrf }}"><label class="form-label" for="block-reason">{{ GetLangText "Reason for blocking" .Lang }}</label><textarea class="form-control mb-3" id="block-reason" name="reason" maxlength="500" required></textarea><button class="btn btn-danger" type="submit">{{ GetLangText "Block user" .Lang }}</button></form>
     {{ end }}
+    <form action="/admin/users/{{ .SelectedUser.ID }}/delete" method="post" class="surface-card p-4 mb-4 js-confirm-admin" data-confirm-message="{{ GetLangText "Confirm delete user" .Lang }}">
+      <input type="hidden" name="_CSRF" value="{{ .Csrf }}">
+      <h2 class="h4">{{ GetLangText "Delete user" .Lang }}</h2>
+      <p>{{ GetLangText "Delete user warning" .Lang }}</p>
+      <label class="form-label" for="confirm-username">{{ GetLangText "Type the user name to confirm" .Lang }}: <strong>{{ .SelectedUser.Username }}</strong></label>
+      <input class="form-control mb-3" id="confirm-username" name="confirm_username" autocomplete="off" required>
+      <button class="btn btn-danger" type="submit">{{ GetLangText "Delete user" .Lang }}</button>
+    </form>
   {{ end }}
   <h2 class="h4">{{ GetLangText "Recent events" .Lang }}</h2>
   {{ template "admin-event-table" . }}

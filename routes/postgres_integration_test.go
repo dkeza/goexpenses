@@ -207,4 +207,69 @@ func TestPostgresRegistrationLoginAndPost(t *testing.T) {
 	if !errors.As(err, &postgresError) || postgresError.Code != "23503" {
 		t.Fatalf("orphan post error = %v, want foreign-key violation", err)
 	}
+
+	// The confirmed user has a shared default account and a private extra account.
+	var targetID, sharedAccountID, privateAccountID int
+	if err := testDB.GetContext(ctx, &targetID, `SELECT id FROM users WHERE username = 'pending-user'`); err != nil {
+		t.Fatalf("load target user: %v", err)
+	}
+	if err := testDB.GetContext(ctx, &sharedAccountID, `SELECT default_accounts_id FROM users WHERE id = $1`, targetID); err != nil {
+		t.Fatalf("load shared account: %v", err)
+	}
+	if _, err := testDB.ExecContext(ctx, `UPDATE users SET is_admin = true WHERE id = $1`, user.Id); err != nil {
+		t.Fatalf("promote test admin: %v", err)
+	}
+	if _, err := testDB.ExecContext(ctx, `INSERT INTO accountsusers (accounts_id, users_id) VALUES ($1, $2)`, sharedAccountID, user.Id); err != nil {
+		t.Fatalf("share account: %v", err)
+	}
+	if err := createAccount(targetID, "Private account"); err != nil {
+		t.Fatalf("create private account: %v", err)
+	}
+	if err := testDB.GetContext(ctx, &privateAccountID, `SELECT a.id FROM accounts a JOIN accountsusers au ON au.accounts_id = a.id WHERE au.users_id = $1 AND a.description = 'Private account'`, targetID); err != nil {
+		t.Fatalf("load private account: %v", err)
+	}
+	if _, err := testDB.ExecContext(ctx, `INSERT INTO posts (description, accounts_id, p_id) VALUES ('private post', $1, 'private-post')`, privateAccountID); err != nil {
+		t.Fatalf("create private post: %v", err)
+	}
+	if _, err := testDB.ExecContext(ctx, `INSERT INTO expenses (description, accounts_id, p_id) VALUES ('private expense', $1, 'private-expense')`, privateAccountID); err != nil {
+		t.Fatalf("create private expense: %v", err)
+	}
+	if _, err := testDB.ExecContext(ctx, `INSERT INTO incomes (description, accounts_id, p_id) VALUES ('private income', $1, 'private-income')`, privateAccountID); err != nil {
+		t.Fatalf("create private income: %v", err)
+	}
+	if _, err := testDB.ExecContext(ctx, `INSERT INTO passwordresets (email, token) VALUES ('pending@example.com', 'test-reset')`); err != nil {
+		t.Fatalf("create reset token: %v", err)
+	}
+	if _, err := testDB.ExecContext(ctx, `INSERT INTO sessions (uuid, user_id) VALUES ('test-session', $1)`, targetID); err != nil {
+		t.Fatalf("create session: %v", err)
+	}
+	if _, err := testDB.ExecContext(ctx, `INSERT INTO admin_events (kind, status, user_id, subject, detail) VALUES ('email', 'smtp_accepted', $1, 'pending@example.com', 'password_reset')`, targetID); err != nil {
+		t.Fatalf("create email event: %v", err)
+	}
+	if err := deleteUser(deleteUserTestContext(fmt.Sprint(targetID), "pending-user", user.Id)); err != nil {
+		t.Fatalf("delete target user: %v", err)
+	}
+	for _, check := range []struct {
+		name  string
+		query string
+		args  []any
+		want  int
+	}{
+		{"target user", `SELECT COUNT(*) FROM users WHERE id = $1`, []any{targetID}, 0},
+		{"shared account", `SELECT COUNT(*) FROM accounts WHERE id = $1`, []any{sharedAccountID}, 1},
+		{"shared membership", `SELECT COUNT(*) FROM accountsusers WHERE accounts_id = $1 AND users_id = $2`, []any{sharedAccountID, user.Id}, 1},
+		{"private account", `SELECT COUNT(*) FROM accounts WHERE id = $1`, []any{privateAccountID}, 0},
+		{"private posts", `SELECT COUNT(*) FROM posts WHERE accounts_id = $1`, []any{privateAccountID}, 0},
+		{"private expenses", `SELECT COUNT(*) FROM expenses WHERE accounts_id = $1`, []any{privateAccountID}, 0},
+		{"private incomes", `SELECT COUNT(*) FROM incomes WHERE accounts_id = $1`, []any{privateAccountID}, 0},
+		{"sessions", `SELECT COUNT(*) FROM sessions WHERE user_id = $1`, []any{targetID}, 0},
+		{"reset tokens", `SELECT COUNT(*) FROM passwordresets WHERE email = 'pending@example.com'`, nil, 0},
+		{"personal event text", `SELECT COUNT(*) FROM admin_events WHERE user_id = $1 AND (subject <> '' OR detail <> '')`, []any{targetID}, 0},
+		{"deletion event", `SELECT COUNT(*) FROM admin_events WHERE kind = 'user_delete' AND user_id = $1 AND actor_user_id = $2`, []any{targetID, user.Id}, 1},
+	} {
+		var count int
+		if err := testDB.GetContext(ctx, &count, check.query, check.args...); err != nil || count != check.want {
+			t.Errorf("%s count = %d, %v; want %d", check.name, count, err, check.want)
+		}
+	}
 }
