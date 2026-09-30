@@ -129,18 +129,3 @@ type Currency struct {
 	Rate float64 `db:"rate"`
 	Date string  `db:"date"`
 }
-
-type Postsum struct {
-	Saldo  float64
-	Saldoe float64
-}
-
-type Incomessum struct {
-	Saldo  float64
-	Saldoe float64
-}
-
-type Expensessum struct {
-	Saldo  float64
-	Saldoe float64
-}
