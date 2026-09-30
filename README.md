@@ -81,19 +81,21 @@ schemas. CI supplies a disposable PostgreSQL service and tests fresh schema
 creation, the version 14 to current upgrade, registration, login, posting, and
 database constraint enforcement.
 
-Version bump
+Versions
 
-Create a dedicated branch with a clean working tree, then run:
+The application version is assigned automatically by CI: every build is
+stamped with the GitHub Actions run number and the short commit hash, for
+example `v58 · 8e503d1`. It is shown in the navigation bar, logged at startup,
+and appended to static file URLs so every deployment refreshes cached CSS and
+JavaScript. Local builds report `dev`. No manual version bump is needed.
 
-```
-./scripts/bump-version.sh
-```
-
-The script increments the application/schema version, registers and creates a
-no-op migration for the new version, and runs all tests. Review and commit the
-generated changes before opening a pull request. For a release that changes the
-database schema, replace the generated `SELECT 1;` with the required SQL before
-committing.
+The database schema version is separate and changes only with real schema
+changes. To add one, create `migrations/sql/NNN_description.sql` with the next
+number, register it in `migrationPaths`, and set `migrations.SchemaVersion` to
+that number; a test checks that they match. An application refuses to start
+against a newer schema, so a binary rollback works for every release without
+a schema change. Keep schema changes backward compatible and back up the
+database before deploying them.
 
 Exchange rates are refreshed in the background, so an unavailable rates service
 does not block application startup or user requests. Failed or invalid responses

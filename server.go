@@ -20,6 +20,7 @@ import (
 	"goexpenses/migrations"
 	"goexpenses/routes"
 	"goexpenses/util"
+	"goexpenses/version"
 
 	"github.com/labstack/echo/v4"
 	_ "github.com/lib/pq"
@@ -81,9 +82,8 @@ func templateFunctions() template.FuncMap {
 			}
 			return x
 		},
-		"ShowBuildVersion": func() string {
-			return fmt.Sprint(util.Settings.Build)
-		},
+		"AppVersion":   version.Label,
+		"AssetVersion": version.AssetTag,
 	}
 }
 
@@ -113,7 +113,7 @@ func initializeApplication() error {
 	}
 	migrationContext, cancelMigrations := context.WithTimeout(context.Background(), 5*time.Minute)
 	defer cancelMigrations()
-	if err := migrations.Apply(migrationContext, database.Db, initialSchema, util.Settings.Build); err != nil {
+	if err := migrations.Apply(migrationContext, database.Db, initialSchema, migrations.SchemaVersion); err != nil {
 		database.Db.Close()
 		return err
 	}
@@ -190,7 +190,7 @@ func runApplication(ctx context.Context) error {
 
 	routes.DefineRoutes()
 
-	e.Logger.Info("Listening on port " + util.Settings.Port)
+	e.Logger.Info("goexpenses " + version.Label() + " listening on port " + util.Settings.Port)
 	if err := serveUntilShutdown(ctx, e, ":"+util.Settings.Port); err != nil {
 		return err
 	}

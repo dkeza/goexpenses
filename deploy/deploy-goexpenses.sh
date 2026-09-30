@@ -20,6 +20,17 @@ fail() {
     exit 1
 }
 
+wait_for_health() {
+    for ((attempt = 1; attempt <= 30; attempt++)); do
+        if sudo systemctl is-active --quiet "$service_name" && \
+            curl --fail --silent --show-error --output /dev/null "$health_url"; then
+            return 0
+        fi
+        sleep 1
+    done
+    return 1
+}
+
 restore_previous_binary() {
     echo "Restoring $backup_binary"
     cp -a -- "$backup_binary" "$next_binary"
@@ -30,12 +41,13 @@ restore_previous_binary() {
         return 1
     fi
 
-    if ! sudo systemctl is-active --quiet "$service_name"; then
-        echo "Rollback completed, but $service_name is not active" >&2
+    if ! wait_for_health; then
+        echo "Rollback completed, but $service_name did not pass its health check" >&2
+        sudo journalctl -u "$service_name" -n 20 --no-pager >&2 || true
         return 1
     fi
 
-    echo "Previous binary restored and $service_name restarted"
+    echo "Previous binary restored and $service_name passed its health check"
 }
 
 [[ -f "$staged_binary" ]] || fail "staged binary not found: $staged_binary"
@@ -64,15 +76,11 @@ if ! sudo systemctl restart "$service_name"; then
     exit 1
 fi
 
-for ((attempt = 1; attempt <= 30; attempt++)); do
-    if sudo systemctl is-active --quiet "$service_name" && \
-        curl --fail --silent --show-error --output /dev/null "$health_url"; then
-        echo "Deploy succeeded: $service_name is active and the HTTP check passed"
-        echo "Rollback binary: $backup_binary"
-        exit 0
-    fi
-    sleep 1
-done
+if wait_for_health; then
+    echo "Deploy succeeded: $service_name is active and the HTTP check passed"
+    echo "Rollback binary: $backup_binary"
+    exit 0
+fi
 
 echo "Service did not pass its health check within 30 seconds" >&2
 sudo journalctl -u "$service_name" -n 20 --no-pager >&2 || true

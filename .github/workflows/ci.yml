@@ -62,9 +62,14 @@ jobs:
           GOOS: linux
           GOARCH: arm
           GOARM: "7"
+          BUILD_NUMBER: ${{ github.run_number }}
         run: |
           mkdir -p dist
-          go build -trimpath -o dist/goexpenses .
+          commit="${GITHUB_SHA::7}"
+          go build -trimpath \
+            -ldflags "-X goexpenses/version.Number=${BUILD_NUMBER} -X goexpenses/version.Commit=${commit}" \
+            -o dist/goexpenses .
+          echo "Built goexpenses v${BUILD_NUMBER} (${commit})"
 
       - name: Upload Raspberry Pi binary
         uses: actions/upload-artifact@v7
