@@ -175,6 +175,8 @@ func TestCheckCookieClearsSessionForMissingUser(t *testing.T) {
 	defer db.Close()
 
 	database.Db = sqlx.NewDb(db, "sqlmock")
+	util.InvalidateEURRateCache()
+	t.Cleanup(util.InvalidateEURRateCache)
 	util.Settings.DatabaseType = "postgres"
 	token, tokenHash, err := util.NewSessionToken()
 	if err != nil {
@@ -216,6 +218,56 @@ func TestCheckCookieClearsSessionForMissingUser(t *testing.T) {
 	}
 	if !called {
 		t.Fatal("next handler was not called")
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatalf("database expectations: %v", err)
+	}
+}
+
+func TestCheckCookieClearsFlashWithOneUpdate(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatalf("create mock database: %v", err)
+	}
+	defer db.Close()
+
+	database.Db = sqlx.NewDb(db, "sqlmock")
+	util.InvalidateEURRateCache()
+	t.Cleanup(util.InvalidateEURRateCache)
+	token, tokenHash, err := util.NewSessionToken()
+	if err != nil {
+		t.Fatalf("NewSessionToken: %v", err)
+	}
+	sessionQuery := "SELECT id, uuid, user_id, lang, message, expenses_id, last_post_description, message_success FROM sessions WHERE uuid = $1 AND created_at >= $2"
+	mock.ExpectQuery(regexp.QuoteMeta(sessionQuery)).
+		WithArgs(tokenHash, sqlmock.AnyArg()).
+		WillReturnRows(sqlmock.NewRows([]string{"id", "uuid", "user_id", "lang", "message", "expenses_id", "last_post_description", "message_success"}).
+			AddRow(9, tokenHash, 0, "EN", "Saved", 12, "Rent", 1))
+	mock.ExpectQuery(regexp.QuoteMeta("SELECT p_id FROM expenses WHERE id = $1")).
+		WithArgs(12).
+		WillReturnRows(sqlmock.NewRows([]string{"p_id"}).AddRow("expense-pid"))
+	mock.ExpectExec(regexp.QuoteMeta("UPDATE sessions SET message = '', expenses_id = 0, last_post_description = '', message_success = 0 WHERE uuid = $1")).
+		WithArgs(tokenHash).
+		WillReturnResult(sqlmock.NewResult(0, 1))
+	mock.ExpectQuery(regexp.QuoteMeta("SELECT id, code, rate, date FROM currencies WHERE code = $1")).
+		WithArgs("EUR").
+		WillReturnRows(sqlmock.NewRows([]string{"id", "code", "rate", "date"}).
+			AddRow(1, "EUR", 117.2, "2026-09-13 12:00:00"))
+
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	req.AddCookie(&http.Cookie{Name: util.SessionCookieName, Value: token})
+	context := echo.New().NewContext(req, httptest.NewRecorder())
+	context.Set("csrf", "test-token")
+	handler := CheckCookie(func(c echo.Context) error {
+		data := c.Get("data").(*util.Data)
+		if data.Flash != "Saved" || data.Expenses_id != "expense-pid" || data.Last_post_description != "Rent" || data.Message_success != 1 {
+			t.Fatalf("flash data = %q %q %q %d", data.Flash, data.Expenses_id, data.Last_post_description, data.Message_success)
+		}
+		return nil
+	})
+
+	if err := handler(context); err != nil {
+		t.Fatalf("CheckCookie: %v", err)
 	}
 	if err := mock.ExpectationsWereMet(); err != nil {
 		t.Fatalf("database expectations: %v", err)

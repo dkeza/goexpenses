@@ -32,23 +32,9 @@ func DefineExpenses() {
 			return databaseReadError(c, "load expenses", err)
 		}
 		data.Expenses = expenses
-
-		expensesadd := []util.Expense{}
-		sql = `
-		SELECT e1.id, e1.description, e1.amount, 
-			CAST(case when e1.amount > 0 AND e1.exchange > 0 then e1.amount/e1.exchange else 0.00 end  AS Numeric(12,2)) AS amounte, 
-			e1.expenses_id, coalesce(e2.description,'') AS expensedescription , e1.p_id 
-			FROM expenses e1
-			LEFT JOIN expenses e2 ON e1.expenses_id = e2.id 
-			WHERE e1.accounts_id = $1 AND e1.deleted = 0 
-			UNION SELECT 0, ' ', 0.00, 0.00, 0 , '', ''
-			FROM expenses
-			ORDER BY 2 ASC
-		`
-		if err := database.Db.Select(&expensesadd, sql, data.User.Default_accounts_id); err != nil {
-			return databaseReadError(c, "load related expenses", err)
-		}
-		data.ExpensesAdd = expensesadd
+		// The related-expense select offers the same list; the template adds the
+		// empty "no related expense" option.
+		data.ExpensesAdd = expenses
 
 		return c.Render(http.StatusOK, "expenses", data)
 	}, auth)
@@ -103,10 +89,8 @@ func DefineExpenses() {
 			e1.p_id 
 			FROM expenses e1
 			LEFT JOIN expenses e2 ON e1.expenses_id = e2.id 
-			WHERE e1.accounts_id = $1 AND e1.deleted = 0 
-			UNION SELECT 0, ' ', 0.00, 0.00, 0 , '', '' 
-			FROM expenses
-			ORDER BY 2 ASC
+			WHERE e1.accounts_id = $1 AND e1.deleted = 0
+			ORDER BY e1.description ASC
 		`
 		errsql = database.Db.Select(&expensesadd, sql, data.User.Default_accounts_id)
 		if errsql != nil {

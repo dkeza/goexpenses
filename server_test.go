@@ -276,3 +276,43 @@ func TestConfigureHTTPServerSetsTimeouts(t *testing.T) {
 			server.ReadHeaderTimeout, server.ReadTimeout, server.WriteTimeout, server.IdleTimeout)
 	}
 }
+
+func TestExpenseTemplatesOfferEmptyRelatedExpense(t *testing.T) {
+	templates, err := parseTemplates()
+	if err != nil {
+		t.Fatalf("parse templates: %v", err)
+	}
+	related := []util.Expense{{Pid: "pid-a", Description: "Fuel"}, {Pid: "pid-b", Description: "Rent"}}
+	const eurDate = "2026-09-30 07:00:00"
+
+	render := func(name string, data *util.Data) string {
+		t.Helper()
+		var rendered bytes.Buffer
+		if err := templates.ExecuteTemplate(&rendered, name, data); err != nil {
+			t.Fatalf("render %s: %v", name, err)
+		}
+		return rendered.String()
+	}
+
+	page := render("expenses", &util.Data{Eurdate: eurDate, ExpensesAdd: related, Expenses_id: "pid-b"})
+	if !strings.Contains(page, `class="form-select"><option value="" ></option>`) {
+		t.Error("expenses form does not start with an unselected empty related expense")
+	}
+	if !strings.Contains(page, `<option value="pid-b" selected>Rent</option>`) {
+		t.Error("expenses form does not keep the last related expense selected")
+	}
+	page = render("expenses", &util.Data{Eurdate: eurDate, ExpensesAdd: related})
+	if !strings.Contains(page, `<option value="" selected></option>`) {
+		t.Error("expenses form does not select the empty related expense by default")
+	}
+
+	page = render("expensesshow", &util.Data{
+		Eurdate:     eurDate,
+		Expenses:    []util.Expense{{Pid: "pid-c", Description: "Parking", ExpensesPid: "pid-a"}},
+		ExpensesAdd: related,
+	})
+	if !strings.Contains(page, `class="form-select"><option value="" ></option>`) ||
+		!strings.Contains(page, `<option value="pid-a" selected>Fuel</option>`) {
+		t.Error("expense edit form does not offer the empty option and select the stored related expense")
+	}
+}

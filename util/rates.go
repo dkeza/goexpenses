@@ -2,6 +2,7 @@ package util
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -25,6 +26,7 @@ const (
 	exchangeRateTimeout      = 10 * time.Second
 	exchangeRateMaxAge       = 7 * 24 * time.Hour
 	exchangeRateRetryDelay   = time.Minute
+	exchangeRateCacheTTL     = 5 * time.Minute
 )
 
 var (
@@ -45,6 +47,42 @@ var (
 		wg        sync.WaitGroup
 	}
 )
+
+var eurRateCache struct {
+	mu       sync.Mutex
+	currency Currency
+	loadedAt time.Time
+}
+
+// CurrentEURRate returns the stored EUR exchange rate. It reads the database
+// at most once per exchangeRateCacheTTL; a missing rate is not cached, so the
+// next request sees a newly stored rate immediately.
+func CurrentEURRate(ctx context.Context) (Currency, error) {
+	eurRateCache.mu.Lock()
+	defer eurRateCache.mu.Unlock()
+
+	if !eurRateCache.loadedAt.IsZero() && time.Since(eurRateCache.loadedAt) < exchangeRateCacheTTL {
+		return eurRateCache.currency, nil
+	}
+
+	currency := Currency{}
+	err := database.Db.GetContext(ctx, &currency, `SELECT id, code, rate, date FROM currencies WHERE code = $1`, "EUR")
+	if err != nil && !errors.Is(err, sql.ErrNoRows) {
+		return Currency{}, err
+	}
+	if currency.Rate > 0 {
+		eurRateCache.currency = currency
+		eurRateCache.loadedAt = time.Now()
+	}
+	return currency, nil
+}
+
+// InvalidateEURRateCache makes the next CurrentEURRate call read the database.
+func InvalidateEURRateCache() {
+	eurRateCache.mu.Lock()
+	eurRateCache.loadedAt = time.Time{}
+	eurRateCache.mu.Unlock()
+}
 
 type exchangeRatesResponse struct {
 	Timestamp int64              `json:"timestamp"`
@@ -139,6 +177,7 @@ func updateExchangeRates(ctx context.Context, client *http.Client, endpoint, api
 	if err := storeExchangeRate(ctx, db, rate, rateTime); err != nil {
 		return 0, "", err
 	}
+	InvalidateEURRateCache()
 	return rate, rateTime.Format("2006-01-02 15:04:05"), nil
 }
 
