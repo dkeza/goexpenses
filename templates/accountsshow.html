@@ -5,7 +5,7 @@
   <div class="page-heading"><h1>{{ GetLangText "Create account" .Lang }}</h1></div>
   <form action="/accounts/save" method="post" class="vstack gap-3">
     <input type="hidden" name="_CSRF" value="{{ .Csrf }}">
-    <div><label class="form-label" for="description">{{ GetLangText "Description" .Lang }}</label><input type="text" class="form-control" id="description" name="description" required></div>
+    <div><label class="form-label" for="description">{{ GetLangText "Description" .Lang }}</label><input type="text" class="form-control" id="description" name="description" maxlength="200" required></div>
     <button type="submit" class="btn btn-primary">{{ GetLangText "Save" .Lang }}</button>
   </form>
 </section>

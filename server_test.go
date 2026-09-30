@@ -264,3 +264,14 @@ func TestServeUntilShutdownReturnsShutdownError(t *testing.T) {
 		t.Fatalf("serveUntilShutdown error = %v, want %v", err, expectedError)
 	}
 }
+
+func TestConfigureHTTPServerSetsTimeouts(t *testing.T) {
+	server := &http.Server{}
+	configureHTTPServer(server)
+
+	if server.ReadHeaderTimeout != readHeaderTimeout || server.ReadTimeout != readTimeout ||
+		server.WriteTimeout != writeTimeout || server.IdleTimeout != idleTimeout {
+		t.Fatalf("server timeouts = header %v, read %v, write %v, idle %v",
+			server.ReadHeaderTimeout, server.ReadTimeout, server.WriteTimeout, server.IdleTimeout)
+	}
+}

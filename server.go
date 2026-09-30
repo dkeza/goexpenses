@@ -30,7 +30,22 @@ import (
 //go:embed templates/*.html static db/*.sql
 var embeddedFiles embed.FS
 
-const gracefulShutdownTimeout = 10 * time.Second
+const (
+	gracefulShutdownTimeout = 10 * time.Second
+	readHeaderTimeout       = 5 * time.Second
+	readTimeout             = 15 * time.Second
+	writeTimeout            = 30 * time.Second
+	idleTimeout             = 2 * time.Minute
+)
+
+// configureHTTPServer bounds how long a client may hold a connection so slow
+// or idle clients cannot exhaust server resources.
+func configureHTTPServer(server *http.Server) {
+	server.ReadHeaderTimeout = readHeaderTimeout
+	server.ReadTimeout = readTimeout
+	server.WriteTimeout = writeTimeout
+	server.IdleTimeout = idleTimeout
+}
 
 type applicationServer interface {
 	Start(address string) error
@@ -161,6 +176,7 @@ func runApplication(ctx context.Context) error {
 	}
 
 	e.Renderer = t
+	configureHTTPServer(e.Server)
 
 	midware.SetMiddleware()
 

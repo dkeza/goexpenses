@@ -141,6 +141,7 @@ func init() {
 	AppLang["Update post"] = LangText{"Izmeni stavku", "Измени ставку", "Buchung ändern"}
 	AppLang["My account"] = LangText{"Moj račun", "Мој рачун", "Mein Konto"}
 	AppLang["Invalid description!"] = LangText{"Neispravan opis!", "Неисправан опис!", "Ungültige Beschreibung!"}
+	AppLang["Description may contain up to 200 characters."] = LangText{"Opis može imati najviše 200 znakova.", "Опис може имати највише 200 знакова.", "Die Beschreibung darf höchstens 200 Zeichen enthalten."}
 	AppLang["Invalid amount!"] = LangText{"Neispravan iznos!", "Неисправан износ!", "Ungültiger Betrag!"}
 	AppLang["Invalid date!"] = LangText{"Neispravan datum!", "Неисправан датум!", "Ungültiges Datum!"}
 	AppLang["Do You really want delete this record?"] = LangText{"Da li si siguran da želiš da obrišeš ovu stavku?", "Да ли си сигуран да желиш да обришеш ову ставку?", "Bist du sicher, dass du willst diese Buchung löschen?"}

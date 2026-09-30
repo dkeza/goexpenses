@@ -6,7 +6,7 @@
   {{ with .Incomes }}{{ range . }}
   <form action="/incomes/update" method="post" class="vstack gap-3">
     <input type="hidden" name="_CSRF" value="{{ $.Csrf }}"><input type="hidden" name="id" value="{{ .Pid }}">
-    <div><label class="form-label" for="description">{{ GetLangText "Description" $.Lang }}</label><input type="text" class="form-control" id="description" name="description" value="{{ .Description }}" required></div>
+    <div><label class="form-label" for="description">{{ GetLangText "Description" $.Lang }}</label><input type="text" class="form-control" id="description" name="description" maxlength="200" value="{{ .Description }}" required></div>
     <div class="d-flex gap-2"><button type="submit" class="btn btn-primary">{{ GetLangText "Save" $.Lang }}</button><a class="btn btn-outline-secondary" href="/incomes">{{ GetLangText "Cancel" $.Lang }}</a></div>
   </form>
   {{ end }}{{ end }}

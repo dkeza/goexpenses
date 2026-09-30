@@ -2,6 +2,7 @@ package routes
 
 import (
 	"math"
+	"strings"
 	"testing"
 	"time"
 )
@@ -91,5 +92,21 @@ func TestDateWithTime(t *testing.T) {
 				t.Errorf("dateWithTime(%q) accepted an invalid date", value)
 			}
 		})
+	}
+}
+
+func TestDescriptionTooLongFor(t *testing.T) {
+	tests := map[string]bool{
+		"":                                     false,
+		strings.Repeat("a", 200):               false,
+		strings.Repeat("š", 200):               false,
+		"  " + strings.Repeat("a", 200) + "  ": false,
+		strings.Repeat("a", 201):               true,
+		strings.Repeat("š", 201):               true,
+	}
+	for description, want := range tests {
+		if got := descriptionTooLongFor(description); got != want {
+			t.Errorf("descriptionTooLongFor(%d runes) = %v, want %v", len([]rune(description)), got, want)
+		}
 	}
 }

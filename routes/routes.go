@@ -5,7 +5,6 @@ import (
 	"crypto/tls"
 	stdsql "database/sql"
 	"errors"
-	"fmt"
 	"html"
 	"net/http"
 	"net/url"
@@ -49,13 +48,13 @@ func MainRoute() {
 
 			if data.Lang != l {
 				data.Lang = l
-				sql := fmt.Sprintf(`UPDATE sessions SET lang = %v WHERE uuid = %v`, util.SqlParam(1), util.SqlParam(2))
+				sql := `UPDATE sessions SET lang = $1 WHERE uuid = $2`
 				if _, err := database.Db.Exec(sql, l, data.CookieId); err != nil {
 					return databaseWriteError(c, "update session language", err)
 				}
 
 				if data.Username != "" {
-					sql := fmt.Sprintf(`UPDATE users SET lang = %v WHERE id = %v`, util.SqlParam(1), util.SqlParam(2))
+					sql := `UPDATE users SET lang = $1 WHERE id = $2`
 					if _, err := database.Db.Exec(sql, l, data.User.Id); err != nil {
 						return databaseWriteError(c, "update user language", err)
 					}
@@ -85,7 +84,7 @@ func healthCheck(c echo.Context) error {
 
 func authenticateUser(username, password string) (util.User, error) {
 	user := util.User{}
-	query := fmt.Sprintf(`SELECT id, name, username, email, password FROM users WHERE lower(btrim(username)) = %v AND email_verified = true AND blocked_at IS NULL`, util.SqlParam(1))
+	query := `SELECT id, name, username, email, password FROM users WHERE lower(btrim(username)) = $1 AND email_verified = true AND blocked_at IS NULL`
 	if err := database.Db.Get(&user, query, strings.ToLower(strings.TrimSpace(username))); err != nil {
 		if errors.Is(err, stdsql.ErrNoRows) {
 			return util.User{}, errInvalidCredentials
@@ -105,7 +104,7 @@ func authenticateUser(username, password string) (util.User, error) {
 	if err != nil {
 		return util.User{}, err
 	}
-	query = fmt.Sprintf(`UPDATE users SET password = %v WHERE id = %v AND password = %v`, util.SqlParam(1), util.SqlParam(2), util.SqlParam(3))
+	query = `UPDATE users SET password = $1 WHERE id = $2 AND password = $3`
 	result, err := database.Db.Exec(query, passwordHash, user.Id, user.Password)
 	if err != nil {
 		return util.User{}, err
@@ -132,7 +131,7 @@ func rotateSession(c echo.Context, userID int, recordLogin ...bool) error {
 	if err != nil {
 		return err
 	}
-	query := fmt.Sprintf(`UPDATE sessions SET uuid = %v, user_id = %v, created_at = %v WHERE uuid = %v`, util.SqlParam(1), util.SqlParam(2), util.SqlParam(3), util.SqlParam(4))
+	query := `UPDATE sessions SET uuid = $1, user_id = $2, created_at = $3 WHERE uuid = $4`
 	updateSession := func(execer sqlExecer) error {
 		result, err := execer.Exec(query, tokenHash, userID, time.Now(), currentHash)
 		if err != nil {
@@ -177,7 +176,7 @@ func logout(c echo.Context) error {
 	}
 
 	userID, _ := c.Get("id").(int)
-	query := fmt.Sprintf(`DELETE FROM sessions WHERE uuid = %v`, util.SqlParam(1))
+	query := `DELETE FROM sessions WHERE uuid = $1`
 	err := runTransaction(database.Db, func(tx *sqlx.Tx) error {
 		if _, err := tx.Exec(query, sessionHash); err != nil {
 			return err
@@ -206,18 +205,18 @@ func selectAccount(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusBadRequest, "invalid account")
 	}
 
-	query := fmt.Sprintf(`
+	query := `
 		UPDATE users
-		SET default_accounts_id = %v
-		WHERE id = %v
+		SET default_accounts_id = $1
+		WHERE id = $2
 		  AND EXISTS (
 			SELECT 1
 			FROM accountsusers au
 			JOIN accounts a ON a.id = au.accounts_id
-			WHERE au.accounts_id = %v
-			  AND au.users_id = %v
+			WHERE au.accounts_id = $3
+			  AND au.users_id = $4
 			  AND a.deleted = 0
-		)`, util.SqlParam(1), util.SqlParam(2), util.SqlParam(3), util.SqlParam(4))
+		)`
 
 	result, err := database.Db.Exec(query, accountID, data.User.Id, accountID, data.User.Id)
 	if err != nil {
@@ -243,10 +242,7 @@ func createPasswordReset(email string, now time.Time) (recipient string, token s
 	defer tx.Rollback()
 
 	user := util.User{}
-	query := fmt.Sprintf(`SELECT id, email FROM users WHERE lower(btrim(email)) = %v AND email_verified = true AND blocked_at IS NULL`, util.SqlParam(1))
-	if util.Settings.DatabaseType == "postgres" {
-		query += " FOR UPDATE"
-	}
+	query := `SELECT id, email FROM users WHERE lower(btrim(email)) = $1 AND email_verified = true AND blocked_at IS NULL FOR UPDATE`
 	if err = tx.Get(&user, query, strings.ToLower(strings.TrimSpace(email))); err != nil {
 		if errors.Is(err, stdsql.ErrNoRows) {
 			return "", "", false, nil
@@ -255,7 +251,7 @@ func createPasswordReset(email string, now time.Time) (recipient string, token s
 	}
 
 	requestCount := 0
-	query = fmt.Sprintf(`SELECT COUNT(*) FROM passwordresets WHERE email = %v AND created_at >= %v`, util.SqlParam(1), util.SqlParam(2))
+	query = `SELECT COUNT(*) FROM passwordresets WHERE email = $1 AND created_at >= $2`
 	if err = tx.Get(&requestCount, query, user.Email, now.Add(-passwordResetRequestInterval)); err != nil {
 		return "", "", false, err
 	}
@@ -268,11 +264,11 @@ func createPasswordReset(email string, now time.Time) (recipient string, token s
 		return "", "", false, err
 	}
 
-	query = fmt.Sprintf(`UPDATE passwordresets SET done = 1 WHERE email = %v AND done = 0`, util.SqlParam(1))
+	query = `UPDATE passwordresets SET done = 1 WHERE email = $1 AND done = 0`
 	if _, err = tx.Exec(query, user.Email); err != nil {
 		return "", "", false, err
 	}
-	query = fmt.Sprintf(`INSERT INTO passwordresets (email, token) VALUES (%v, %v)`, util.SqlParam(1), util.SqlParam(2))
+	query = `INSERT INTO passwordresets (email, token) VALUES ($1, $2)`
 	if _, err = tx.Exec(query, user.Email, tokenHash); err != nil {
 		return "", "", false, err
 	}
@@ -290,7 +286,7 @@ func passwordResetTokenValid(token string, now time.Time) (bool, error) {
 	}
 
 	reset := util.PasswordReset{}
-	query := fmt.Sprintf(`SELECT id FROM passwordresets WHERE token = %v AND created_at >= %v AND done = 0`, util.SqlParam(1), util.SqlParam(2))
+	query := `SELECT id FROM passwordresets WHERE token = $1 AND created_at >= $2 AND done = 0`
 	if err := database.Db.Get(&reset, query, tokenHash, now.Add(-passwordResetDuration)); err != nil {
 		if errors.Is(err, stdsql.ErrNoRows) {
 			return false, nil
@@ -313,10 +309,7 @@ func resetPasswordWithToken(token, passwordHash string, now time.Time) (bool, er
 	defer tx.Rollback()
 
 	reset := util.PasswordReset{}
-	query := fmt.Sprintf(`SELECT id, email FROM passwordresets WHERE token = %v AND created_at >= %v AND done = 0`, util.SqlParam(1), util.SqlParam(2))
-	if util.Settings.DatabaseType == "postgres" {
-		query += " FOR UPDATE"
-	}
+	query := `SELECT id, email FROM passwordresets WHERE token = $1 AND created_at >= $2 AND done = 0 FOR UPDATE`
 	if err = tx.Get(&reset, query, tokenHash, now.Add(-passwordResetDuration)); err != nil {
 		if errors.Is(err, stdsql.ErrNoRows) {
 			return false, nil
@@ -325,7 +318,7 @@ func resetPasswordWithToken(token, passwordHash string, now time.Time) (bool, er
 	}
 
 	user := util.User{}
-	query = fmt.Sprintf(`SELECT id FROM users WHERE email = %v AND blocked_at IS NULL`, util.SqlParam(1))
+	query = `SELECT id FROM users WHERE email = $1 AND blocked_at IS NULL`
 	if err = tx.Get(&user, query, reset.Email); err != nil {
 		if errors.Is(err, stdsql.ErrNoRows) {
 			return false, nil
@@ -333,7 +326,7 @@ func resetPasswordWithToken(token, passwordHash string, now time.Time) (bool, er
 		return false, err
 	}
 
-	query = fmt.Sprintf(`UPDATE passwordresets SET done = 1 WHERE token = %v AND done = 0`, util.SqlParam(1))
+	query = `UPDATE passwordresets SET done = 1 WHERE token = $1 AND done = 0`
 	result, err := tx.Exec(query, tokenHash)
 	if err != nil {
 		return false, err
@@ -346,11 +339,11 @@ func resetPasswordWithToken(token, passwordHash string, now time.Time) (bool, er
 		return false, nil
 	}
 
-	query = fmt.Sprintf(`UPDATE passwordresets SET done = 1 WHERE email = %v AND done = 0`, util.SqlParam(1))
+	query = `UPDATE passwordresets SET done = 1 WHERE email = $1 AND done = 0`
 	if _, err = tx.Exec(query, reset.Email); err != nil {
 		return false, err
 	}
-	query = fmt.Sprintf(`UPDATE users SET password = %v WHERE id = %v`, util.SqlParam(1), util.SqlParam(2))
+	query = `UPDATE users SET password = $1 WHERE id = $2`
 	result, err = tx.Exec(query, passwordHash, user.Id)
 	if err != nil {
 		return false, err
@@ -363,7 +356,7 @@ func resetPasswordWithToken(token, passwordHash string, now time.Time) (bool, er
 		return false, errors.New("password reset user no longer exists")
 	}
 
-	query = fmt.Sprintf(`DELETE FROM sessions WHERE user_id = %v`, util.SqlParam(1))
+	query = `DELETE FROM sessions WHERE user_id = $1`
 	if _, err = tx.Exec(query, user.Id); err != nil {
 		return false, err
 	}
@@ -495,7 +488,7 @@ func DefineRoutes() {
 			uuid := c.Get("_id").(string)
 
 			session := util.Session{}
-			sql := fmt.Sprintf(`SELECT id, uuid, user_id FROM sessions WHERE uuid = %v`, util.SqlParam(1))
+			sql := `SELECT id, uuid, user_id FROM sessions WHERE uuid = $1`
 			if err := database.Db.Get(&session, sql, uuid); err != nil {
 				if errors.Is(err, stdsql.ErrNoRows) {
 					return c.Redirect(http.StatusSeeOther, "/login")
@@ -734,8 +727,12 @@ func DefineRoutes() {
 
 		description := c.FormValue("description")
 
-		if description == "" {
+		if strings.TrimSpace(description) == "" {
 			util.Flash(`Invalid description!`, data, 0, ``, 0)
+			return c.Redirect(http.StatusSeeOther, "/accounts/show")
+		}
+		if descriptionTooLongFor(description) {
+			util.Flash(descriptionTooLong, data, 0, ``, 0)
 			return c.Redirect(http.StatusSeeOther, "/accounts/show")
 		}
 
@@ -751,7 +748,7 @@ func DefineRoutes() {
 		data.Active = "incomes"
 
 		incomes := []util.Income{}
-		sql := fmt.Sprintf(`SELECT id, description, p_id FROM incomes WHERE accounts_id = %v AND deleted = 0 ORDER BY description ASC`, util.SqlParam(1))
+		sql := `SELECT id, description, p_id FROM incomes WHERE accounts_id = $1 AND deleted = 0 ORDER BY description ASC`
 		if err := database.Db.Select(&incomes, sql, data.User.Default_accounts_id); err != nil {
 			return databaseReadError(c, "load incomes", err)
 		}
@@ -767,11 +764,15 @@ func DefineRoutes() {
 			util.Flash(`Invalid description!`, data, 0, ``, 0)
 			return c.Redirect(http.StatusSeeOther, "/incomes")
 		}
+		if descriptionTooLongFor(description) {
+			util.Flash(descriptionTooLong, data, 0, ``, 0)
+			return c.Redirect(http.StatusSeeOther, "/incomes")
+		}
 		publicID, err := util.NewPublicID()
 		if err != nil {
 			return databaseWriteError(c, "generate income public ID", err)
 		}
-		sql := fmt.Sprintf(`INSERT INTO incomes (description, accounts_id, p_id) VALUES (%v, %v, %v)`, util.SqlParam(1), util.SqlParam(2), util.SqlParam(3))
+		sql := `INSERT INTO incomes (description, accounts_id, p_id) VALUES ($1, $2, $3)`
 		if err := executeExactlyOne(database.Db, sql, strings.TrimSpace(description), data.User.Default_accounts_id, publicID); err != nil {
 			return databaseWriteError(c, "create income", err)
 		}
@@ -788,7 +789,11 @@ func DefineRoutes() {
 			util.Flash(`Invalid description!`, data, 0, ``, 0)
 			return c.Redirect(http.StatusSeeOther, "/incomes")
 		}
-		sql := fmt.Sprintf(`UPDATE incomes SET description = %v WHERE p_id = %v AND accounts_id = %v AND deleted = 0`, util.SqlParam(1), util.SqlParam(2), util.SqlParam(3))
+		if descriptionTooLongFor(description) {
+			util.Flash(descriptionTooLong, data, 0, ``, 0)
+			return c.Redirect(http.StatusSeeOther, "/incomes")
+		}
+		sql := `UPDATE incomes SET description = $1 WHERE p_id = $2 AND accounts_id = $3 AND deleted = 0`
 		if err := executeExactlyOne(database.Db, sql, strings.TrimSpace(description), id, data.User.Default_accounts_id); err != nil {
 			return databaseWriteError(c, "update income", err)
 		}
@@ -800,7 +805,7 @@ func DefineRoutes() {
 		data := c.Get("data").(*util.Data)
 		id := c.FormValue("id")
 
-		sql := fmt.Sprintf(`UPDATE incomes SET deleted = 1 WHERE p_id = %v AND accounts_id = %v AND deleted = 0`, util.SqlParam(1), util.SqlParam(2))
+		sql := `UPDATE incomes SET deleted = 1 WHERE p_id = $1 AND accounts_id = $2 AND deleted = 0`
 		if err := executeExactlyOne(database.Db, sql, id, data.User.Default_accounts_id); err != nil {
 			return databaseWriteError(c, "delete income", err)
 		}
@@ -814,7 +819,7 @@ func DefineRoutes() {
 
 		id := c.QueryParam("id")
 		incomes := []util.Income{}
-		sql := fmt.Sprintf(`SELECT id, description, p_id FROM incomes WHERE p_id = %v AND accounts_id = %v AND deleted = 0`, util.SqlParam(1), util.SqlParam(2))
+		sql := `SELECT id, description, p_id FROM incomes WHERE p_id = $1 AND accounts_id = $2 AND deleted = 0`
 		if err := database.Db.Select(&incomes, sql, id, data.User.Default_accounts_id); err != nil {
 			return databaseReadError(c, "load income", err)
 		}

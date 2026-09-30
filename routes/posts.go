@@ -118,10 +118,10 @@ func setPostPagination(data *util.Data, posts []util.Post, request postPageReque
 func loadPostsPage(accountID int, filterDateFrom, filterDateTo *time.Time, request postPageRequest) ([]util.Post, bool, error) {
 	posts := []util.Post{}
 	queryArgs := []any{accountID}
-	where := "p.accounts_id = " + util.SqlParam(len(queryArgs)) + " AND p.deleted = 0"
+	where := "p.accounts_id = $1 AND p.deleted = 0"
 	if filterDateFrom != nil && filterDateTo != nil {
 		queryArgs = append(queryArgs, *filterDateFrom, *filterDateTo)
-		where += fmt.Sprintf(" AND p.created_at BETWEEN %v AND %v", util.SqlParam(len(queryArgs)-1), util.SqlParam(len(queryArgs)))
+		where += fmt.Sprintf(" AND p.created_at BETWEEN $%d AND $%d", len(queryArgs)-1, len(queryArgs))
 	}
 
 	order := "p.created_at DESC, p.id DESC"
@@ -133,12 +133,12 @@ func loadPostsPage(accountID int, filterDateFrom, filterDateTo *time.Time, reque
 			order = "p.created_at ASC, p.id ASC"
 		}
 		where += fmt.Sprintf(
-			" AND (p.created_at %s %v OR (p.created_at = %v AND p.id %s %v))",
+			" AND (p.created_at %s $%d OR (p.created_at = $%d AND p.id %s $%d))",
 			operator,
-			util.SqlParam(len(queryArgs)-2),
-			util.SqlParam(len(queryArgs)-1),
+			len(queryArgs)-2,
+			len(queryArgs)-1,
 			operator,
-			util.SqlParam(len(queryArgs)),
+			len(queryArgs),
 		)
 	}
 
@@ -153,8 +153,8 @@ func loadPostsPage(accountID int, filterDateFrom, filterDateTo *time.Time, reque
 		LEFT JOIN incomes i ON p.incomes_id = i.id
 		WHERE %s
 		ORDER BY %s
-		LIMIT %s
-	`, where, order, util.SqlParam(len(queryArgs)))
+		LIMIT $%d
+	`, where, order, len(queryArgs))
 	if err := database.Db.Select(&posts, query, queryArgs...); err != nil {
 		return nil, false, err
 	}
@@ -205,18 +205,18 @@ func DefinePosts() {
 		ldatefilter := false
 
 		if creset != "" {
-			sql := fmt.Sprintf(`UPDATE accounts SET fromdate = %v, todate = %v WHERE id = %v`, util.SqlParam(1), util.SqlParam(2), util.SqlParam(3))
+			sql := `UPDATE accounts SET fromdate = $1, todate = $2 WHERE id = $3`
 			if err := executeExactlyOne(database.Db, sql, "", "", data.User.Default_accounts_id); err != nil {
 				return databaseWriteError(c, "reset account date filter", err)
 			}
 		} else {
 			if cfrom == "" {
 				account := util.Account{}
-				sql := fmt.Sprintf(`
+				sql := `
 				SELECT fromdate, todate, id, description, deleted 
 					FROM accounts 
-					WHERE id = %v
-				`, util.SqlParam(1))
+					WHERE id = $1
+				`
 				if err := database.Db.Get(&account, sql, data.User.Default_accounts_id); err != nil {
 					return databaseRecordReadError(c, "load account date filter", err)
 				}
@@ -233,7 +233,7 @@ func DefinePosts() {
 					filterdatefrom = tfrom
 					filterdateto = tto
 					data.Filter = filterdatefrom.Format("02-01-2006") + " - " + filterdateto.Format("02-01-2006")
-					sql := fmt.Sprintf(`UPDATE accounts SET fromdate = %v, todate = %v WHERE id = %v`, util.SqlParam(1), util.SqlParam(2), util.SqlParam(3))
+					sql := `UPDATE accounts SET fromdate = $1, todate = $2 WHERE id = $3`
 					if err := executeExactlyOne(database.Db, sql, cfrom, cto, data.User.Default_accounts_id); err != nil {
 						return databaseWriteError(c, "save account date filter", err)
 					}
@@ -244,21 +244,21 @@ func DefinePosts() {
 		postsum := util.Postsum{}
 		var errsql error
 		if ldatefilter {
-			sql := fmt.Sprintf(`
+			sql := `
 			SELECT COALESCE(CAST(SUM(amount) AS Numeric(12,2)), 0) AS saldo,
 				COALESCE(CAST(SUM(amount/NULLIF(exchange, 0)) AS Numeric(12,2)), 0) AS saldoe
 				FROM posts 
-				WHERE accounts_id = %v AND deleted = 0 AND created_at 
-				BETWEEN %v AND %v
-			`, util.SqlParam(1), util.SqlParam(2), util.SqlParam(3))
+				WHERE accounts_id = $1 AND deleted = 0 AND created_at 
+				BETWEEN $2 AND $3
+			`
 			errsql = database.Db.Get(&postsum, sql, data.User.Default_accounts_id, filterdatefrom, filterdateto)
 		} else {
-			sql := fmt.Sprintf(`
+			sql := `
 			SELECT COALESCE(CAST(SUM(amount) AS Numeric(12,2)), 0) AS saldo,
 				COALESCE(CAST(SUM(amount/NULLIF(exchange, 0)) AS Numeric(12,2)), 0) AS saldoe
 				FROM posts 
-				WHERE accounts_id = %v AND deleted = 0
-			`, util.SqlParam(1))
+				WHERE accounts_id = $1 AND deleted = 0
+			`
 			errsql = database.Db.Get(&postsum, sql, data.User.Default_accounts_id)
 		}
 		if errsql != nil {
@@ -269,20 +269,20 @@ func DefinePosts() {
 
 		incomesum := util.Incomessum{}
 		if ldatefilter {
-			sql := fmt.Sprintf(`
+			sql := `
 			SELECT COALESCE(CAST(SUM(amount) AS Numeric(12,2)), 0) AS saldo,
 				COALESCE(CAST(SUM(amount/NULLIF(exchange, 0)) AS Numeric(12,2)), 0) AS saldoe
 				FROM posts 
-				WHERE incomes_id > 0 AND accounts_id = %v AND deleted = 0 AND created_at BETWEEN %v AND %v
-			`, util.SqlParam(1), util.SqlParam(2), util.SqlParam(3))
+				WHERE incomes_id > 0 AND accounts_id = $1 AND deleted = 0 AND created_at BETWEEN $2 AND $3
+			`
 			errsql = database.Db.Get(&incomesum, sql, data.User.Default_accounts_id, filterdatefrom, filterdateto)
 		} else {
-			sql := fmt.Sprintf(`
+			sql := `
 			SELECT COALESCE(CAST(SUM(amount) AS Numeric(12,2)), 0) AS saldo,
 				COALESCE(CAST(SUM(amount/NULLIF(exchange, 0)) AS Numeric(12,2)), 0) AS saldoe
 				FROM posts 
-				WHERE incomes_id > 0 AND accounts_id = %v AND deleted = 0
-			`, util.SqlParam(1))
+				WHERE incomes_id > 0 AND accounts_id = $1 AND deleted = 0
+			`
 			errsql = database.Db.Get(&incomesum, sql, data.User.Default_accounts_id)
 		}
 		if errsql != nil {
@@ -293,19 +293,19 @@ func DefinePosts() {
 
 		expensesum := util.Expensessum{}
 		if ldatefilter {
-			sql := fmt.Sprintf(`
+			sql := `
 			SELECT COALESCE(CAST(SUM(amount) AS Numeric(12,2)), 0) AS saldo,
 				COALESCE(CAST(SUM(amount/NULLIF(exchange, 0)) AS Numeric(12,2)), 0) AS saldoe
 				FROM posts 
-				WHERE expenses_id > 0 AND accounts_id = %v AND deleted = 0 AND created_at BETWEEN %v AND %v
-			`, util.SqlParam(1), util.SqlParam(2), util.SqlParam(3))
+				WHERE expenses_id > 0 AND accounts_id = $1 AND deleted = 0 AND created_at BETWEEN $2 AND $3
+			`
 			errsql = database.Db.Get(&expensesum, sql, data.User.Default_accounts_id, filterdatefrom, filterdateto)
 		} else {
-			sql := fmt.Sprintf(`
+			sql := `
 			SELECT COALESCE(CAST(SUM(amount) AS Numeric(12,2)), 0) AS saldo,
 				COALESCE(CAST(SUM(amount/NULLIF(exchange, 0)) AS Numeric(12,2)), 0) AS saldoe
-				FROM posts WHERE expenses_id > 0 AND accounts_id = %v AND deleted = 0
-			`, util.SqlParam(1))
+				FROM posts WHERE expenses_id > 0 AND accounts_id = $1 AND deleted = 0
+			`
 			errsql = database.Db.Get(&expensesum, sql, data.User.Default_accounts_id)
 		}
 		if errsql != nil {
@@ -315,12 +315,12 @@ func DefinePosts() {
 		data.Expensesume = fmt.Sprintf("%.2f", expensesum.Saldoe)
 
 		expenses := []util.Expense{}
-		sql := fmt.Sprintf(`
+		sql := `
 		SELECT p_id, description 
 			FROM expenses 
-			WHERE accounts_id = %v AND deleted = 0 
+			WHERE accounts_id = $1 AND deleted = 0 
 			ORDER BY description ASC
-		`, util.SqlParam(1))
+		`
 		if err := database.Db.Select(&expenses, sql, data.User.Default_accounts_id); err != nil {
 			return databaseReadError(c, "load expenses", err)
 		}
@@ -353,6 +353,10 @@ func DefinePosts() {
 		amount := c.FormValue("amount")
 		amounte := c.FormValue("amounte")
 		date := c.FormValue("date")
+		if descriptionTooLongFor(description) {
+			util.Flash(descriptionTooLong, data, 0, "", 0)
+			return c.Redirect(http.StatusSeeOther, "/posts")
+		}
 		amountnum, err := parseAmountInputs(amount, amounte, data.Eur)
 		if err != nil {
 			util.Flash(`Changes not saved, because of invalid input data!`, data, 0, "", 0)
@@ -381,12 +385,12 @@ func DefinePosts() {
 			}
 		} else {
 			// Check if valid expense is selected
-			sql := fmt.Sprintf(`
+			sql := `
 				SELECT id, description, amount, expenses_id 
 				FROM expenses 
-				WHERE accounts_id = %v AND p_id = %v AND deleted = 0
+				WHERE accounts_id = $1 AND p_id = $2 AND deleted = 0
 				ORDER BY description ASC
-			`, util.SqlParam(1), util.SqlParam(2))
+			`
 			errExpenses := database.Db.Select(&expenses, sql, data.User.Default_accounts_id, expenses_pid)
 			if errExpenses != nil {
 				return databaseReadError(c, "validate expense", errExpenses)
@@ -410,7 +414,7 @@ func DefinePosts() {
 		incomes := []util.Income{}
 		if incomes_pid != "" {
 			// Check if valid income is selected
-			sql := fmt.Sprintf(`SELECT id, description FROM incomes WHERE accounts_id = %v AND p_id = %v AND deleted = 0 ORDER BY description ASC`, util.SqlParam(1), util.SqlParam(2))
+			sql := `SELECT id, description FROM incomes WHERE accounts_id = $1 AND p_id = $2 AND deleted = 0 ORDER BY description ASC`
 			errIncomes := database.Db.Select(&incomes, sql, data.User.Default_accounts_id, incomes_pid)
 			if errIncomes != nil {
 				return databaseReadError(c, "validate income", errIncomes)
@@ -439,7 +443,7 @@ func DefinePosts() {
 		}}
 		if expenses_idnum > 0 && expenses[0].ExpensesId > 0 {
 			expensesadd := []util.Expense{}
-			sql := fmt.Sprintf(`SELECT e1.id, e1.amount FROM expenses e1 WHERE e1.id = %v AND e1.accounts_id = %v AND e1.deleted = 0`, util.SqlParam(1), util.SqlParam(2))
+			sql := `SELECT e1.id, e1.amount FROM expenses e1 WHERE e1.id = $1 AND e1.accounts_id = $2 AND e1.deleted = 0`
 			errsql2 := database.Db.Select(&expensesadd, sql, expenses[0].ExpensesId, data.User.Default_accounts_id)
 			if errsql2 != nil {
 				return databaseReadError(c, "load linked expense", errsql2)
@@ -471,7 +475,7 @@ func DefinePosts() {
 		data := c.Get("data").(*util.Data)
 		id := c.FormValue("id")
 
-		sql := fmt.Sprintf(`UPDATE posts SET deleted = 1 WHERE p_id = %v AND accounts_id = %v AND deleted = 0`, util.SqlParam(1), util.SqlParam(2))
+		sql := `UPDATE posts SET deleted = 1 WHERE p_id = $1 AND accounts_id = $2 AND deleted = 0`
 		if err := executeExactlyOne(database.Db, sql, id, data.User.Default_accounts_id); err != nil {
 			return databaseWriteError(c, "delete post", err)
 		}
@@ -485,26 +489,14 @@ func DefinePosts() {
 
 		id := c.QueryParam("id")
 		posts := []util.Post{}
-		sql := ""
-		if util.Settings.DatabaseType == "sqlite" {
-			sql = fmt.Sprintf(`
-			SELECT p.id, p.p_id, p.description, ifnull(e.description,'') AS expense, 
-				ifnull(i.description,'') AS income, created_at AS date, created_at AS datetime, created_ts, p.amount 
-				FROM posts p 
-				LEFT JOIN expenses e ON p.expenses_id = e.id 
-				LEFT JOIN incomes i ON p.incomes_id = i.id 
-				WHERE p.p_id = %v AND p.accounts_id = %v AND p.deleted = 0
-			`, util.SqlParam(1), util.SqlParam(2))
-		} else {
-			sql = fmt.Sprintf(`
-			SELECT p.id, p.p_id, p.description, COALESCE(e.description,'') AS expense, 
-				COALESCE(i.description,'') AS income, created_at AS date, created_at AS datetime, created_ts, p.amount 
-				FROM posts p 
-				LEFT JOIN expenses e ON p.expenses_id = e.id 
-				LEFT JOIN incomes i ON p.incomes_id = i.id 
-				WHERE p.p_id = %v AND p.accounts_id = %v AND p.deleted = 0
-			`, util.SqlParam(1), util.SqlParam(2))
-		}
+		sql := `
+			SELECT p.id, p.p_id, p.description, COALESCE(e.description,'') AS expense,
+				COALESCE(i.description,'') AS income, created_at AS date, created_at AS datetime, created_ts, p.amount
+				FROM posts p
+				LEFT JOIN expenses e ON p.expenses_id = e.id
+				LEFT JOIN incomes i ON p.incomes_id = i.id
+				WHERE p.p_id = $1 AND p.accounts_id = $2 AND p.deleted = 0
+			`
 		errsql := database.Db.Select(&posts, sql, id, data.User.Default_accounts_id)
 		if errsql != nil {
 			return databaseReadError(c, "load post", errsql)
@@ -527,28 +519,15 @@ func DefinePosts() {
 		description := c.FormValue("description")
 		amount := c.FormValue("amount")
 		dateOnly := c.FormValue("dateonly")
+		if descriptionTooLongFor(description) {
+			util.Flash(descriptionTooLong, data, 0, "", 0)
+			return c.Redirect(http.StatusSeeOther, "/posts")
+		}
 
 		storedDate := time.Now()
 
 		posts := []util.Post{}
-		sql := ""
-		if util.Settings.DatabaseType == "sqlite" {
-			sql = fmt.Sprintf(`
-			SELECT created_at AS datetime 
-				FROM posts p 
-				LEFT JOIN expenses e ON p.expenses_id = e.id 
-				LEFT JOIN incomes i ON p.incomes_id = i.id 
-				WHERE p.p_id = %v AND p.accounts_id = %v AND p.deleted = 0
-			`, util.SqlParam(1), util.SqlParam(2))
-		} else {
-			sql = fmt.Sprintf(`
-			SELECT created_at AS datetime 
-				FROM posts p 
-				LEFT JOIN expenses e ON p.expenses_id = e.id 
-				LEFT JOIN incomes i ON p.incomes_id = i.id 
-				WHERE p.p_id = %v AND p.accounts_id = %v AND p.deleted = 0
-			`, util.SqlParam(1), util.SqlParam(2))
-		}
+		sql := `SELECT created_at AS datetime FROM posts WHERE p_id = $1 AND accounts_id = $2 AND deleted = 0`
 		errsql1 := database.Db.Select(&posts, sql, id, data.User.Default_accounts_id)
 		if errsql1 != nil {
 			return databaseReadError(c, "load post for update", errsql1)
@@ -571,7 +550,7 @@ func DefinePosts() {
 			util.Flash(`Invalid date!`, data, 0, description, 0)
 			return c.Redirect(http.StatusSeeOther, "/posts")
 		}
-		sql = fmt.Sprintf(`UPDATE posts SET description = %v, amount = %v, created_at = %v WHERE p_id = %v AND accounts_id = %v AND deleted = 0`, util.SqlParam(1), util.SqlParam(2), util.SqlParam(3), util.SqlParam(4), util.SqlParam(5))
+		sql = `UPDATE posts SET description = $1, amount = $2, created_at = $3 WHERE p_id = $4 AND accounts_id = $5 AND deleted = 0`
 
 		if err := executeExactlyOne(database.Db, sql, description, amountNumber, createdAt, id, data.User.Default_accounts_id); err != nil {
 			return databaseWriteError(c, "update post", err)
@@ -585,12 +564,12 @@ func DefinePosts() {
 		data.Active = "posts"
 
 		incomes := []util.Income{}
-		sql := fmt.Sprintf(`
+		sql := `
 		SELECT id, p_id, description 
 			FROM incomes 
-			WHERE accounts_id = %v AND deleted = 0 
+			WHERE accounts_id = $1 AND deleted = 0 
 			ORDER BY description ASC
-		`, util.SqlParam(1))
+		`
 		if err := database.Db.Select(&incomes, sql, data.User.Default_accounts_id); err != nil {
 			return databaseReadError(c, "load incomes", err)
 		}
