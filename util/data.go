@@ -3,21 +3,24 @@ package util
 import "time"
 
 type Data struct {
-	User                  User
-	Active                string
-	CookieId              string
-	Username              string
-	Incomesum             string
-	Incomesume            string
-	Saldo                 string
-	Saldoe                string
-	Expensesum            string
-	Expensesume           string
-	Lang                  string
-	Csrf                  string
-	CSPNonce              string
-	Token                 string
-	LoginNext             string
+	User        User
+	Active      string
+	CookieId    string
+	Username    string
+	Incomesum   string
+	Incomesume  string
+	Saldo       string
+	Saldoe      string
+	Expensesum  string
+	Expensesume string
+	Lang        string
+	Csrf        string
+	CSPNonce    string
+	Token       string
+	LoginNext   string
+	// HideThirdPartyScripts keeps analytics and ads off pages whose URL
+	// carries a secret token.
+	HideThirdPartyScripts bool
 	Flash                 string
 	Filter                string
 	Eur                   float64

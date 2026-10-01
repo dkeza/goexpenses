@@ -195,7 +195,7 @@ func newPasswordResetDialer() *gomail.Dialer {
 	return dialer
 }
 
-func sendPasswordResetEmail(recipient, token, lang string) error {
+func sendPasswordResetEmail(recipient, token, lang string) {
 	resetURL := strings.TrimRight(util.Settings.Host, "/") + "/resetpassword?t=" + url.QueryEscape(token)
 
 	message := gomail.NewMessage()
@@ -204,7 +204,7 @@ func sendPasswordResetEmail(recipient, token, lang string) error {
 	message.SetHeader("Subject", "Goexpenses "+util.GetLangText("reset password", lang))
 	message.SetBody("text/html", util.GetLangText(`Click to this link to reset password:`, lang)+` <a href="`+html.EscapeString(resetURL)+`">Reset</a>`)
 
-	return sendTrackedEmail("password_reset", recipient, message)
+	queueTrackedEmail("password_reset", recipient, message)
 }
 
 func changePassword(c echo.Context) error {
@@ -294,9 +294,7 @@ func DefinePasswordRoutes() {
 			return echo.NewHTTPError(http.StatusInternalServerError, "could not request password reset").SetInternal(err)
 		}
 		if created {
-			if err := sendPasswordResetEmail(recipient, token, data.Lang); err != nil {
-				c.Logger().Errorf("could not send password reset email: %v", err)
-			}
+			sendPasswordResetEmail(recipient, token, data.Lang)
 		}
 		util.Flash(passwordResetResponseMessage, data, 1, "", 0)
 
@@ -304,8 +302,13 @@ func DefinePasswordRoutes() {
 	}, rateLimitMiddleware(publicRequestLimiter, passwordResetRateLimitRules))
 
 	e.GET("/resetpassword", func(c echo.Context) error {
+		// The URL carries the reset token: keep it out of caches, Referer
+		// headers and third-party scripts.
+		c.Response().Header().Set("Cache-Control", "no-store")
+		c.Response().Header().Set("Referrer-Policy", "no-referrer")
 		data := c.Get("data").(*util.Data)
 		data.Active = "login"
+		data.HideThirdPartyScripts = true
 		token := c.FormValue("t")
 		if token == "" {
 			return c.Redirect(http.StatusSeeOther, "/")

@@ -3,6 +3,8 @@ package routes
 import (
 	"crypto/tls"
 	"database/sql/driver"
+	"net/http"
+	"net/http/httptest"
 	"regexp"
 	"testing"
 	"time"
@@ -12,6 +14,7 @@ import (
 
 	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/jmoiron/sqlx"
+	"github.com/labstack/echo/v4"
 )
 
 type captureStringArgument struct {
@@ -214,5 +217,45 @@ func TestPasswordResetDialerVerifiesTLSCertificate(t *testing.T) {
 	}
 	if dialer.TLSConfig.MinVersion != tls.VersionTLS12 {
 		t.Fatalf("minimum TLS version = %d, want TLS 1.2", dialer.TLSConfig.MinVersion)
+	}
+}
+
+func TestResetPasswordPageHidesTokenFromThirdParties(t *testing.T) {
+	mock, _ := useMockRouteDatabase(t)
+	token, tokenHash, err := util.NewPasswordResetToken()
+	if err != nil {
+		t.Fatalf("NewPasswordResetToken: %v", err)
+	}
+	mock.ExpectQuery(regexp.QuoteMeta("SELECT id FROM passwordresets WHERE token = $1 AND created_at >= $2 AND done = 0")).
+		WithArgs(tokenHash, sqlmock.AnyArg()).
+		WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(7))
+
+	previousEcho := E
+	E = echo.New()
+	E.Renderer = discardRenderer{}
+	t.Cleanup(func() { E = previousEcho })
+	data := &util.Data{}
+	E.Use(func(next echo.HandlerFunc) echo.HandlerFunc {
+		return func(c echo.Context) error {
+			c.Set("data", data)
+			return next(c)
+		}
+	})
+	DefinePasswordRoutes()
+
+	recorder := httptest.NewRecorder()
+	E.ServeHTTP(recorder, httptest.NewRequest(http.MethodGet, "/resetpassword?t="+token, nil))
+
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("status = %d", recorder.Code)
+	}
+	if !data.HideThirdPartyScripts || data.Token != token {
+		t.Fatalf("page data = hide %v, token set %v", data.HideThirdPartyScripts, data.Token == token)
+	}
+	if got := recorder.Header().Get("Referrer-Policy"); got != "no-referrer" {
+		t.Errorf("Referrer-Policy = %q", got)
+	}
+	if got := recorder.Header().Get("Cache-Control"); got != "no-store" {
+		t.Errorf("Cache-Control = %q", got)
 	}
 }
