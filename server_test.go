@@ -316,3 +316,28 @@ func TestExpenseTemplatesOfferEmptyRelatedExpense(t *testing.T) {
 		t.Error("expense edit form does not offer the empty option and select the stored related expense")
 	}
 }
+
+func TestTemplateFormattersHandleShortValues(t *testing.T) {
+	tests := []struct {
+		name string
+		got  string
+		want string
+	}{
+		{"date from timestamp", formatDate("2026-09-30T07:15:42Z"), "30.09.2026"},
+		{"date only", formatDate("2026-09-30"), "30.09.2026"},
+		{"empty date", formatDate(""), ""},
+		{"short date", formatDate("2026-09"), "2026-09"},
+		{"date time", formatDateTime("2026-09-30T07:15:42.123456Z"), "30.09.2026 07:15:42"},
+		{"date time with space", formatDateTime("2026-09-30 07:15:42"), "30.09.2026 07:15:42"},
+		{"date time without time", formatDateTime("2026-09-30"), "30.09.2026"},
+		{"empty date time", formatDateTime(""), ""},
+		{"public ID", formatVisibleID("0123456789abcdef0123456789abcdef01234567"), "ef01234567"},
+		{"short public ID", formatVisibleID("abc"), "abc"},
+		{"empty public ID", formatVisibleID(""), ""},
+	}
+	for _, test := range tests {
+		if test.got != test.want {
+			t.Errorf("%s = %q, want %q", test.name, test.got, test.want)
+		}
+	}
+}
