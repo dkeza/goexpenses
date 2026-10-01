@@ -1,6 +1,7 @@
 package routes
 
 import (
+	"errors"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -195,5 +196,40 @@ func TestRateLimitBackURL(t *testing.T) {
 		if got := rateLimitBackURL(path); got != want {
 			t.Errorf("rateLimitBackURL(%q) = %q, want %q", path, got, want)
 		}
+	}
+}
+
+func TestLoginLimitDoesNotLockOutUserFromOtherAddress(t *testing.T) {
+	limiter := newRequestLimiter()
+	e := echo.New()
+	handler := rateLimitMiddleware(limiter, loginRateLimitRules)(func(c echo.Context) error {
+		return c.NoContent(http.StatusNoContent)
+	})
+	attempt := func(remoteAddr string) int {
+		form := url.Values{"username": {"victim"}, "password": {"wrong-password"}}
+		request := httptest.NewRequest(http.MethodPost, "/auth", strings.NewReader(form.Encode()))
+		request.Header.Set(echo.HeaderContentType, echo.MIMEApplicationForm)
+		request.RemoteAddr = remoteAddr
+		recorder := httptest.NewRecorder()
+		if err := handler(e.NewContext(request, recorder)); err != nil {
+			var httpError *echo.HTTPError
+			if errors.As(err, &httpError) {
+				return httpError.Code
+			}
+			t.Fatalf("login attempt: %v", err)
+		}
+		return recorder.Code
+	}
+
+	for range loginAccountRateLimit {
+		if status := attempt("203.0.113.9:4000"); status != http.StatusNoContent {
+			t.Fatalf("attacker attempt within limit = %d", status)
+		}
+	}
+	if status := attempt("203.0.113.9:4000"); status != http.StatusTooManyRequests {
+		t.Fatalf("attacker attempt over limit = %d, want 429", status)
+	}
+	if status := attempt("198.51.100.7:5000"); status != http.StatusNoContent {
+		t.Fatalf("user from another address = %d, want allowed", status)
 	}
 }

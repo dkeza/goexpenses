@@ -252,7 +252,7 @@ func DefineAuthRoutes() {
 
 		user, err := authenticateUser(username, password)
 		if err == nil {
-			publicRequestLimiter.reset(rateLimitIdentifierKey("login", "username", username))
+			publicRequestLimiter.reset(loginAccountKey(c, username))
 			if err := rotateSession(c, user.Id, true); err != nil {
 				return echo.NewHTTPError(http.StatusInternalServerError, "could not rotate session").SetInternal(err)
 			}
