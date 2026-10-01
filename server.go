@@ -68,23 +68,39 @@ func templateFunctions() template.FuncMap {
 		"FormatCurrency": func(c float64) string {
 			return fmt.Sprintf("%.2f", c)
 		},
-		"GetLangText": util.GetLangText,
-		"FormatDateTime": func(dt string) string {
-			return dt[8:10] + "." + dt[5:7] + "." + dt[0:4] + " " + dt[11:19]
-		},
-		"FormatDate": func(dt string) string {
-			return dt[8:10] + "." + dt[5:7] + "." + dt[0:4]
-		},
-		"FormatVisibleId": func(vid string) string {
-			x := ""
-			if len(vid) > 0 {
-				x = vid[len(vid)-10:]
-			}
-			return x
-		},
-		"AppVersion":   version.Label,
-		"AssetVersion": version.AssetTag,
+		"GetLangText":     util.GetLangText,
+		"FormatDateTime":  formatDateTime,
+		"FormatDate":      formatDate,
+		"FormatVisibleId": formatVisibleID,
+		"AppVersion":      version.Label,
+		"AssetVersion":    version.AssetTag,
 	}
+}
+
+// formatDate turns a "2006-01-02..." value into "02.01.2006". Values too
+// short to contain a date are returned unchanged instead of failing the page.
+func formatDate(dt string) string {
+	if len(dt) < 10 {
+		return dt
+	}
+	return dt[8:10] + "." + dt[5:7] + "." + dt[0:4]
+}
+
+// formatDateTime turns a "2006-01-02T15:04:05..." value into
+// "02.01.2006 15:04:05", or returns the date alone when no time is present.
+func formatDateTime(dt string) string {
+	if len(dt) < 19 {
+		return formatDate(dt)
+	}
+	return formatDate(dt) + " " + dt[11:19]
+}
+
+// formatVisibleID shows the last ten characters of a public ID.
+func formatVisibleID(vid string) string {
+	if len(vid) <= 10 {
+		return vid
+	}
+	return vid[len(vid)-10:]
 }
 
 func parseTemplates() (*template.Template, error) {
