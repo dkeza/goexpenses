@@ -31,8 +31,7 @@ func MainRoute() {
 		data := c.Get("data").(*util.Data)
 		data.Active = "home"
 		l := c.QueryParam("lang")
-		if l != "" {
-
+		if supportedLanguage(l) {
 			if data.Lang != l {
 				data.Lang = l
 				sql := `UPDATE sessions SET lang = $1 WHERE uuid = $2`
@@ -51,6 +50,16 @@ func MainRoute() {
 		}
 		return c.Render(http.StatusOK, "index", data)
 	})
+}
+
+// supportedLanguage reports whether lang is one of the interface languages.
+// Other values are ignored instead of being stored in the session.
+func supportedLanguage(lang string) bool {
+	switch lang {
+	case "EN", "DE", "RS", "SR":
+		return true
+	}
+	return false
 }
 
 func healthCheck(c echo.Context) error {

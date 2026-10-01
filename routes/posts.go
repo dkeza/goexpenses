@@ -242,7 +242,10 @@ func DefinePosts() {
 				return databaseWriteError(c, "reset account date filter", err)
 			}
 		} else {
-			if cfrom == "" {
+			// A filter from the query string is new and gets saved; otherwise the
+			// account's saved filter is applied without writing it back.
+			filterSubmitted := cfrom != ""
+			if !filterSubmitted {
 				account := util.Account{}
 				sql := `
 				SELECT fromdate, todate, id, description, deleted 
@@ -265,9 +268,11 @@ func DefinePosts() {
 					filterdatefrom = tfrom
 					filterdateto = tto
 					data.Filter = filterdatefrom.Format("02-01-2006") + " - " + filterdateto.Format("02-01-2006")
-					sql := `UPDATE accounts SET fromdate = $1, todate = $2 WHERE id = $3`
-					if err := executeExactlyOne(database.Db, sql, cfrom, cto, data.User.Default_accounts_id); err != nil {
-						return databaseWriteError(c, "save account date filter", err)
+					if filterSubmitted {
+						sql := `UPDATE accounts SET fromdate = $1, todate = $2 WHERE id = $3`
+						if err := executeExactlyOne(database.Db, sql, cfrom, cto, data.User.Default_accounts_id); err != nil {
+							return databaseWriteError(c, "save account date filter", err)
+						}
 					}
 				}
 			}

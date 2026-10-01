@@ -3,6 +3,7 @@ package midware
 import (
 	stdsql "database/sql"
 	"errors"
+	"log/slog"
 	"net/http"
 	"strings"
 	"time"
@@ -23,6 +24,7 @@ func SetMiddleware() {
 	e := routes.E
 
 	e.Use(SecurityHeaders)
+	e.Use(RequestLogger(slog.Default()))
 	e.Use(middleware.BodyLimit(RequestBodyLimit))
 	e.Use(middleware.CSRFWithConfig(middleware.CSRFConfig{
 		Skipper: func(c echo.Context) bool {
@@ -35,7 +37,6 @@ func SetMiddleware() {
 		CookieHTTPOnly: true,
 		CookieSameSite: http.SameSiteLaxMode,
 	}))
-	//e.Use(middleware.Logger())
 	e.Use(middleware.Recover())
 	e.Use(ServerHeader)
 	e.Use(CheckCookie)
