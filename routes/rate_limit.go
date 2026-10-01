@@ -128,10 +128,17 @@ func clientIPExtractor() echo.IPExtractor {
 	)
 }
 
+// loginAccountKey limits password guesses for one user name from one client
+// address. Keying by user name alone would let anyone who knows a user name
+// lock that user out of signing in.
+func loginAccountKey(c echo.Context, username string) string {
+	return rateLimitIdentifierKey("login", "username", username) + ":ip:" + c.RealIP()
+}
+
 func loginRateLimitRules(c echo.Context) []rateLimitRule {
 	return []rateLimitRule{
 		{key: rateLimitIPKey("login", c), limit: loginIPRateLimit, window: loginRateLimitWindow},
-		{key: rateLimitIdentifierKey("login", "username", c.FormValue("username")), limit: loginAccountRateLimit, window: loginRateLimitWindow},
+		{key: loginAccountKey(c, c.FormValue("username")), limit: loginAccountRateLimit, window: loginRateLimitWindow},
 	}
 }
 
