@@ -341,3 +341,21 @@ func TestTemplateFormattersHandleShortValues(t *testing.T) {
 		}
 	}
 }
+
+func TestHeaderOmitsThirdPartyScriptsWhenHidden(t *testing.T) {
+	templates, err := parseTemplates()
+	if err != nil {
+		t.Fatalf("parse templates: %v", err)
+	}
+	for _, hide := range []bool{false, true} {
+		var rendered bytes.Buffer
+		if err := templates.ExecuteTemplate(&rendered, "header", &util.Data{HideThirdPartyScripts: hide}); err != nil {
+			t.Fatalf("render header: %v", err)
+		}
+		page := rendered.String()
+		hasThirdParty := strings.Contains(page, "googletagmanager.com") || strings.Contains(page, "googlesyndication.com")
+		if hasThirdParty == hide {
+			t.Errorf("HideThirdPartyScripts=%v: third-party scripts present = %v", hide, hasThirdParty)
+		}
+	}
+}

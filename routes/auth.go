@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net/http"
 	"strings"
+	"sync"
 	"time"
 
 	"goexpenses/database"
@@ -16,11 +17,22 @@ import (
 
 var errInvalidCredentials = errors.New("invalid credentials")
 
+// unknownUserPasswordHash is checked when no matching user exists, so a failed
+// sign-in takes as long for unknown user names as for wrong passwords.
+var unknownUserPasswordHash = sync.OnceValue(func() string {
+	hash, err := util.HashPassword("unknown-user-placeholder")
+	if err != nil {
+		return ""
+	}
+	return hash
+})
+
 func authenticateUser(username, password string) (util.User, error) {
 	user := util.User{}
 	query := `SELECT id, name, username, email, password FROM users WHERE lower(btrim(username)) = $1 AND email_verified = true AND blocked_at IS NULL`
 	if err := database.Db.Get(&user, query, strings.ToLower(strings.TrimSpace(username))); err != nil {
 		if errors.Is(err, stdsql.ErrNoRows) {
+			util.VerifyPassword(unknownUserPasswordHash(), password)
 			return util.User{}, errInvalidCredentials
 		}
 		return util.User{}, err
@@ -179,9 +191,7 @@ func DefineAuthRoutes() {
 			}
 			return databaseWriteError(c, "register user", err)
 		}
-		if err := sendVerificationEmail(input.Email, token, data.Lang); err != nil {
-			c.Logger().Errorf("could not send verification email: %v", err)
-		}
+		sendVerificationEmail(input.Email, token, data.Lang)
 		util.Flash(registrationResponseMessage, data, 1, ``, 0)
 		return c.Redirect(http.StatusSeeOther, "/login")
 	}, rateLimitMiddleware(publicRequestLimiter, registrationRateLimitRules))
@@ -228,9 +238,7 @@ func DefineAuthRoutes() {
 			return databaseWriteError(c, "request verification", err)
 		}
 		if created {
-			if err := sendVerificationEmail(recipient, token, data.Lang); err != nil {
-				c.Logger().Errorf("could not resend verification email: %v", err)
-			}
+			sendVerificationEmail(recipient, token, data.Lang)
 		}
 		util.Flash(verificationResponseMessage, data, 1, "", 0)
 		return c.Redirect(http.StatusSeeOther, "/login")

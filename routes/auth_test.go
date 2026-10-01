@@ -5,12 +5,14 @@ import (
 	"errors"
 	"regexp"
 	"testing"
+	"time"
 
 	"goexpenses/database"
 	"goexpenses/util"
 
 	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/jmoiron/sqlx"
+	"golang.org/x/crypto/bcrypt"
 )
 
 func TestAuthenticateUserExcludesBlockedAccounts(t *testing.T) {
@@ -129,5 +131,38 @@ func TestAuthenticateUserRejectsWrongPassword(t *testing.T) {
 	}
 	if err := mock.ExpectationsWereMet(); err != nil {
 		t.Fatalf("database expectations: %v", err)
+	}
+}
+
+func TestUnknownUserPasswordHashUsesCurrentBcryptCost(t *testing.T) {
+	hash := unknownUserPasswordHash()
+	cost, err := bcrypt.Cost([]byte(hash))
+	if err != nil {
+		t.Fatalf("placeholder hash is not bcrypt: %v", err)
+	}
+	if cost != bcrypt.DefaultCost {
+		t.Fatalf("placeholder bcrypt cost = %d, want %d", cost, bcrypt.DefaultCost)
+	}
+	if valid, _ := util.VerifyPassword(hash, "integration-password"); valid {
+		t.Fatal("placeholder hash accepted a password")
+	}
+}
+
+func TestUnknownUserSignInTakesAsLongAsPasswordCheck(t *testing.T) {
+	mock, _ := useMockRouteDatabase(t)
+	query := `SELECT id, name, username, email, password FROM users WHERE lower(btrim(username)) = $1 AND email_verified = true AND blocked_at IS NULL`
+	mock.ExpectQuery(regexp.QuoteMeta(query)).WithArgs("nobody").WillReturnError(sql.ErrNoRows)
+
+	hash := unknownUserPasswordHash()
+	started := time.Now()
+	util.VerifyPassword(hash, "wrong-password")
+	passwordCheck := time.Since(started)
+
+	started = time.Now()
+	if _, err := authenticateUser("nobody", "wrong-password"); !errors.Is(err, errInvalidCredentials) {
+		t.Fatalf("authenticateUser error = %v", err)
+	}
+	if unknownUser := time.Since(started); unknownUser < passwordCheck/2 {
+		t.Fatalf("unknown user sign-in took %v, password check takes %v", unknownUser, passwordCheck)
 	}
 }

@@ -207,8 +207,14 @@ func runApplication(ctx context.Context) error {
 	routes.DefineRoutes()
 
 	e.Logger.Info("goexpenses " + version.Label() + " listening on port " + util.Settings.Port)
-	if err := serveUntilShutdown(ctx, e, ":"+util.Settings.Port); err != nil {
-		return err
+	serveErr := serveUntilShutdown(ctx, e, ":"+util.Settings.Port)
+	emailContext, cancelEmails := context.WithTimeout(context.Background(), gracefulShutdownTimeout)
+	defer cancelEmails()
+	if err := routes.WaitForEmails(emailContext); err != nil {
+		e.Logger.Warn("shutdown before queued emails were sent")
+	}
+	if serveErr != nil {
+		return serveErr
 	}
 	if ctx.Err() != nil {
 		e.Logger.Info("Shutdown complete")
