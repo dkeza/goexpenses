@@ -53,8 +53,10 @@ jobs:
       - name: Run govulncheck
         run: go run golang.org/x/vuln/cmd/govulncheck@v1.8.0 ./...
 
-      - name: Run tests
-        run: go test ./...
+      - name: Run tests with race detector
+        env:
+          CGO_ENABLED: "1"
+        run: go test -race ./...
 
       - name: Build Raspberry Pi binary
         env:

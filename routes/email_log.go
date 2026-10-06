@@ -63,7 +63,10 @@ func WaitForEmails(ctx context.Context) error {
 
 func deliverEmailWithTimeout(message *gomail.Message, timeout time.Duration) error {
 	result := make(chan error, 1)
-	go func() { result <- deliverEmail(message) }()
+	// Read deliverEmail before starting the goroutine: after a timeout the
+	// delivery keeps running while callers may already have moved on.
+	deliver := deliverEmail
+	go func() { result <- deliver(message) }()
 	timer := time.NewTimer(timeout)
 	defer timer.Stop()
 	select {
