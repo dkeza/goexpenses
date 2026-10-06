@@ -4,79 +4,24 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"net/url"
-	"os"
-	"strings"
 	"testing"
 	"time"
 
 	"goexpenses/database"
+	"goexpenses/internal/testdb"
 	"goexpenses/migrations"
 	"goexpenses/util"
 
-	"github.com/jmoiron/sqlx"
 	"github.com/lib/pq"
 )
 
 func TestPostgresRegistrationLoginAndPost(t *testing.T) {
-	databaseURL := os.Getenv("TEST_DATABASE_URL")
-	if databaseURL == "" {
-		localURL, err := os.ReadFile("../.test-db-url")
-		if errors.Is(err, os.ErrNotExist) {
-			t.Skip("TEST_DATABASE_URL is not set and .test-db-url is absent")
-		}
-		if err != nil {
-			t.Fatalf("read local test database URL: %v", err)
-		}
-		databaseURL = strings.TrimSpace(string(localURL))
-		if databaseURL == "" {
-			t.Fatal(".test-db-url is empty")
-		}
-	}
+	integration := testdb.Open(t)
+	testDB, initialSchema := integration.DB, integration.InitialSchema
 
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	adminDB, err := sqlx.ConnectContext(ctx, "postgres", databaseURL)
-	if err != nil {
-		t.Fatalf("connect to integration database: %v", err)
-	}
-	defer adminDB.Close()
-
-	schemaName := fmt.Sprintf("goexpenses_test_%d", time.Now().UnixNano())
-	quotedSchema := pq.QuoteIdentifier(schemaName)
-	if _, err := adminDB.ExecContext(ctx, "CREATE SCHEMA "+quotedSchema); err != nil {
-		t.Fatalf("create test schema: %v", err)
-	}
-	defer func() {
-		if _, err := adminDB.ExecContext(context.Background(), "DROP SCHEMA "+quotedSchema+" CASCADE"); err != nil {
-			t.Errorf("drop test schema: %v", err)
-		}
-	}()
-
-	parsedURL, err := url.Parse(databaseURL)
-	if err != nil {
-		t.Fatalf("parse TEST_DATABASE_URL: %v", err)
-	}
-	query := parsedURL.Query()
-	query.Set("search_path", schemaName)
-	parsedURL.RawQuery = query.Encode()
-
-	testDB, err := sqlx.ConnectContext(ctx, "postgres", parsedURL.String())
-	if err != nil {
-		t.Fatalf("connect to isolated test schema: %v", err)
-	}
-	testDB.SetMaxOpenConns(1)
-	defer testDB.Close()
-
-	initialSchema, err := os.ReadFile("../db/pg_structure.sql")
-	if err != nil {
-		t.Fatalf("read initial schema: %v", err)
-	}
-	initialSchema = []byte(strings.ReplaceAll(string(initialSchema), "public.", quotedSchema+"."))
-	if err := migrations.Apply(ctx, testDB, initialSchema, migrations.SchemaVersion); err != nil {
-		t.Fatalf("apply schema: %v", err)
-	}
 	// Recreate the version-14 shape so CI executes the upgrade SQL as well as
 	// checking that a newly initialized database contains the same protections.
 	const removeDataIntegrityMigration = `

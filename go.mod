@@ -5,7 +5,7 @@ go 1.27.1
 require (
 	github.com/DATA-DOG/go-sqlmock v1.5.2
 	github.com/jmoiron/sqlx v1.4.0
-	github.com/labstack/echo/v4 v4.15.4
+	github.com/labstack/echo/v4 v4.16.0
 	github.com/lib/pq v1.12.3
 	github.com/vaughan0/go-ini v0.0.0-20130923145212-a98ad7ee00ec
 	golang.org/x/crypto v0.57.0
