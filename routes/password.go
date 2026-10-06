@@ -1,7 +1,6 @@
 package routes
 
 import (
-	"crypto/tls"
 	stdsql "database/sql"
 	"errors"
 	"html"
@@ -15,7 +14,6 @@ import (
 
 	"github.com/jmoiron/sqlx"
 	"github.com/labstack/echo/v4"
-	gomail "gopkg.in/gomail.v2"
 )
 
 const (
@@ -186,25 +184,14 @@ func changeOwnPassword(userID int, currentPassword, newPasswordHash, currentSess
 	})
 }
 
-func newPasswordResetDialer() *gomail.Dialer {
-	dialer := gomail.NewDialer(util.Settings.MailHost, util.Settings.MailHostPort, util.Settings.MailFrom, util.Settings.MailPassword)
-	dialer.TLSConfig = &tls.Config{
-		MinVersion: tls.VersionTLS12,
-		ServerName: util.Settings.MailHost,
-	}
-	return dialer
-}
-
 func sendPasswordResetEmail(recipient, token, lang string) {
 	resetURL := strings.TrimRight(util.Settings.Host, "/") + "/resetpassword?t=" + url.QueryEscape(token)
 
-	message := gomail.NewMessage()
-	message.SetHeader("From", util.Settings.MailFrom)
-	message.SetHeader("To", recipient)
-	message.SetHeader("Subject", "Goexpenses "+util.GetLangText("reset password", lang))
-	message.SetBody("text/html", util.GetLangText(`Click to this link to reset password:`, lang)+` <a href="`+html.EscapeString(resetURL)+`">Reset</a>`)
-
-	queueTrackedEmail("password_reset", recipient, message)
+	queueTrackedEmail("password_reset", emailMessage{
+		Recipient: recipient,
+		Subject:   "Goexpenses " + util.GetLangText("reset password", lang),
+		HTMLBody:  util.GetLangText(`Click to this link to reset password:`, lang) + ` <a href="` + html.EscapeString(resetURL) + `">Reset</a>`,
+	})
 }
 
 func changePassword(c echo.Context) error {

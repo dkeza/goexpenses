@@ -8,10 +8,11 @@ import (
 	"time"
 
 	"github.com/DATA-DOG/go-sqlmock"
-	gomail "gopkg.in/gomail.v2"
 )
 
-func stubEmailDelivery(t *testing.T, deliver func(*gomail.Message) error) {
+var testEmail = emailMessage{Recipient: "user@example.com", Subject: "Test", HTMLBody: "<p>Test</p>"}
+
+func stubEmailDelivery(t *testing.T, deliver func(context.Context, emailMessage) error) {
 	t.Helper()
 	previous := deliverEmail
 	deliverEmail = deliver
@@ -34,13 +35,13 @@ func TestQueuedEmailDoesNotBlockCaller(t *testing.T) {
 	mock, _ := useMockRouteDatabase(t)
 	expectEmailEvent(mock, "smtp_accepted")
 	release := make(chan struct{})
-	stubEmailDelivery(t, func(*gomail.Message) error {
+	stubEmailDelivery(t, func(context.Context, emailMessage) error {
 		<-release
 		return nil
 	})
 
 	started := time.Now()
-	queueTrackedEmail("password_reset", "user@example.com", gomail.NewMessage())
+	queueTrackedEmail("password_reset", testEmail)
 	if elapsed := time.Since(started); elapsed > 100*time.Millisecond {
 		t.Fatalf("queueing waited %v for SMTP delivery", elapsed)
 	}
@@ -60,11 +61,11 @@ func TestWaitForEmailsStopsAtDeadline(t *testing.T) {
 	mock, _ := useMockRouteDatabase(t)
 	expectEmailEvent(mock, "smtp_accepted")
 	release := make(chan struct{})
-	stubEmailDelivery(t, func(*gomail.Message) error {
+	stubEmailDelivery(t, func(context.Context, emailMessage) error {
 		<-release
 		return nil
 	})
-	queueTrackedEmail("password_reset", "user@example.com", gomail.NewMessage())
+	queueTrackedEmail("password_reset", testEmail)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Millisecond)
 	defer cancel()
@@ -81,12 +82,12 @@ func TestWaitForEmailsStopsAtDeadline(t *testing.T) {
 func TestEmailDeliveryTimeoutIsRecordedAsUnconfirmed(t *testing.T) {
 	release := make(chan struct{})
 	t.Cleanup(func() { close(release) })
-	stubEmailDelivery(t, func(*gomail.Message) error {
+	stubEmailDelivery(t, func(context.Context, emailMessage) error {
 		<-release
 		return nil
 	})
 
-	if err := deliverEmailWithTimeout(gomail.NewMessage(), 10*time.Millisecond); !errors.Is(err, errEmailTimeout) {
+	if err := deliverEmailWithTimeout(testEmail, 10*time.Millisecond); !errors.Is(err, errEmailTimeout) {
 		t.Fatalf("deliverEmailWithTimeout error = %v, want errEmailTimeout", err)
 	}
 }
@@ -94,9 +95,9 @@ func TestEmailDeliveryTimeoutIsRecordedAsUnconfirmed(t *testing.T) {
 func TestFailedEmailIsRecordedAsUnconfirmed(t *testing.T) {
 	mock, _ := useMockRouteDatabase(t)
 	expectEmailEvent(mock, "smtp_unconfirmed")
-	stubEmailDelivery(t, func(*gomail.Message) error { return errors.New("smtp unavailable") })
+	stubEmailDelivery(t, func(context.Context, emailMessage) error { return errors.New("smtp unavailable") })
 
-	if err := sendTrackedEmail("password_reset", "user@example.com", gomail.NewMessage()); err == nil {
+	if err := sendTrackedEmail("password_reset", testEmail); err == nil {
 		t.Fatal("sendTrackedEmail ignored a delivery failure")
 	}
 	if err := mock.ExpectationsWereMet(); err != nil {

@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"regexp"
+	"strconv"
 	"testing"
 	"time"
 
@@ -15,6 +16,7 @@ import (
 	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/jmoiron/sqlx"
 	"github.com/labstack/echo/v4"
+	mail "github.com/wneessen/go-mail"
 )
 
 type captureStringArgument struct {
@@ -201,22 +203,47 @@ func TestResetPasswordRejectsConsumedToken(t *testing.T) {
 	}
 }
 
-func TestPasswordResetDialerVerifiesTLSCertificate(t *testing.T) {
+func TestMailTLSConfigVerifiesCertificate(t *testing.T) {
+	previous := util.Settings
+	t.Cleanup(func() { util.Settings = previous })
 	util.Settings.MailHost = "smtp.example.com"
-	util.Settings.MailHostPort = 587
 
-	dialer := newPasswordResetDialer()
-	if dialer.TLSConfig == nil {
-		t.Fatal("password reset dialer has no TLS configuration")
+	config := mailTLSConfig()
+	if config.InsecureSkipVerify {
+		t.Fatal("mail TLS configuration disables certificate verification")
 	}
-	if dialer.TLSConfig.InsecureSkipVerify {
-		t.Fatal("password reset dialer disables certificate verification")
+	if config.ServerName != util.Settings.MailHost {
+		t.Fatalf("TLS server name = %q, want %q", config.ServerName, util.Settings.MailHost)
 	}
-	if dialer.TLSConfig.ServerName != util.Settings.MailHost {
-		t.Fatalf("TLS server name = %q, want %q", dialer.TLSConfig.ServerName, util.Settings.MailHost)
+	if config.MinVersion != tls.VersionTLS12 {
+		t.Fatalf("TLS minimum version = %x, want TLS 1.2", config.MinVersion)
 	}
-	if dialer.TLSConfig.MinVersion != tls.VersionTLS12 {
-		t.Fatalf("minimum TLS version = %d, want TLS 1.2", dialer.TLSConfig.MinVersion)
+}
+
+func TestMailClientTLSPolicyFollowsPort(t *testing.T) {
+	previous := util.Settings
+	t.Cleanup(func() { util.Settings = previous })
+	util.Settings.MailHost = "smtp.example.com"
+	util.Settings.MailFrom = "app@example.com"
+
+	for _, test := range []struct {
+		port   int
+		policy string
+	}{
+		{587, "TLSOpportunistic"},
+		{25, "TLSOpportunistic"},
+	} {
+		util.Settings.MailHostPort = test.port
+		client, err := mail.NewClient(util.Settings.MailHost, mailClientOptions()...)
+		if err != nil {
+			t.Fatalf("port %d: NewClient: %v", test.port, err)
+		}
+		if got := client.TLSPolicy(); got != test.policy {
+			t.Errorf("port %d: TLS policy = %q, want %q", test.port, got, test.policy)
+		}
+		if got := client.ServerAddr(); got != "smtp.example.com:"+strconv.Itoa(test.port) {
+			t.Errorf("port %d: server address = %q", test.port, got)
+		}
 	}
 }
 

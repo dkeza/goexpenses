@@ -11,8 +11,6 @@ import (
 
 	"goexpenses/database"
 	"goexpenses/util"
-
-	gomail "gopkg.in/gomail.v2"
 )
 
 const (
@@ -99,10 +97,9 @@ func requestVerification(email string, now time.Time) (recipient, token string, 
 
 func sendVerificationEmail(recipient, token, lang string) {
 	link := strings.TrimRight(util.Settings.Host, "/") + "/verify-email?t=" + url.QueryEscape(token)
-	message := gomail.NewMessage()
-	message.SetHeader("From", util.Settings.MailFrom)
-	message.SetHeader("To", recipient)
-	message.SetHeader("Subject", "Goexpenses "+util.GetLangText("Confirm your E-Mail", lang))
-	message.SetBody("text/html", util.GetLangText("Click this link to confirm your E-Mail:", lang)+` <a href="`+html.EscapeString(link)+`">`+util.GetLangText("Confirm E-Mail", lang)+`</a>`)
-	queueTrackedEmail("email_verification", recipient, message)
+	queueTrackedEmail("email_verification", emailMessage{
+		Recipient: recipient,
+		Subject:   "Goexpenses " + util.GetLangText("Confirm your E-Mail", lang),
+		HTMLBody:  util.GetLangText("Click this link to confirm your E-Mail:", lang) + ` <a href="` + html.EscapeString(link) + `">` + util.GetLangText("Confirm E-Mail", lang) + `</a>`,
+	})
 }
