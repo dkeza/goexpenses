@@ -5,8 +5,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math"
 	"net/http"
 	"slices"
+	"strings"
 	"time"
 
 	"goexpenses/database"
@@ -486,6 +488,8 @@ func DefinePosts() {
 		for _, post := range posts {
 			post.DateOnly = post.DateTime.Format("2006-01-02")
 			post.TimeOnly = post.DateTime.Format("15:04")
+			// Income posts are stored negative but edited as a positive amount.
+			post.Amount = math.Abs(post.Amount)
 			data.Posts = append(data.Posts, post)
 		}
 
@@ -503,28 +507,34 @@ func DefinePosts() {
 			return c.Redirect(http.StatusSeeOther, "/posts")
 		}
 
-		storedDate := time.Now()
+		stored := struct {
+			CreatedAt time.Time `db:"created_at"`
+			IncomeID  int       `db:"incomes_id"`
+		}{}
+		sql := `SELECT created_at, incomes_id FROM posts WHERE p_id = $1 AND accounts_id = $2 AND deleted = 0`
+		if err := database.Db.Get(&stored, sql, id, data.User.Default_accounts_id); err != nil {
+			return databaseRecordReadError(c, "load post for update", err)
+		}
+		isIncome := stored.IncomeID > 0
 
-		posts := []util.Post{}
-		sql := `SELECT created_at AS datetime FROM posts WHERE p_id = $1 AND accounts_id = $2 AND deleted = 0`
-		errsql1 := database.Db.Select(&posts, sql, id, data.User.Default_accounts_id)
-		if errsql1 != nil {
-			return databaseReadError(c, "load post for update", errsql1)
-		}
-		if len(posts) == 0 {
-			return echo.NewHTTPError(http.StatusNotFound, "record not found")
-		}
-		for _, post := range posts {
-			storedDate = post.DateTime
-			break
+		// Like on save, an expense post needs a description; income posts may
+		// leave it empty.
+		if !isIncome && strings.TrimSpace(description) == "" {
+			util.Flash(`Invalid description!`, data, 0, ``, 0)
+			return c.Redirect(http.StatusSeeOther, "/posts")
 		}
 
+		// The amount is entered as a positive number, like on save; income
+		// posts are stored negative.
 		amountNumber, err := parseDatabaseAmount(amount)
-		if err != nil || amountNumber == 0 {
+		if err != nil || amountNumber <= 0 {
 			util.Flash(`Invalid amount!`, data, 0, description, 0)
 			return c.Redirect(http.StatusSeeOther, "/posts")
 		}
-		createdAt, err := dateWithTime(dateOnly, storedDate)
+		if isIncome {
+			amountNumber = -amountNumber
+		}
+		createdAt, err := dateWithTime(dateOnly, stored.CreatedAt)
 		if err != nil {
 			util.Flash(`Invalid date!`, data, 0, description, 0)
 			return c.Redirect(http.StatusSeeOther, "/posts")

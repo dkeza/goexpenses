@@ -39,6 +39,9 @@ func TestPostgresRegistrationLoginAndPost(t *testing.T) {
 		DROP INDEX passwordresets_active_email_created_idx;
 		DROP INDEX accountsusers_user_idx;
 		DROP TABLE admin_events;
+		DROP TABLE posts_history;
+		DROP TRIGGER posts_history_trigger ON posts;
+		DROP FUNCTION posts_history_record();
 		ALTER TABLE users
 			DROP CONSTRAINT users_name_not_blank,
 			DROP CONSTRAINT users_username_not_blank,
