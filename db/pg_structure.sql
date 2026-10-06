@@ -6,7 +6,8 @@ CREATE TABLE public.accounts
   description character varying NOT NULL DEFAULT ''::character varying,
   deleted integer NOT NULL DEFAULT 0,
   fromdate character varying NOT NULL DEFAULT ''::character varying,
-  todate character varying NOT NULL DEFAULT ''::character varying
+  todate character varying NOT NULL DEFAULT ''::character varying,
+  post_filter character varying NOT NULL DEFAULT ''::character varying
 );
 
 -- Table: public.users

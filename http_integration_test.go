@@ -512,6 +512,56 @@ func TestHTTPPostsPageShowsIncomesPositiveAndBalanceAsIncomesMinusExpenses(t *te
 	}
 }
 
+func TestHTTPPostsFilterSearchesSavesAndResets(t *testing.T) {
+	server, db := startTestApp(t)
+	alice := createTestUser(t, db, "alice")
+	records := createTestRecords(t, db, alice, "alice")
+	client := newTestClient(t, server)
+	client.login(alice)
+	if _, err := db.Exec(`
+		INSERT INTO posts (description, incomes_id, amount, exchange, accounts_id, p_id)
+		SELECT 'Salary 100%', id, -1000, 117.2, $1, 'alice-income-post-pid' FROM incomes WHERE p_id = $2`,
+		alice.accountID, records.incomePID); err != nil {
+		t.Fatalf("create income post: %v", err)
+	}
+
+	filter := url.Values{"from": {""}, "to": {""}, "q": {"100%"}, "type": {"income:" + records.incomePID}}
+	if response := client.get("/posts?" + filter.Encode()); response.status != http.StatusSeeOther {
+		t.Fatalf("apply filter = %d, body %q", response.status, response.body)
+	}
+	page := client.get("/posts").body
+	for _, want := range []string{
+		`<td data-label="Description">Salary 100%</td>`,
+		`alice income · „100%”`,
+		`summary-income"><div class="summary-label">Incomes</div><p class="summary-value">1000.00 RSD`,
+		`summary-expense"><div class="summary-label">Expenses</div><p class="summary-value">0.00 RSD`,
+		`value="100%"`,
+		`<option value="income:` + records.incomePID + `" selected>`,
+	} {
+		if !strings.Contains(page, want) {
+			t.Errorf("filtered posts page does not contain %q", want)
+		}
+	}
+	if strings.Contains(page, `<tr class="expense-row">`) {
+		t.Error("filtered posts page shows an expense post")
+	}
+
+	invalid := url.Values{"from": {"2026-09-30"}, "to": {"2026-09-01"}, "q": {""}, "type": {""}}
+	if response := client.get("/posts?" + invalid.Encode()); response.status != http.StatusSeeOther {
+		t.Fatalf("apply invalid filter = %d", response.status)
+	}
+	if page := client.get("/posts").body; !strings.Contains(page, "The start date is after the end date!") || !strings.Contains(page, `value="100%"`) {
+		t.Error("invalid filter was not reported or replaced the saved filter")
+	}
+
+	if response := client.get("/posts?reset=1"); response.status != http.StatusSeeOther {
+		t.Fatalf("reset filter = %d", response.status)
+	}
+	if page := client.get("/posts").body; !strings.Contains(page, `<tr class="expense-row">`) || strings.Contains(page, "filter-chip") {
+		t.Error("posts page is still filtered after the reset")
+	}
+}
+
 func TestHTTPSignedOutVisitorIsRedirectedToLogin(t *testing.T) {
 	server, db := startTestApp(t)
 	bob := createTestUser(t, db, "bob")
