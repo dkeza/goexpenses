@@ -21,6 +21,8 @@ type Data struct {
 	// HideThirdPartyScripts keeps analytics and ads off pages whose URL
 	// carries a secret token.
 	HideThirdPartyScripts bool
+	// SaldoNegative marks a balance where expenses exceed incomes.
+	SaldoNegative         bool
 	Flash                 string
 	Filter                string
 	Eur                   float64

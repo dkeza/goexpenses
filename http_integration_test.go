@@ -468,6 +468,48 @@ func TestHTTPPostChangesKeepPreviousVersions(t *testing.T) {
 	}
 }
 
+func TestHTTPPostsPageShowsIncomesPositiveAndBalanceAsIncomesMinusExpenses(t *testing.T) {
+	server, db := startTestApp(t)
+	alice := createTestUser(t, db, "alice")
+	records := createTestRecords(t, db, alice, "alice")
+	client := newTestClient(t, server)
+	client.login(alice)
+
+	// Only the 25.00 expense post: the balance is negative and shown as such.
+	page := client.get("/posts").body
+	for _, want := range []string{
+		`summary-card surface-card summary-expense"><div class="summary-label">Saldo</div><p class="summary-value">-25.00 RSD`,
+		`<p class="summary-value">0.00 RSD`,
+		`<tr class="expense-row">`,
+	} {
+		if !strings.Contains(page, want) {
+			t.Errorf("posts page without incomes does not contain %q", want)
+		}
+	}
+
+	if _, err := db.Exec(`
+		INSERT INTO posts (description, incomes_id, amount, exchange, accounts_id, p_id)
+		SELECT 'Salary', id, -1000, 117.2, $1, 'alice-income-post-pid' FROM incomes WHERE p_id = $2`,
+		alice.accountID, records.incomePID); err != nil {
+		t.Fatalf("create income post: %v", err)
+	}
+	page = client.get("/posts").body
+	for _, want := range []string{
+		`summary-card surface-card"><div class="summary-label">Saldo</div><p class="summary-value">975.00 RSD`,
+		`summary-income"><div class="summary-label">Incomes</div><p class="summary-value">1000.00 RSD`,
+		`summary-expense"><div class="summary-label">Expenses</div><p class="summary-value">25.00 RSD`,
+		`<tr class="income-row">`,
+		`>1000.00</td>`,
+	} {
+		if !strings.Contains(page, want) {
+			t.Errorf("posts page does not contain %q", want)
+		}
+	}
+	if strings.Contains(page, "-1000.00") {
+		t.Error("posts page shows the income post with a minus sign")
+	}
+}
+
 func TestHTTPSignedOutVisitorIsRedirectedToLogin(t *testing.T) {
 	server, db := startTestApp(t)
 	bob := createTestUser(t, db, "bob")

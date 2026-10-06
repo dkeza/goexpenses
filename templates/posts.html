@@ -15,7 +15,7 @@
 </div>
 
 <section class="row g-3 mb-4" aria-label="{{ GetLangText "Summary" .Lang }}">
-  <div class="col-12 col-md-4"><div class="summary-card surface-card"><div class="summary-label">{{ GetLangText "Saldo" .Lang }}</div><p class="summary-value">{{ .Saldo }} RSD</p><span class="text-body-secondary">{{ .Saldoe }} EUR</span></div></div>
+  <div class="col-12 col-md-4"><div class="summary-card surface-card{{ if .SaldoNegative }} summary-expense{{ end }}"><div class="summary-label">{{ GetLangText "Saldo" .Lang }}</div><p class="summary-value">{{ .Saldo }} RSD</p><span class="text-body-secondary">{{ .Saldoe }} EUR</span></div></div>
   <div class="col-6 col-md-4"><div class="summary-card surface-card summary-income"><div class="summary-label">{{ GetLangText "Incomes" .Lang }}</div><p class="summary-value">{{ .Incomesum }} RSD</p><span class="text-body-secondary">{{ .Incomesume }} EUR</span></div></div>
   <div class="col-6 col-md-4"><div class="summary-card surface-card summary-expense"><div class="summary-label">{{ GetLangText "Expenses" .Lang }}</div><p class="summary-value">{{ .Expensesum }} RSD</p><span class="text-body-secondary">{{ .Expensesume }} EUR</span></div></div>
 </section>
@@ -40,7 +40,7 @@
       <thead><tr><th scope="col">#</th><th scope="col">{{ GetLangText "Description" .Lang }}</th><th scope="col">{{ GetLangText "Expense" .Lang }}</th><th scope="col">{{ GetLangText "Income" .Lang }}</th><th scope="col">{{ GetLangText "Date" .Lang }}</th><th scope="col">{{ GetLangText "Timestamp" .Lang }}</th><th scope="col" class="text-end">{{ GetLangText "Amount" .Lang }} RSD</th><th scope="col" class="text-end">{{ GetLangText "Amount" .Lang }} EUR</th><th scope="col" class="text-end">{{ GetLangText "Actions" .Lang }}</th></tr></thead>
       <tbody>
         {{ with .Posts }}{{ range . }}
-        <tr{{ if lt .Amount 0.00 }} class="expense-row"{{ end }}>
+        <tr class="{{ if .Income }}income-row{{ else }}expense-row{{ end }}">
           <td data-label="#">{{ FormatVisibleId .Pid }}</td><td data-label="{{ GetLangText "Description" $.Lang }}">{{ .Description }}</td><td data-label="{{ GetLangText "Expense" $.Lang }}">{{ .Expense }}</td><td data-label="{{ GetLangText "Income" $.Lang }}">{{ .Income }}</td><td data-label="{{ GetLangText "Date" $.Lang }}">{{ FormatDate .Date }}</td><td data-label="{{ GetLangText "Timestamp" $.Lang }}">{{ FormatDateTime .Timestamp }}</td><td class="amount" data-label="{{ GetLangText "Amount" $.Lang }} RSD">{{ printf "%.2f" .Amount }}</td><td class="amount" data-label="{{ GetLangText "Amount" $.Lang }} EUR">{{ printf "%.2f" .Amounte }}</td>
           <td data-label="{{ GetLangText "Actions" $.Lang }}"><div class="table-actions">
             <form action="/posts/show" method="get"><input type="hidden" name="id" value="{{ .Pid }}"><button type="submit" class="btn btn-outline-primary btn-sm">{{ GetLangText "Edit" $.Lang }}</button></form>
