@@ -382,8 +382,15 @@ func TestHTTPPostUpdateKeepsAmountSignAndRequiresDescription(t *testing.T) {
 	client.login(alice)
 	today := time.Now().Format("2006-01-02")
 
-	if response := client.get("/posts/show?id=" + incomePostPID); !strings.Contains(response.body, `value="1000"`) {
+	incomePage := client.get("/posts/show?id=" + incomePostPID).body
+	if !strings.Contains(incomePage, `value="1000"`) {
 		t.Errorf("income post edit form does not show the positive amount")
+	}
+	if !strings.Contains(incomePage, `id="income"`) || strings.Contains(incomePage, `id="expense"`) {
+		t.Errorf("income post edit form should show only the income field")
+	}
+	if expensePage := client.get("/posts/show?id=" + records.postPID).body; !strings.Contains(expensePage, `id="expense"`) || strings.Contains(expensePage, `id="income"`) {
+		t.Errorf("expense post edit form should show only the expense field")
 	}
 
 	steps := []struct {
