@@ -7,9 +7,9 @@
   <form action="/posts/update" method="post">
     <input type="hidden" name="_CSRF" value="{{ $.Csrf }}"><input type="hidden" name="id" value="{{ .Pid }}">
     <div class="row g-3">
-      <div class="col-12 col-lg-6"><label class="form-label" for="description">{{ GetLangText "Description" $.Lang }}</label><input type="text" class="form-control" id="description" name="description" maxlength="200" value="{{ .Description }}"></div>
-      <div class="col-6 col-lg-3"><label class="form-label" for="expense">{{ GetLangText "Expense" $.Lang }}</label><input type="text" class="form-control" id="expense" value="{{ .Expense }}" readonly></div>
-      <div class="col-6 col-lg-3"><label class="form-label" for="income">{{ GetLangText "Income" $.Lang }}</label><input type="text" class="form-control" id="income" value="{{ .Income }}" readonly></div>
+      <div class="col-12 col-lg-8"><label class="form-label" for="description">{{ GetLangText "Description" $.Lang }}</label><input type="text" class="form-control" id="description" name="description" maxlength="200" value="{{ .Description }}"></div>
+      {{ if .Income }}<div class="col-12 col-lg-4"><label class="form-label" for="income">{{ GetLangText "Income" $.Lang }}</label><input type="text" class="form-control" id="income" value="{{ .Income }}" readonly></div>
+      {{ else }}<div class="col-12 col-lg-4"><label class="form-label" for="expense">{{ GetLangText "Expense" $.Lang }}</label><input type="text" class="form-control" id="expense" value="{{ .Expense }}" readonly></div>{{ end }}
       <div class="col-12 col-md-4"><label class="form-label" for="dateonly">{{ GetLangText "Date" $.Lang }}</label><input type="date" class="form-control" id="dateonly" name="dateonly" value="{{ .DateOnly }}"></div>
       <div class="col-12 col-md-4"><label class="form-label" for="timestamp">{{ GetLangText "Timestamp" $.Lang }}</label><input type="text" class="form-control" id="timestamp" value="{{ FormatDateTime .Timestamp }}" readonly></div>
       <div class="col-12 col-md-4"><label class="form-label" for="amount">{{ GetLangText "Amount" $.Lang }}</label><input type="number" min="0.01" step="any" class="form-control" id="amount" name="amount" value="{{ .Amount }}"></div>
