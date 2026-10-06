@@ -493,6 +493,21 @@ func DefinePosts() {
 			data.Posts = append(data.Posts, post)
 		}
 
+		history := []util.PostVersion{}
+		sql = `
+			SELECT changed_at, description, created_at, amount
+				FROM posts_history
+				WHERE posts_id = $1
+				ORDER BY changed_at DESC, id DESC
+			`
+		if err := database.Db.Select(&history, sql, posts[0].Id); err != nil {
+			return databaseReadError(c, "load post history", err)
+		}
+		for i := range history {
+			history[i].Amount = math.Abs(history[i].Amount)
+		}
+		data.PostHistory = history
+
 		return c.Render(http.StatusOK, "postsshow", data)
 	}, auth)
 
