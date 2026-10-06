@@ -20,9 +20,11 @@
 </section>
 
 <section class="table-card surface-card">
-  <div class="page-heading"><h2 class="h4">{{ GetLangText "Change history" .Lang }}</h2></div>
+  <div class="table-card-header">
+    <h2 class="h4 mb-1">{{ GetLangText "Change history" .Lang }}</h2>
+    <p class="text-body-secondary small mb-0">{{ if .PostHistory }}{{ GetLangText "Previous values of this post, newest first." .Lang }}{{ else }}{{ GetLangText "This post has not been changed." .Lang }}{{ end }}</p>
+  </div>
   {{ if .PostHistory }}
-  <p class="text-body-secondary small">{{ GetLangText "Previous values of this post, newest first." .Lang }}</p>
   <div class="table-responsive">
     <table class="table table-hover">
       <thead><tr><th scope="col">{{ GetLangText "Changed at" .Lang }}</th><th scope="col">{{ GetLangText "Description" .Lang }}</th><th scope="col">{{ GetLangText "Date" .Lang }}</th><th scope="col" class="text-end">{{ GetLangText "Amount" .Lang }}</th></tr></thead>
@@ -33,8 +35,6 @@
       </tbody>
     </table>
   </div>
-  {{ else }}
-  <p class="text-body-secondary mb-0">{{ GetLangText "This post has not been changed." .Lang }}</p>
   {{ end }}
 </section>
 {{ template "footer" . }}

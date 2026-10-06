@@ -219,6 +219,11 @@ body {
   margin-top: 1.5rem;
 }
 
+/* Heading above a table card's table, aligned with its cells. */
+.table-card-header {
+  padding: 1.25rem 1rem;
+}
+
 .table-card .table-responsive,
 .table-card .table {
   margin-bottom: 0;
