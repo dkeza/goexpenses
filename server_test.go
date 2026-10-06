@@ -66,6 +66,7 @@ func TestEmbeddedPostgresSchemaIsCurrentAndNonDestructive(t *testing.T) {
 		"users_username_lower_uidx",
 		"posts_active_account_date_id_idx",
 		"posts_account_fk",
+		"posts_history_trigger",
 	} {
 		if !strings.Contains(schemaText, required) {
 			t.Fatalf("initial PostgreSQL schema does not contain %q", required)
