@@ -129,6 +129,7 @@ func init() {
 	AppLang["Income type"] = LangText{"Vrsta prihoda", "Врста прихода", "Einkommen Typ"}
 	AppLang["Amount"] = LangText{"Iznos", "Износ", "Betrag"}
 	AppLang["Saldo"] = LangText{"Saldo", "Салдо", "Saldo"}
+	AppLang["Type"] = LangText{"Vrsta", "Врста", "Art"}
 	AppLang["Expense type"] = LangText{"Vrsta troška", "Врста трошка", "Kosten Typ"}
 	AppLang["New income"] = LangText{"Novi prihod", "Нови приход", "Neuer Einkommen"}
 	AppLang["Date"] = LangText{"Datum", "Датум", "Datum"}

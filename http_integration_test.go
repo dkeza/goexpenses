@@ -500,6 +500,8 @@ func TestHTTPPostsPageShowsIncomesPositiveAndBalanceAsIncomesMinusExpenses(t *te
 		`summary-expense"><div class="summary-label">Expenses</div><p class="summary-value">25.00 RSD`,
 		`<tr class="income-row">`,
 		`>1000.00</td>`,
+		`<td data-label="Type">alice income</td>`,
+		`<td data-label="Type">alice expense</td>`,
 	} {
 		if !strings.Contains(page, want) {
 			t.Errorf("posts page does not contain %q", want)
