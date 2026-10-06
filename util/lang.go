@@ -139,6 +139,10 @@ func init() {
 	AppLang["Enter new income post"] = LangText{"Unesi novu stavku prihoda", "Унеси нову ставку прихода", "Neue Einkommenbuchung erstellen"}
 	AppLang["Update income"] = LangText{"Izmeni prihod", "Измени приход", "Einkommen ändern"}
 	AppLang["Update post"] = LangText{"Izmeni stavku", "Измени ставку", "Buchung ändern"}
+	AppLang["Change history"] = LangText{"Istorija izmena", "Историја измена", "Änderungsverlauf"}
+	AppLang["Changed at"] = LangText{"Izmenjeno", "Измењено", "Geändert am"}
+	AppLang["Previous values of this post, newest first."] = LangText{"Prethodne vrednosti ove stavke, od najnovije.", "Претходне вредности ове ставке, од најновије.", "Frühere Werte dieser Buchung, neueste zuerst."}
+	AppLang["This post has not been changed."] = LangText{"Ova stavka nije menjana.", "Ова ставка није мењана.", "Diese Buchung wurde nicht geändert."}
 	AppLang["My account"] = LangText{"Moj račun", "Мој рачун", "Mein Konto"}
 	AppLang["Invalid description!"] = LangText{"Neispravan opis!", "Неисправан опис!", "Ungültige Beschreibung!"}
 	AppLang["Description may contain up to 200 characters."] = LangText{"Opis može imati najviše 200 znakova.", "Опис може имати највише 200 знакова.", "Die Beschreibung darf höchstens 200 Zeichen enthalten."}

@@ -33,6 +33,7 @@ type Data struct {
 	Date                  string
 	Accounts              []Account
 	Posts                 []Post
+	PostHistory           []PostVersion
 	Pagination            Pagination
 	Expenses              []Expense
 	ExpensesAdd           []Expense
@@ -88,6 +89,14 @@ type Post struct {
 	Amount      float64   `db:"amount"`
 	Amounte     float64   `db:"amounte"`
 	Exchange    float64   `db:"exchange"`
+}
+
+// PostVersion is a previous version of a post, kept when the post changed.
+type PostVersion struct {
+	ChangedAt   time.Time `db:"changed_at"`
+	Description string    `db:"description"`
+	CreatedAt   time.Time `db:"created_at"`
+	Amount      float64   `db:"amount"`
 }
 
 type Session struct {

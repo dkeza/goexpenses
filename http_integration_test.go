@@ -426,8 +426,15 @@ func TestHTTPPostChangesKeepPreviousVersions(t *testing.T) {
 	client.login(alice)
 	today := time.Now().Format("2006-01-02")
 
+	if response := client.get("/posts/show?id=" + records.postPID); !strings.Contains(response.body, "This post has not been changed.") {
+		t.Errorf("unchanged post page does not say it has no history")
+	}
 	if response := client.post("/posts/update", url.Values{"id": {records.postPID}, "description": {"Updated post"}, "amount": {"75"}, "dateonly": {today}}); response.status != http.StatusSeeOther {
 		t.Fatalf("update post = %d, body %q", response.status, response.body)
+	}
+	page := client.get("/posts/show?id=" + records.postPID).body
+	if !strings.Contains(page, "<td data-label=\"Description\">alice post</td>") || !strings.Contains(page, ">25.00</td>") {
+		t.Errorf("post page does not show the previous version in its history")
 	}
 	if response := client.post("/posts/delete", url.Values{"id": {records.postPID}}); response.status != http.StatusSeeOther {
 		t.Fatalf("delete post = %d, body %q", response.status, response.body)

@@ -18,5 +18,24 @@
   </form>
   {{ end }}{{ end }}
 </section>
+
+<section class="table-card surface-card">
+  <div class="page-heading"><h2 class="h4">{{ GetLangText "Change history" .Lang }}</h2></div>
+  {{ if .PostHistory }}
+  <p class="text-body-secondary small">{{ GetLangText "Previous values of this post, newest first." .Lang }}</p>
+  <div class="table-responsive">
+    <table class="table table-hover">
+      <thead><tr><th scope="col">{{ GetLangText "Changed at" .Lang }}</th><th scope="col">{{ GetLangText "Description" .Lang }}</th><th scope="col">{{ GetLangText "Date" .Lang }}</th><th scope="col" class="text-end">{{ GetLangText "Amount" .Lang }}</th></tr></thead>
+      <tbody>
+        {{ range .PostHistory }}
+        <tr><td data-label="{{ GetLangText "Changed at" $.Lang }}">{{ FormatAdminTime .ChangedAt }}</td><td data-label="{{ GetLangText "Description" $.Lang }}">{{ .Description }}</td><td data-label="{{ GetLangText "Date" $.Lang }}">{{ .CreatedAt.Format "02.01.2006" }}</td><td class="amount" data-label="{{ GetLangText "Amount" $.Lang }}">{{ printf "%.2f" .Amount }}</td></tr>
+        {{ end }}
+      </tbody>
+    </table>
+  </div>
+  {{ else }}
+  <p class="text-body-secondary mb-0">{{ GetLangText "This post has not been changed." .Lang }}</p>
+  {{ end }}
+</section>
 {{ template "footer" . }}
 {{ end }}
