@@ -235,4 +235,16 @@ func init() {
 	AppLang["Invalid expense!"] = LangText{"Neispravan trošak!", "Неисправан трошак!", "Ungültiger Kosten!"}
 	AppLang["Invalid income!"] = LangText{"Neispravan prihod!", "Неисправан приход!", "Ungültiger Einkommen!"}
 	AppLang["Timestamp"] = LangText{"Kreiran", "Креиран", "Zeitstempel"}
+	AppLang["Search in description"] = LangText{"Pretraga po opisu", "Претрага по опису", "In der Beschreibung suchen"}
+	AppLang["All posts"] = LangText{"Sve stavke", "Све ставке", "Alle Buchungen"}
+	AppLang["All expenses"] = LangText{"Svi troškovi", "Сви трошкови", "Alle Kosten"}
+	AppLang["All incomes"] = LangText{"Svi prihodi", "Сви приходи", "Alle Einkommen"}
+	AppLang["Period"] = LangText{"Period", "Период", "Zeitraum"}
+	AppLang["This month"] = LangText{"Ovaj mesec", "Овај месец", "Dieser Monat"}
+	AppLang["Last month"] = LangText{"Prošli mesec", "Прошли месец", "Letzter Monat"}
+	AppLang["Last 30 days"] = LangText{"Poslednjih 30 dana", "Последњих 30 дана", "Letzte 30 Tage"}
+	AppLang["This year"] = LangText{"Ova godina", "Ова година", "Dieses Jahr"}
+	AppLang["Last year"] = LangText{"Prošla godina", "Прошла година", "Letztes Jahr"}
+	AppLang["The start date is after the end date!"] = LangText{"Početni datum je posle krajnjeg!", "Почетни датум је после крајњег!", "Das Anfangsdatum liegt nach dem Enddatum!"}
+	AppLang["Invalid filter!"] = LangText{"Neispravan filter!", "Неисправан филтер!", "Ungültiger Filter!"}
 }

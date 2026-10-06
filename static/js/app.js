@@ -59,4 +59,27 @@ document.addEventListener('DOMContentLoaded', () => {
       pendingForm = null;
     });
   }
+
+  // Quick periods fill the date fields of the posts filter.
+  const isoDate = (date) => {
+    const pad = (value) => String(value).padStart(2, '0');
+    return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+  };
+  const filterPeriods = {
+    'this-month': (today) => [new Date(today.getFullYear(), today.getMonth(), 1), new Date(today.getFullYear(), today.getMonth() + 1, 0)],
+    'last-month': (today) => [new Date(today.getFullYear(), today.getMonth() - 1, 1), new Date(today.getFullYear(), today.getMonth(), 0)],
+    'last-30-days': (today) => [new Date(today.getFullYear(), today.getMonth(), today.getDate() - 29), today],
+    'this-year': (today) => [new Date(today.getFullYear(), 0, 1), new Date(today.getFullYear(), 11, 31)],
+    'last-year': (today) => [new Date(today.getFullYear() - 1, 0, 1), new Date(today.getFullYear() - 1, 11, 31)],
+  };
+  document.querySelectorAll('[data-filter-period]').forEach((button) => {
+    button.addEventListener('click', () => {
+      const period = filterPeriods[button.dataset.filterPeriod];
+      const form = button.closest('form');
+      if (!period || !form) return;
+      const [from, to] = period(new Date());
+      form.elements.from.value = isoDate(from);
+      form.elements.to.value = isoDate(to);
+    });
+  });
 });

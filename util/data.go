@@ -24,7 +24,7 @@ type Data struct {
 	// SaldoNegative marks a balance where expenses exceed incomes.
 	SaldoNegative         bool
 	Flash                 string
-	Filter                string
+	PostFilter            PostFilterView
 	Eur                   float64
 	Eurdate               string
 	Expenses_id           string
@@ -40,6 +40,20 @@ type Data struct {
 	Expenses              []Expense
 	ExpensesAdd           []Expense
 	Incomes               []Income
+}
+
+// PostFilterView is the posts list filter as the filter form and the filter
+// summary show it.
+type PostFilterView struct {
+	From          string // yyyy-mm-dd
+	To            string // yyyy-mm-dd
+	FromLabel     string // dd.mm.yyyy
+	ToLabel       string // dd.mm.yyyy
+	Text          string
+	Type          string // the form value, such as "expense:<p_id>"
+	Kind          string // "", "expense" or "income"
+	CategoryLabel string // description of the selected expense or income type
+	Active        bool
 }
 
 type Pagination struct {

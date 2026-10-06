@@ -6,7 +6,7 @@
 <div class="d-flex flex-wrap align-items-start justify-content-between gap-3 page-heading">
   <div>
     <h1>{{ GetLangText "Posts" .Lang }}</h1>
-    {{ if ne .Filter "" }}<span class="filter-chip"><span aria-hidden="true">◉</span>{{ .Filter }}</span>{{ end }}
+    {{ with .PostFilter }}{{ if .Active }}<span class="filter-chip"><span aria-hidden="true">◉</span><span>{{ if and .FromLabel .ToLabel }}{{ .FromLabel }} – {{ .ToLabel }}{{ else if .FromLabel }}{{ GetLangText "From" $.Lang }} {{ .FromLabel }}{{ else if .ToLabel }}{{ GetLangText "To" $.Lang }} {{ .ToLabel }}{{ end }}{{ if and (or .FromLabel .ToLabel) (or .Kind .Text) }} · {{ end }}{{ if .CategoryLabel }}{{ .CategoryLabel }}{{ else if eq .Kind "expense" }}{{ GetLangText "Expenses" $.Lang }}{{ else if eq .Kind "income" }}{{ GetLangText "Incomes" $.Lang }}{{ end }}{{ if and .Kind .Text }} · {{ end }}{{ if .Text }}„{{ .Text }}”{{ end }}</span><a class="filter-chip-clear" href="/posts?reset=1" aria-label="{{ GetLangText "Reset filter" $.Lang }}" title="{{ GetLangText "Reset filter" $.Lang }}">✕</a></span>{{ end }}{{ end }}
   </div>
   <div class="d-flex gap-2">
     <button type="button" class="btn btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#filter-modal">{{ GetLangText "Filter" .Lang }}</button>
@@ -73,12 +73,26 @@
         <div class="modal-header"><h2 class="modal-title fs-5" id="filter-modal-title">{{ GetLangText "Filter" .Lang }}</h2><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="{{ GetLangText "Close" .Lang }}"></button></div>
         <div class="modal-body">
           <div class="row g-3">
-            <div class="col-12 col-sm-6"><label class="form-label" for="from">{{ GetLangText "From" .Lang }}</label><input type="date" class="form-control" name="from" id="from"></div>
-            <div class="col-12 col-sm-6"><label class="form-label" for="to">{{ GetLangText "To" .Lang }}</label><input type="date" class="form-control" name="to" id="to"></div>
-            <div class="col-12"><div class="form-check"><input type="checkbox" class="form-check-input" name="reset" value="1" id="reset-filter"><label class="form-check-label" for="reset-filter">{{ GetLangText "Reset filter" .Lang }}</label></div></div>
+            <div class="col-12"><label class="form-label" for="filter-text">{{ GetLangText "Search in description" .Lang }}</label><input type="search" class="form-control" name="q" id="filter-text" maxlength="100" value="{{ .PostFilter.Text }}"></div>
+            <div class="col-12"><label class="form-label" for="filter-type">{{ GetLangText "Type" .Lang }}</label><select class="form-select" name="type" id="filter-type">
+              <option value="">{{ GetLangText "All posts" .Lang }}</option>
+              <option value="expense"{{ if eq .PostFilter.Type "expense" }} selected{{ end }}>{{ GetLangText "All expenses" .Lang }}</option>
+              <option value="income"{{ if eq .PostFilter.Type "income" }} selected{{ end }}>{{ GetLangText "All incomes" .Lang }}</option>
+              {{ with .Expenses }}<optgroup label="{{ GetLangText "Expenses" $.Lang }}">{{ range . }}<option value="expense:{{ .Pid }}"{{ if eq $.PostFilter.Type (printf "expense:%s" .Pid) }} selected{{ end }}>{{ .Description }}</option>{{ end }}</optgroup>{{ end }}
+              {{ with .Incomes }}<optgroup label="{{ GetLangText "Incomes" $.Lang }}">{{ range . }}<option value="income:{{ .Pid }}"{{ if eq $.PostFilter.Type (printf "income:%s" .Pid) }} selected{{ end }}>{{ .Description }}</option>{{ end }}</optgroup>{{ end }}
+            </select></div>
+            <div class="col-12"><div class="d-flex flex-wrap gap-2" role="group" aria-label="{{ GetLangText "Period" .Lang }}">
+              <button type="button" class="btn btn-outline-secondary btn-sm" data-filter-period="this-month">{{ GetLangText "This month" .Lang }}</button>
+              <button type="button" class="btn btn-outline-secondary btn-sm" data-filter-period="last-month">{{ GetLangText "Last month" .Lang }}</button>
+              <button type="button" class="btn btn-outline-secondary btn-sm" data-filter-period="last-30-days">{{ GetLangText "Last 30 days" .Lang }}</button>
+              <button type="button" class="btn btn-outline-secondary btn-sm" data-filter-period="this-year">{{ GetLangText "This year" .Lang }}</button>
+              <button type="button" class="btn btn-outline-secondary btn-sm" data-filter-period="last-year">{{ GetLangText "Last year" .Lang }}</button>
+            </div></div>
+            <div class="col-12 col-sm-6"><label class="form-label" for="from">{{ GetLangText "From" .Lang }}</label><input type="date" class="form-control" name="from" id="from" value="{{ .PostFilter.From }}"></div>
+            <div class="col-12 col-sm-6"><label class="form-label" for="to">{{ GetLangText "To" .Lang }}</label><input type="date" class="form-control" name="to" id="to" value="{{ .PostFilter.To }}"></div>
           </div>
         </div>
-        <div class="modal-footer"><button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">{{ GetLangText "Cancel" .Lang }}</button><button type="submit" class="btn btn-primary">{{ GetLangText "Apply filter" .Lang }}</button></div>
+        <div class="modal-footer">{{ if .PostFilter.Active }}<a class="btn btn-outline-danger me-auto" href="/posts?reset=1">{{ GetLangText "Reset filter" .Lang }}</a>{{ end }}<button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">{{ GetLangText "Cancel" .Lang }}</button><button type="submit" class="btn btn-primary">{{ GetLangText "Apply filter" .Lang }}</button></div>
       </form>
     </div>
   </div>

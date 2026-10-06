@@ -29,21 +29,6 @@ type postPageRequest struct {
 	Direction string
 }
 
-func parsePostFilterRange(from, to string) (time.Time, time.Time, error) {
-	var fromDate, toDate time.Time
-	var err error
-	for _, layout := range []string{"2006-01-02", "02.01.2006"} {
-		fromDate, err = time.Parse(layout, from)
-		if err == nil {
-			toDate, err = time.Parse(layout, to)
-			if err == nil {
-				return fromDate, toDate.AddDate(0, 0, 1).Add(-time.Nanosecond), nil
-			}
-		}
-	}
-	return time.Time{}, time.Time{}, errors.New("invalid post filter date range")
-}
-
 func encodePostCursor(post util.Post) (string, error) {
 	encoded, err := json.Marshal(postPageCursor{CreatedAt: post.DateTime, ID: post.Id})
 	if err != nil {
@@ -127,14 +112,10 @@ type postTotals struct {
 }
 
 // loadPostTotals sums all, income and expense posts of an account in one
-// query, optionally limited to a date range. Each sum is rounded like before.
-func loadPostTotals(accountID int, filterDateFrom, filterDateTo *time.Time) (postTotals, error) {
-	queryArgs := []any{accountID}
-	where := "accounts_id = $1 AND deleted = 0"
-	if filterDateFrom != nil && filterDateTo != nil {
-		queryArgs = append(queryArgs, *filterDateFrom, *filterDateTo)
-		where += " AND created_at BETWEEN $2 AND $3"
-	}
+// query, limited by the filter. Each sum is rounded like before.
+func loadPostTotals(accountID int, filter postFilterQuery) (postTotals, error) {
+	conditions, queryArgs := filter.where("posts", []any{accountID})
+	where := "posts.accounts_id = $1 AND posts.deleted = 0" + conditions
 	totals := postTotals{}
 	err := database.Db.Get(&totals, `
 		SELECT
@@ -149,14 +130,10 @@ func loadPostTotals(accountID int, filterDateFrom, filterDateTo *time.Time) (pos
 	return totals, err
 }
 
-func loadPostsPage(accountID int, filterDateFrom, filterDateTo *time.Time, request postPageRequest) ([]util.Post, bool, error) {
+func loadPostsPage(accountID int, filter postFilterQuery, request postPageRequest) ([]util.Post, bool, error) {
 	posts := []util.Post{}
-	queryArgs := []any{accountID}
-	where := "p.accounts_id = $1 AND p.deleted = 0"
-	if filterDateFrom != nil && filterDateTo != nil {
-		queryArgs = append(queryArgs, *filterDateFrom, *filterDateTo)
-		where += fmt.Sprintf(" AND p.created_at BETWEEN $%d AND $%d", len(queryArgs)-1, len(queryArgs))
-	}
+	conditions, queryArgs := filter.where("p", []any{accountID})
+	where := "p.accounts_id = $1 AND p.deleted = 0" + conditions
 
 	order := "p.created_at DESC, p.id DESC"
 	if request.Direction != "" {
@@ -238,63 +215,32 @@ func DefinePosts() {
 		if err != nil {
 			return echo.NewHTTPError(http.StatusBadRequest, "invalid paging cursor").SetInternal(err)
 		}
-		cfrom := c.QueryParam("from")
-		cto := c.QueryParam("to")
-		creset := c.QueryParam("reset")
+		accountID := data.User.Default_accounts_id
 
-		var filterdatefrom time.Time
-		var filterdateto time.Time
-
-		data.Filter = ""
-		ldatefilter := false
-
-		if creset != "" {
-			sql := `UPDATE accounts SET fromdate = $1, todate = $2 WHERE id = $3`
-			if err := executeExactlyOne(database.Db, sql, "", "", data.User.Default_accounts_id); err != nil {
-				return databaseWriteError(c, "reset account date filter", err)
+		if c.QueryParam("reset") != "" {
+			if err := savePostFilter(accountID, postFilter{}); err != nil {
+				return databaseWriteError(c, "reset post filter", err)
 			}
-		} else {
-			// A filter from the query string is new and gets saved; otherwise the
-			// account's saved filter is applied without writing it back.
-			filterSubmitted := cfrom != ""
-			if !filterSubmitted {
-				account := util.Account{}
-				sql := `
-				SELECT fromdate, todate, id, description, deleted 
-					FROM accounts 
-					WHERE id = $1
-				`
-				if err := database.Db.Get(&account, sql, data.User.Default_accounts_id); err != nil {
-					return databaseRecordReadError(c, "load account date filter", err)
-				}
-				if account.Fromdate != "" {
-					cfrom = account.Fromdate
-					cto = account.Todate
-				}
+			return c.Redirect(http.StatusSeeOther, "/posts")
+		}
+		// A filter from the form is checked and saved; the page then shows
+		// the account's saved filter.
+		if filter, submitted := submittedPostFilter(c); submitted {
+			if _, err := filter.query(); err != nil {
+				util.Flash(postFilterErrorMessage(err), data, 0, "", 0)
+				return c.Redirect(http.StatusSeeOther, "/posts")
 			}
-
-			if cfrom != "" {
-				tfrom, tto, err := parsePostFilterRange(cfrom, cto)
-				if err == nil {
-					ldatefilter = true
-					filterdatefrom = tfrom
-					filterdateto = tto
-					data.Filter = filterdatefrom.Format("02-01-2006") + " - " + filterdateto.Format("02-01-2006")
-					if filterSubmitted {
-						sql := `UPDATE accounts SET fromdate = $1, todate = $2 WHERE id = $3`
-						if err := executeExactlyOne(database.Db, sql, cfrom, cto, data.User.Default_accounts_id); err != nil {
-							return databaseWriteError(c, "save account date filter", err)
-						}
-					}
-				}
+			if err := savePostFilter(accountID, filter); err != nil {
+				return databaseWriteError(c, "save post filter", err)
 			}
+			return c.Redirect(http.StatusSeeOther, "/posts")
+		}
+		filter, filterQuery, err := loadPostFilter(accountID)
+		if err != nil {
+			return databaseRecordReadError(c, "load post filter", err)
 		}
 
-		var totalsFrom, totalsTo *time.Time
-		if ldatefilter {
-			totalsFrom, totalsTo = &filterdatefrom, &filterdateto
-		}
-		totals, err := loadPostTotals(data.User.Default_accounts_id, totalsFrom, totalsTo)
+		totals, err := loadPostTotals(accountID, filterQuery)
 		if err != nil {
 			return databaseReadError(c, "load post totals", err)
 		}
@@ -315,17 +261,19 @@ func DefinePosts() {
 			WHERE accounts_id = $1 AND deleted = 0 
 			ORDER BY description ASC
 		`
-		if err := database.Db.Select(&expenses, sql, data.User.Default_accounts_id); err != nil {
+		if err := database.Db.Select(&expenses, sql, accountID); err != nil {
 			return databaseReadError(c, "load expenses", err)
 		}
 		data.Expenses = expenses
-
-		var pageFilterFrom, pageFilterTo *time.Time
-		if ldatefilter {
-			pageFilterFrom = &filterdatefrom
-			pageFilterTo = &filterdateto
+		incomes := []util.Income{}
+		sql = `SELECT p_id, description FROM incomes WHERE accounts_id = $1 AND deleted = 0 ORDER BY description ASC`
+		if err := database.Db.Select(&incomes, sql, accountID); err != nil {
+			return databaseReadError(c, "load incomes", err)
 		}
-		posts, hasMore, err := loadPostsPage(data.User.Default_accounts_id, pageFilterFrom, pageFilterTo, pageRequest)
+		data.Incomes = incomes
+		data.PostFilter = postFilterView(filter, filterQuery, expenses, incomes)
+
+		posts, hasMore, err := loadPostsPage(accountID, filterQuery, pageRequest)
 		if err != nil {
 			return databaseReadError(c, "load posts", err)
 		}

@@ -42,6 +42,7 @@ func TestPostgresRegistrationLoginAndPost(t *testing.T) {
 		DROP TABLE posts_history;
 		DROP TRIGGER posts_history_trigger ON posts;
 		DROP FUNCTION posts_history_record();
+		ALTER TABLE accounts DROP COLUMN post_filter;
 		ALTER TABLE users
 			DROP CONSTRAINT users_name_not_blank,
 			DROP CONSTRAINT users_username_not_blank,
@@ -154,19 +155,30 @@ func TestPostgresRegistrationLoginAndPost(t *testing.T) {
 	}); err != nil {
 		t.Fatalf("create totals posts: %v", err)
 	}
-	totals, err := loadPostTotals(accountID, nil, nil)
+	totals, err := loadPostTotals(accountID, postFilterQuery{})
 	if err != nil {
 		t.Fatalf("load post totals: %v", err)
 	}
 	if want := (postTotals{Saldo: 54.5, Saldoe: 0.73, IncomeSaldo: -50, IncomeSaldoe: -0.5, ExpenseSaldo: 230, ExpenseSaldoe: 2.3}); totals != want {
 		t.Fatalf("post totals = %+v, want %+v", totals, want)
 	}
-	totals, err = loadPostTotals(accountID, &filterFrom, &filterTo)
+	totals, err = loadPostTotals(accountID, postFilterQuery{From: &filterFrom, To: &filterTo})
 	if err != nil {
 		t.Fatalf("load filtered post totals: %v", err)
 	}
 	if want := (postTotals{Saldo: 24.5, Saldoe: 0.43, IncomeSaldo: -50, IncomeSaldoe: -0.5, ExpenseSaldo: 200, ExpenseSaldoe: 2}); totals != want {
 		t.Fatalf("filtered post totals = %+v, want %+v", totals, want)
+	}
+	totals, err = loadPostTotals(accountID, postFilterQuery{Text: "totals", Kind: "expense"})
+	if err != nil {
+		t.Fatalf("load searched post totals: %v", err)
+	}
+	if want := (postTotals{Saldo: 200, Saldoe: 2, ExpenseSaldo: 200, ExpenseSaldoe: 2}); totals != want {
+		t.Fatalf("searched post totals = %+v, want %+v", totals, want)
+	}
+	posts, _, err := loadPostsPage(accountID, postFilterQuery{Text: "%_"}, postPageRequest{})
+	if err != nil || len(posts) != 0 {
+		t.Fatalf("search with LIKE wildcards = %d posts, %v; want none", len(posts), err)
 	}
 
 	duplicateErr := createUserWithAccount("Duplicate", "other@example.com", "INTEGRATION-USER", passwordHash, "EN")

@@ -70,11 +70,15 @@ func servePostsPage(t *testing.T, target string) *httptest.ResponseRecorder {
 	return recorder
 }
 
-func expectPostsPageReads(mock sqlmock.Sqlmock) {
+func expectPostsPageReads(mock sqlmock.Sqlmock, savedFilter string) {
+	mock.ExpectQuery(regexp.QuoteMeta("SELECT post_filter FROM accounts WHERE id = $1")).WithArgs(7).
+		WillReturnRows(sqlmock.NewRows([]string{"post_filter"}).AddRow(savedFilter))
 	totals := sqlmock.NewRows([]string{"saldo", "saldoe", "income_saldo", "income_saldoe", "expense_saldo", "expense_saldoe"}).
 		AddRow(0, 0, 0, 0, 0, 0)
 	mock.ExpectQuery(`AS expense_saldoe\s+FROM posts`).WillReturnRows(totals)
 	mock.ExpectQuery(`SELECT p_id, description\s+FROM expenses`).WithArgs(7).
+		WillReturnRows(sqlmock.NewRows([]string{"p_id", "description"}))
+	mock.ExpectQuery(`SELECT p_id, description FROM incomes`).WithArgs(7).
 		WillReturnRows(sqlmock.NewRows([]string{"p_id", "description"}))
 	mock.ExpectQuery(`FROM posts p\s+LEFT JOIN expenses`).
 		WillReturnRows(sqlmock.NewRows([]string{"id"}))
@@ -82,11 +86,7 @@ func expectPostsPageReads(mock sqlmock.Sqlmock) {
 
 func TestPostsPageAppliesSavedFilterWithoutWriting(t *testing.T) {
 	mock, _ := useMockRouteDatabase(t)
-	mock.ExpectQuery(regexp.QuoteMeta("SELECT fromdate, todate, id, description, deleted")).
-		WithArgs(7).
-		WillReturnRows(sqlmock.NewRows([]string{"fromdate", "todate", "id", "description", "deleted"}).
-			AddRow("2026-09-01", "2026-09-30", 7, "My account", 0))
-	expectPostsPageReads(mock)
+	expectPostsPageReads(mock, `{"from":"2026-09-01","to":"2026-09-30","text":"rent"}`)
 
 	if recorder := servePostsPage(t, "/posts"); recorder.Code != http.StatusOK {
 		t.Fatalf("status = %d, body = %s", recorder.Code, recorder.Body.String())
@@ -98,13 +98,41 @@ func TestPostsPageAppliesSavedFilterWithoutWriting(t *testing.T) {
 
 func TestPostsPageSavesSubmittedFilter(t *testing.T) {
 	mock, _ := useMockRouteDatabase(t)
-	mock.ExpectExec(regexp.QuoteMeta("UPDATE accounts SET fromdate = $1, todate = $2 WHERE id = $3")).
-		WithArgs("2026-09-01", "2026-09-30", 7).
+	mock.ExpectExec(regexp.QuoteMeta("UPDATE accounts SET post_filter = $1, fromdate = $2, todate = $3 WHERE id = $4")).
+		WithArgs(`{"from":"2026-09-01","to":"2026-09-30","text":"rent","type":"expense:fuel"}`, "2026-09-01", "2026-09-30", 7).
 		WillReturnResult(sqlmock.NewResult(0, 1))
-	expectPostsPageReads(mock)
 
-	if recorder := servePostsPage(t, "/posts?from=2026-09-01&to=2026-09-30"); recorder.Code != http.StatusOK {
-		t.Fatalf("status = %d, body = %s", recorder.Code, recorder.Body.String())
+	recorder := servePostsPage(t, "/posts?from=2026-09-01&to=2026-09-30&q=+rent+&type=expense:fuel")
+	if recorder.Code != http.StatusSeeOther || recorder.Header().Get("Location") != "/posts" {
+		t.Fatalf("status = %d, location = %q", recorder.Code, recorder.Header().Get("Location"))
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatalf("database expectations: %v", err)
+	}
+}
+
+func TestPostsPageClearsFilterFromEmptyForm(t *testing.T) {
+	mock, _ := useMockRouteDatabase(t)
+	mock.ExpectExec(regexp.QuoteMeta("UPDATE accounts SET post_filter = $1, fromdate = $2, todate = $3 WHERE id = $4")).
+		WithArgs("", "", "", 7).
+		WillReturnResult(sqlmock.NewResult(0, 1))
+
+	if recorder := servePostsPage(t, "/posts?from=&to=&q=&type="); recorder.Code != http.StatusSeeOther {
+		t.Fatalf("status = %d", recorder.Code)
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatalf("database expectations: %v", err)
+	}
+}
+
+func TestPostsPageDoesNotSaveInvalidFilter(t *testing.T) {
+	mock, _ := useMockRouteDatabase(t)
+	mock.ExpectExec(regexp.QuoteMeta("UPDATE sessions SET message = $1")).
+		WithArgs("The start date is after the end date!", 0, "", 0, sqlmock.AnyArg()).
+		WillReturnResult(sqlmock.NewResult(0, 1))
+
+	if recorder := servePostsPage(t, "/posts?from=2026-09-30&to=2026-09-01&q=&type="); recorder.Code != http.StatusSeeOther {
+		t.Fatalf("status = %d", recorder.Code)
 	}
 	if err := mock.ExpectationsWereMet(); err != nil {
 		t.Fatalf("database expectations: %v", err)

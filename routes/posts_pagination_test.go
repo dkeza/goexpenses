@@ -47,35 +47,6 @@ func TestParsePostPageRequestRejectsTwoDirections(t *testing.T) {
 	}
 }
 
-func TestParsePostFilterRangeAcceptsNativeDateInput(t *testing.T) {
-	from, to, err := parsePostFilterRange("2026-09-21", "2026-09-21")
-	if err != nil {
-		t.Fatalf("parsePostFilterRange: %v", err)
-	}
-	if got := from.Format(time.RFC3339Nano); got != "2026-09-21T00:00:00Z" {
-		t.Fatalf("from = %s", got)
-	}
-	if got := to.Format(time.RFC3339Nano); got != "2026-09-21T23:59:59.999999999Z" {
-		t.Fatalf("to = %s", got)
-	}
-}
-
-func TestParsePostFilterRangeAcceptsLegacyDateInput(t *testing.T) {
-	from, to, err := parsePostFilterRange("21.09.2026", "22.09.2026")
-	if err != nil {
-		t.Fatalf("parsePostFilterRange: %v", err)
-	}
-	if from.Day() != 21 || to.Day() != 22 {
-		t.Fatalf("range = %v to %v", from, to)
-	}
-}
-
-func TestParsePostFilterRangeRejectsInvalidInput(t *testing.T) {
-	if _, _, err := parsePostFilterRange("2026-09-21", ""); err == nil {
-		t.Fatal("parsePostFilterRange accepted an incomplete range")
-	}
-}
-
 func TestLoadPostsPageUsesStableOrderAndOneExtraRow(t *testing.T) {
 	mock, _ := useMockRouteDatabase(t)
 	createdAt := time.Date(2026, time.September, 21, 12, 0, 0, 0, time.UTC)
@@ -89,7 +60,7 @@ func TestLoadPostsPageUsesStableOrderAndOneExtraRow(t *testing.T) {
 		WithArgs(7, postsPageSize+1).
 		WillReturnRows(rows)
 
-	posts, hasMore, err := loadPostsPage(7, nil, nil, postPageRequest{})
+	posts, hasMore, err := loadPostsPage(7, postFilterQuery{}, postPageRequest{})
 	if err != nil {
 		t.Fatalf("loadPostsPage: %v", err)
 	}
@@ -112,11 +83,11 @@ func TestLoadPostsPageLoadsImmediateNewerPageWithinDateFilter(t *testing.T) {
 	}).
 		AddRow(9, "nearer", "expense", "", newerTime, newerTime, newerTime, 10, 0.1, "post-9").
 		AddRow(10, "newest", "expense", "", newerTime.Add(time.Hour), newerTime.Add(time.Hour), newerTime.Add(time.Hour), 10, 0.1, "post-10")
-	mock.ExpectQuery(`(?s)p\.created_at BETWEEN \$2 AND \$3.*p\.created_at > \$4 OR \(p\.created_at = \$5 AND p\.id > \$6\).*ORDER BY p\.created_at ASC, p\.id ASC\s+LIMIT \$7`).
+	mock.ExpectQuery(`(?s)p\.created_at >= \$2 AND p\.created_at <= \$3.*p\.created_at > \$4 OR \(p\.created_at = \$5 AND p\.id > \$6\).*ORDER BY p\.created_at ASC, p\.id ASC\s+LIMIT \$7`).
 		WithArgs(7, filterFrom, filterTo, cursorTime, cursorTime, 8, postsPageSize+1).
 		WillReturnRows(rows)
 
-	posts, hasMore, err := loadPostsPage(7, &filterFrom, &filterTo, postPageRequest{
+	posts, hasMore, err := loadPostsPage(7, postFilterQuery{From: &filterFrom, To: &filterTo}, postPageRequest{
 		Direction: "before",
 		Cursor:    postPageCursor{CreatedAt: cursorTime, ID: 8},
 	})
