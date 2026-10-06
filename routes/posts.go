@@ -203,6 +203,16 @@ func loadPostsPage(accountID int, filterDateFrom, filterDateTo *time.Time, reque
 	return posts, hasMore, nil
 }
 
+// formatPostAmount formats an amount with two decimals and never shows
+// "-0.00" for a zero total.
+func formatPostAmount(amount float64) string {
+	formatted := fmt.Sprintf("%.2f", amount)
+	if formatted == "-0.00" {
+		return "0.00"
+	}
+	return formatted
+}
+
 // linkedPostWrite builds the automatic post for an expense's linked expense.
 // It shares the primary post's description, account, rate and date.
 func linkedPostWrite(primary postWrite, expenseID int, amount float64, publicID string) postWrite {
@@ -288,10 +298,13 @@ func DefinePosts() {
 		if err != nil {
 			return databaseReadError(c, "load post totals", err)
 		}
-		data.Saldo = fmt.Sprintf("%.2f", totals.Saldo)
-		data.Saldoe = fmt.Sprintf("%.2f", totals.Saldoe)
-		data.Incomesum = fmt.Sprintf("%.2f", totals.IncomeSaldo)
-		data.Incomesume = fmt.Sprintf("%.2f", totals.IncomeSaldoe)
+		// Income posts are stored negative and expense posts positive. Incomes
+		// are shown positive and the balance as incomes minus expenses.
+		data.Saldo = formatPostAmount(-totals.Saldo)
+		data.Saldoe = formatPostAmount(-totals.Saldoe)
+		data.SaldoNegative = totals.Saldo > 0
+		data.Incomesum = formatPostAmount(-totals.IncomeSaldo)
+		data.Incomesume = formatPostAmount(-totals.IncomeSaldoe)
 		data.Expensesum = fmt.Sprintf("%.2f", totals.ExpenseSaldo)
 		data.Expensesume = fmt.Sprintf("%.2f", totals.ExpenseSaldoe)
 
@@ -318,6 +331,11 @@ func DefinePosts() {
 		}
 		if err := setPostPagination(data, posts, pageRequest, hasMore); err != nil {
 			return echo.NewHTTPError(http.StatusInternalServerError, "could not build paging links").SetInternal(err)
+		}
+		// Rows are colored by post type, so amounts are shown without a sign.
+		for i := range posts {
+			posts[i].Amount = math.Abs(posts[i].Amount)
+			posts[i].Amounte = math.Abs(posts[i].Amounte)
 		}
 		data.Posts = posts
 		data.Date = time.Now().Format("2006-01-02")

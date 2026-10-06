@@ -255,6 +255,7 @@ body {
   font-variant-numeric: tabular-nums;
 }
 
+.income-row .amount { color: var(--app-income); }
 .expense-row .amount { color: var(--app-expense); }
 
 .table-actions {
