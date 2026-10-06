@@ -366,6 +366,54 @@ func TestHTTPUserManagesOwnRecords(t *testing.T) {
 	}
 }
 
+func TestHTTPPostUpdateKeepsAmountSignAndRequiresDescription(t *testing.T) {
+	server, db := startTestApp(t)
+	alice := createTestUser(t, db, "alice")
+	records := createTestRecords(t, db, alice, "alice")
+	incomePostPID := "alice-income-post-pid"
+	if _, err := db.Exec(`
+		INSERT INTO posts (description, incomes_id, amount, exchange, accounts_id, p_id)
+		SELECT 'Salary', id, -1000, 117.2, $1, $2 FROM incomes WHERE p_id = $3`,
+		alice.accountID, incomePostPID, records.incomePID); err != nil {
+		t.Fatalf("create income post: %v", err)
+	}
+	client := newTestClient(t, server)
+	client.login(alice)
+	today := time.Now().Format("2006-01-02")
+
+	if response := client.get("/posts/show?id=" + incomePostPID); !strings.Contains(response.body, `value="1000"`) {
+		t.Errorf("income post edit form does not show the positive amount")
+	}
+
+	steps := []struct {
+		name string
+		form url.Values
+	}{
+		{"income amount", url.Values{"id": {incomePostPID}, "description": {""}, "amount": {"1200"}, "dateonly": {today}}},
+		{"negative expense amount", url.Values{"id": {records.postPID}, "description": {"Market"}, "amount": {"-30"}, "dateonly": {today}}},
+		{"empty expense description", url.Values{"id": {records.postPID}, "description": {"  "}, "amount": {"30"}, "dateonly": {today}}},
+	}
+	for _, step := range steps {
+		if response := client.post("/posts/update", step.form); response.status != http.StatusSeeOther {
+			t.Fatalf("%s = %d, body %q", step.name, response.status, response.body)
+		}
+	}
+
+	checks := []struct {
+		name  string
+		query string
+		args  []any
+	}{
+		{"income post stays negative", `SELECT COUNT(*) FROM posts WHERE p_id = $1 AND description = '' AND amount = -1200`, []any{incomePostPID}},
+		{"expense post unchanged", `SELECT COUNT(*) FROM posts WHERE p_id = $1 AND description = 'alice post' AND amount = 25`, []any{records.postPID}},
+	}
+	for _, check := range checks {
+		if got := countRows(t, db, check.query, check.args...); got != 1 {
+			t.Errorf("%s: %d matching rows, want 1", check.name, got)
+		}
+	}
+}
+
 func TestHTTPSignedOutVisitorIsRedirectedToLogin(t *testing.T) {
 	server, db := startTestApp(t)
 	bob := createTestUser(t, db, "bob")
