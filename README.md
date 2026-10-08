@@ -163,6 +163,12 @@ once every 15 minutes per unconfirmed account. Existing accounts remain verified
 when upgrading to schema version 20. Configure working SMTP delivery and a public
 `HOST` so new users can receive and open their confirmation links.
 
+New posts can be filled from the NBS IPS QR code on a bill: the scanner reads
+the amount and builds the description from the payee and payment purpose. It
+uses the camera (Chrome on Android uses its built-in barcode detector, other
+browsers the bundled jsQR library), or an image chosen from a file or pasted
+with Ctrl+V. The image is decoded in the browser and never sent to the server.
+
 Working example:
 https://goexpenses.kezic.net/
 
@@ -170,4 +176,5 @@ Credits to
 
 * [Echo Web Framework](https://github.com/labstack/echo)
 * [Bootstrap](https://getbootstrap.com/)
+* [jsQR](https://github.com/cozmo/jsQR) (Apache-2.0)
 * [open exchange rates](https://openexchangerates.org)

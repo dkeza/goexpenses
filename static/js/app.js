@@ -82,4 +82,171 @@ document.addEventListener('DOMContentLoaded', () => {
       form.elements.to.value = isoDate(to);
     });
   });
+
+  // An IPS QR code from a bill fills the amount and description of a new post.
+  const scanModalElement = document.querySelector('#ips-scan-modal');
+  if (scanModalElement) {
+    const scanModal = bootstrap.Modal.getOrCreateInstance(scanModalElement);
+    const video = document.querySelector('#ips-scan-video');
+    const status = document.querySelector('#ips-scan-status');
+    const fileInput = document.querySelector('#ips-scan-file');
+    const messages = scanModalElement.dataset;
+    let stream = null;
+    let session = 0;
+    let detectorPromise = null;
+
+    const showStatus = (text, isError = false) => {
+      status.textContent = text;
+      status.classList.toggle('text-danger', isError);
+    };
+
+    // BarcodeDetector is built into Chrome on Android. Other browsers, Windows among them, use jsQR.
+    const getDetector = () => detectorPromise ??= (async () => {
+      if ('BarcodeDetector' in window) {
+        try {
+          if ((await BarcodeDetector.getSupportedFormats()).includes('qr_code')) {
+            const detector = new BarcodeDetector({ formats: ['qr_code'] });
+            return async (source) => (await detector.detect(source)).map((code) => code.rawValue);
+          }
+        } catch (_) {}
+      }
+      await new Promise((resolve, reject) => {
+        const script = document.createElement('script');
+        script.src = messages.jsqrSrc;
+        script.onload = resolve;
+        script.onerror = reject;
+        document.head.append(script);
+      });
+      const canvas = document.createElement('canvas');
+      const context = canvas.getContext('2d', { willReadFrequently: true });
+      return async (source, maxSide = 1280) => {
+        const width = source.videoWidth || source.width;
+        const height = source.videoHeight || source.height;
+        const scale = Math.min(1, maxSide / Math.max(width, height));
+        canvas.width = Math.round(width * scale);
+        canvas.height = Math.round(height * scale);
+        context.drawImage(source, 0, 0, canvas.width, canvas.height);
+        const image = context.getImageData(0, 0, canvas.width, canvas.height);
+        const code = jsQR(image.data, image.width, image.height);
+        return code ? [code.data] : [];
+      };
+    })();
+
+    const applyCodes = (codes) => {
+      const payment = codes.map(parseIpsQr).find(Boolean);
+      if (!payment) return false;
+      const form = document.querySelector('#amount')?.form;
+      if (form) {
+        if (payment.currency === 'EUR') {
+          form.elements.amounte.value = payment.amount;
+          form.elements.amount.value = '';
+        } else {
+          form.elements.amount.value = payment.amount;
+          form.elements.amounte.value = '';
+        }
+        if (payment.description) form.elements.description.value = payment.description;
+      }
+      scanModal.hide();
+      form?.elements.expense_id?.focus();
+      return true;
+    };
+
+    const stopCamera = () => {
+      session += 1;
+      stream?.getTracks().forEach((track) => track.stop());
+      stream = null;
+      video.srcObject = null;
+      video.classList.add('d-none');
+    };
+
+    const scanFrames = async (current) => {
+      if (current !== session) return;
+      try {
+        if (video.readyState >= video.HAVE_ENOUGH_DATA) {
+          const codes = await (await getDetector())(video);
+          if (current !== session) return;
+          if (codes.length) {
+            if (applyCodes(codes)) return;
+            showStatus(messages.msgNotIps, true);
+          }
+        }
+      } catch (_) {}
+      window.setTimeout(() => scanFrames(current), 200);
+    };
+
+    const startCamera = async () => {
+      const current = ++session;
+      if (!navigator.mediaDevices?.getUserMedia) {
+        showStatus(messages.msgNoCamera);
+        return;
+      }
+      try {
+        const cameraStream = await navigator.mediaDevices.getUserMedia({
+          audio: false,
+          video: { facingMode: { ideal: 'environment' }, width: { ideal: 1920 }, height: { ideal: 1080 } },
+        });
+        if (current !== session) {
+          cameraStream.getTracks().forEach((track) => track.stop());
+          return;
+        }
+        stream = cameraStream;
+        video.srcObject = stream;
+        video.classList.remove('d-none');
+        await video.play();
+        showStatus(messages.msgScanning);
+        scanFrames(current);
+      } catch (_) {
+        if (current === session) showStatus(messages.msgNoCamera);
+      }
+    };
+
+    const scanImage = async (file) => {
+      try {
+        const bitmap = await createImageBitmap(file);
+        const codes = await (await getDetector())(bitmap, 2000);
+        bitmap.close();
+        if (!codes.length) showStatus(messages.msgNoCode, true);
+        else if (!applyCodes(codes)) showStatus(messages.msgNotIps, true);
+      } catch (_) {
+        showStatus(messages.msgNoCode, true);
+      }
+    };
+
+    scanModalElement.addEventListener('shown.bs.modal', () => {
+      showStatus('');
+      startCamera();
+    });
+    scanModalElement.addEventListener('hidden.bs.modal', stopCamera);
+    fileInput.addEventListener('change', () => {
+      const [file] = fileInput.files;
+      fileInput.value = '';
+      if (file) scanImage(file);
+    });
+    document.addEventListener('paste', (event) => {
+      if (!scanModalElement.classList.contains('show')) return;
+      const file = [...(event.clipboardData?.files || [])].find((item) => item.type.startsWith('image/'));
+      if (!file) return;
+      event.preventDefault();
+      scanImage(file);
+    });
+  }
 });
+
+// Reads the NBS IPS QR payload, e.g. "K:PR|V:01|C:1|R:...|N:Payee\r\nCity|I:RSD3596,13|S:Purpose".
+function parseIpsQr(text) {
+  const fields = {};
+  for (const part of String(text).trim().split('|')) {
+    const separator = part.indexOf(':');
+    if (separator > 0) fields[part.slice(0, separator).trim().toUpperCase()] = part.slice(separator + 1);
+  }
+  if (!['PR', 'PT', 'PK', 'EK'].includes(fields.K?.trim())) return null;
+  const amountMatch = /^([A-Z]{3})(\d+)(?:,(\d{0,2}))?$/.exec((fields.I || '').trim());
+  const amount = amountMatch ? Number(`${amountMatch[2]}.${amountMatch[3] || '0'}`) : 0;
+  const payee = (fields.N || '').split(/\r\n|\r|\n/)[0].trim();
+  const purpose = (fields.S || '').trim();
+  return {
+    currency: amountMatch ? amountMatch[1] : 'RSD',
+    amount: amount > 0 ? String(amount) : '',
+    description: [payee, purpose].filter(Boolean).join(' – ').slice(0, 200),
+  };
+}

@@ -235,6 +235,13 @@ func init() {
 	AppLang["Invalid expense!"] = LangText{"Neispravan trošak!", "Неисправан трошак!", "Ungültiger Kosten!"}
 	AppLang["Invalid income!"] = LangText{"Neispravan prihod!", "Неисправан приход!", "Ungültiger Einkommen!"}
 	AppLang["Timestamp"] = LangText{"Kreiran", "Креиран", "Zeitstempel"}
+	AppLang["Scan IPS QR"] = LangText{"Skeniraj IPS QR", "Скенирај IPS QR", "IPS-QR scannen"}
+	AppLang["Point the camera at the IPS QR code."] = LangText{"Usmerite kameru ka IPS QR kodu.", "Усмерите камеру ка IPS QR коду.", "Richten Sie die Kamera auf den IPS-QR-Code."}
+	AppLang["Camera is not available. Choose or paste an image of the QR code."] = LangText{"Kamera nije dostupna. Izaberite ili nalepite sliku QR koda.", "Камера није доступна. Изаберите или налепите слику QR кода.", "Die Kamera ist nicht verfügbar. Wählen oder fügen Sie ein Bild des QR-Codes ein."}
+	AppLang["No QR code found in the image."] = LangText{"Na slici nije pronađen QR kod.", "На слици није пронађен QR код.", "Im Bild wurde kein QR-Code gefunden."}
+	AppLang["This is not an IPS QR code."] = LangText{"Ovo nije IPS QR kod.", "Ово није IPS QR код.", "Das ist kein IPS-QR-Code."}
+	AppLang["Choose image"] = LangText{"Izaberi sliku", "Изабери слику", "Bild auswählen"}
+	AppLang["You can also paste an image of the QR code (Ctrl+V)."] = LangText{"Možete i da nalepite sliku QR koda (Ctrl+V).", "Можете и да налепите слику QR кода (Ctrl+V).", "Sie können auch ein Bild des QR-Codes einfügen (Strg+V)."}
 	AppLang["Search in description"] = LangText{"Pretraga po opisu", "Претрага по опису", "In der Beschreibung suchen"}
 	AppLang["All posts"] = LangText{"Sve stavke", "Све ставке", "Alle Buchungen"}
 	AppLang["All expenses"] = LangText{"Svi troškovi", "Сви трошкови", "Alle Kosten"}
