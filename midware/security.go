@@ -42,7 +42,7 @@ func SecurityHeaders(next echo.HandlerFunc) echo.HandlerFunc {
 		headers.Set("X-Content-Type-Options", "nosniff")
 		headers.Set("X-Frame-Options", "DENY")
 		headers.Set("Referrer-Policy", "strict-origin-when-cross-origin")
-		headers.Set("Permissions-Policy", "camera=(), geolocation=(), microphone=()")
+		headers.Set("Permissions-Policy", "camera=(self), geolocation=(), microphone=()")
 		if util.Settings.CookieSecure {
 			headers.Set("Strict-Transport-Security", "max-age=31536000")
 		}

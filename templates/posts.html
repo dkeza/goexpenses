@@ -29,7 +29,7 @@
       <div class="col-12 col-sm-6 col-lg-2"><label class="form-label" for="date">{{ GetLangText "Date" .Lang }}</label><input type="date" class="form-control" id="date" name="date" value="{{ .Date }}" required></div>
       <div class="col-6 col-lg"><label class="form-label" for="amount">{{ GetLangText "Amount" .Lang }} RSD</label><input type="number" min="0.01" step="any" class="form-control" id="amount" name="amount"></div>
       <div class="col-6 col-lg"><label class="form-label" for="amounte">{{ GetLangText "Amount" .Lang }} EUR</label><input type="number" min="0.01" step="any" class="form-control" id="amounte" name="amounte"></div>
-      <div class="col-12 col-lg-auto"><button type="submit" class="btn btn-primary w-100">{{ GetLangText "Save" .Lang }}</button></div>
+      <div class="col-12 col-lg-auto d-flex gap-2"><button type="button" class="btn btn-outline-secondary flex-fill text-nowrap" data-bs-toggle="modal" data-bs-target="#ips-scan-modal">{{ GetLangText "Scan IPS QR" .Lang }}</button><button type="submit" class="btn btn-primary flex-fill">{{ GetLangText "Save" .Lang }}</button></div>
     </div>
   </form>
 </section>
@@ -94,6 +94,21 @@
         </div>
         <div class="modal-footer">{{ if .PostFilter.Active }}<a class="btn btn-outline-danger me-auto" href="/posts?reset=1">{{ GetLangText "Reset filter" .Lang }}</a>{{ end }}<button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">{{ GetLangText "Cancel" .Lang }}</button><button type="submit" class="btn btn-primary">{{ GetLangText "Apply filter" .Lang }}</button></div>
       </form>
+    </div>
+  </div>
+</div>
+<div class="modal fade" id="ips-scan-modal" tabindex="-1" aria-labelledby="ips-scan-modal-title" aria-hidden="true" data-jsqr-src="/static/js/jsQR.js?v={{ AssetVersion }}" data-msg-scanning="{{ GetLangText "Point the camera at the IPS QR code." .Lang }}" data-msg-no-camera="{{ GetLangText "Camera is not available. Choose or paste an image of the QR code." .Lang }}" data-msg-no-code="{{ GetLangText "No QR code found in the image." .Lang }}" data-msg-not-ips="{{ GetLangText "This is not an IPS QR code." .Lang }}">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header"><h2 class="modal-title fs-5" id="ips-scan-modal-title">{{ GetLangText "Scan IPS QR" .Lang }}</h2><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="{{ GetLangText "Close" .Lang }}"></button></div>
+      <div class="modal-body">
+        <video class="ips-scan-video d-none" id="ips-scan-video" muted playsinline></video>
+        <p class="mt-3 mb-3" id="ips-scan-status" role="status" aria-live="polite"></p>
+        <label class="btn btn-outline-primary" for="ips-scan-file">{{ GetLangText "Choose image" .Lang }}</label>
+        <input type="file" class="visually-hidden" id="ips-scan-file" accept="image/*">
+        <p class="form-text mb-0 mt-2">{{ GetLangText "You can also paste an image of the QR code (Ctrl+V)." .Lang }}</p>
+      </div>
+      <div class="modal-footer"><button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">{{ GetLangText "Cancel" .Lang }}</button></div>
     </div>
   </div>
 </div>

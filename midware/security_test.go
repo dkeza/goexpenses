@@ -62,7 +62,7 @@ func TestSecurityHeadersUsesUniqueCSPNonce(t *testing.T) {
 		assertSecurityHeader(t, headers, "X-Content-Type-Options", "nosniff")
 		assertSecurityHeader(t, headers, "X-Frame-Options", "DENY")
 		assertSecurityHeader(t, headers, "Referrer-Policy", "strict-origin-when-cross-origin")
-		assertSecurityHeader(t, headers, "Permissions-Policy", "camera=(), geolocation=(), microphone=()")
+		assertSecurityHeader(t, headers, "Permissions-Policy", "camera=(self), geolocation=(), microphone=()")
 		assertSecurityHeader(t, headers, "Strict-Transport-Security", "max-age=31536000")
 	}
 }
