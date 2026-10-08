@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"net/http"
 	"strings"
@@ -183,6 +184,57 @@ func TestTemplatesApplyCSPNonceToEveryScript(t *testing.T) {
 	scriptCount := strings.Count(html, "<script")
 	if scriptCount == 0 || strings.Count(html, `nonce="`+nonce+`"`) != scriptCount {
 		t.Fatalf("rendered %d scripts without applying nonce to every script", scriptCount)
+	}
+}
+
+func TestSpeculationRulesSkipStateChangingLinks(t *testing.T) {
+	templates, err := parseTemplates()
+	if err != nil {
+		t.Fatalf("parse templates: %v", err)
+	}
+
+	var rendered bytes.Buffer
+	if err := templates.ExecuteTemplate(&rendered, "index", &util.Data{CSPNonce: "nonce"}); err != nil {
+		t.Fatalf("render index template: %v", err)
+	}
+
+	html := rendered.String()
+	const opening = `<script type="speculationrules" nonce="nonce">`
+	start := strings.Index(html, opening)
+	if start < 0 {
+		t.Fatal("index template has no speculation rules")
+	}
+	body := html[start+len(opening):]
+	body = body[:strings.Index(body, "</script>")]
+
+	var rules struct {
+		Prefetch []struct {
+			Where struct {
+				And []struct {
+					HrefMatches string `json:"href_matches"`
+					Not         struct {
+						HrefMatches string `json:"href_matches"`
+					} `json:"not"`
+				} `json:"and"`
+			} `json:"where"`
+			Eagerness string `json:"eagerness"`
+		} `json:"prefetch"`
+	}
+	if err := json.Unmarshal([]byte(body), &rules); err != nil {
+		t.Fatalf("speculation rules are not valid JSON: %v\n%s", err, body)
+	}
+	if len(rules.Prefetch) != 1 {
+		t.Fatalf("got %d prefetch rules, want 1", len(rules.Prefetch))
+	}
+
+	excluded := map[string]bool{}
+	for _, condition := range rules.Prefetch[0].Where.And {
+		excluded[condition.Not.HrefMatches] = true
+	}
+	for _, pattern := range []string{"/logout", "/verify-email*", "/resetpassword*", `/*\?*(^|&)lang=*`, `/*\?*(^|&)reset=*`} {
+		if !excluded[pattern] {
+			t.Errorf("speculation rules do not exclude %q", pattern)
+		}
 	}
 }
 

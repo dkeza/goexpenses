@@ -37,6 +37,7 @@ body {
 }
 
 .navbar {
+  view-transition-name: site-navbar;
   --bs-navbar-padding-y: 0.75rem;
   box-shadow: 0 1px 0 rgba(15, 23, 42, 0.03);
 }
@@ -359,7 +360,20 @@ body {
   }
 }
 
+/* Same-origin page loads cross-fade instead of flashing a blank page. */
+@view-transition {
+  navigation: auto;
+}
+
+::view-transition-group(root) {
+  animation-duration: 0.15s;
+}
+
 @media (prefers-reduced-motion: reduce) {
+  @view-transition {
+    navigation: none;
+  }
+
   *, *::before, *::after {
     scroll-behavior: auto !important;
     transition-duration: 0.01ms !important;
