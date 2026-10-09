@@ -171,7 +171,9 @@ with Ctrl+V. The image is decoded in the browser and never sent to the server.
 
 The app can be installed on a phone or desktop as a Progressive Web App (in
 Chrome: menu → *Add to Home screen* / *Install app*); it then opens in its own
-window without the address bar. Installation requires HTTPS. The service worker
+window without the address bar, named in the language chosen when it was
+installed, with a title bar that follows the light or dark theme.
+Installation requires HTTPS. The service worker
 (`/sw.js`) caches only static files, which are refreshed on every deploy; pages
 with financial data are always loaded from the server, and without a connection
 a short offline page is shown.

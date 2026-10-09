@@ -448,6 +448,7 @@ func TestProgressiveWebAppFilesAreServedFromRoot(t *testing.T) {
 		t.Errorf("manifest Content-Type = %q", got)
 	}
 	var manifest struct {
+		ID       string `json:"id"`
 		StartURL string `json:"start_url"`
 		Display  string `json:"display"`
 		Icons    []struct {
@@ -458,7 +459,7 @@ func TestProgressiveWebAppFilesAreServedFromRoot(t *testing.T) {
 	if err := json.Unmarshal(manifestResponse.Body.Bytes(), &manifest); err != nil {
 		t.Fatalf("decode manifest: %v", err)
 	}
-	if manifest.StartURL != "/" || manifest.Display != "standalone" {
+	if manifest.ID != "/" || manifest.StartURL != "/" || manifest.Display != "standalone" {
 		t.Errorf("manifest start_url = %q, display = %q", manifest.StartURL, manifest.Display)
 	}
 	purposes := map[string]bool{}
@@ -472,4 +473,63 @@ func TestProgressiveWebAppFilesAreServedFromRoot(t *testing.T) {
 
 	serve("/static/offline.html")
 	serve("/static/icons/apple-touch-icon.png")
+}
+
+func TestManifestNamesAppInPageLanguage(t *testing.T) {
+	e := echo.New()
+	e.GET("/manifest.webmanifest", serveManifest)
+
+	tests := map[string]struct{ lang, name, shortName string }{
+		"RS":      {"sr-Latn", "Aplikacija za evidenciju troškova", "Troškovi"},
+		"SR":      {"sr-Cyrl", "Апликација за евиденцију трошкова", "Трошкови"},
+		"DE":      {"de", "Kosten App", "Kosten"},
+		"EN":      {"en", "Expenses App", "Expenses"},
+		"":        {"en", "Expenses App", "Expenses"},
+		"unknown": {"en", "Expenses App", "Expenses"},
+	}
+	for query, want := range tests {
+		recorder := httptest.NewRecorder()
+		e.ServeHTTP(recorder, httptest.NewRequest(http.MethodGet, "/manifest.webmanifest?lang="+query, nil))
+		if recorder.Code != http.StatusOK {
+			t.Fatalf("lang=%q status = %d, want 200", query, recorder.Code)
+		}
+		if got := recorder.Header().Get("Cache-Control"); got != "no-cache" {
+			t.Errorf("lang=%q Cache-Control = %q, want no-cache", query, got)
+		}
+		var manifest struct {
+			Lang      string `json:"lang"`
+			Name      string `json:"name"`
+			ShortName string `json:"short_name"`
+		}
+		if err := json.Unmarshal(recorder.Body.Bytes(), &manifest); err != nil {
+			t.Fatalf("lang=%q decode manifest: %v", query, err)
+		}
+		if manifest.Lang != want.lang || manifest.Name != want.name || manifest.ShortName != want.shortName {
+			t.Errorf("lang=%q manifest = %+v, want %+v", query, manifest, want)
+		}
+	}
+}
+
+func TestHeaderLinksLocalizedManifestAndThemeColor(t *testing.T) {
+	templates, err := parseTemplates()
+	if err != nil {
+		t.Fatalf("parse templates: %v", err)
+	}
+	var rendered bytes.Buffer
+	if err := templates.ExecuteTemplate(&rendered, "header", &util.Data{Lang: "RS"}); err != nil {
+		t.Fatalf("render header: %v", err)
+	}
+	page := rendered.String()
+	for _, expected := range []string{
+		`<link rel="manifest" href="/manifest.webmanifest?lang=RS">`,
+		`<meta name="theme-color" content="#ffffff">`,
+	} {
+		if !strings.Contains(page, expected) {
+			t.Errorf("header does not contain %s", expected)
+		}
+	}
+	// The theme script reads the meta tag, so the tag must come first.
+	if strings.Index(page, `name="theme-color"`) > strings.Index(page, "<script") {
+		t.Error("theme-color meta tag is rendered after the theme script")
+	}
 }
