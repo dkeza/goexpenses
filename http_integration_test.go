@@ -500,8 +500,8 @@ func TestHTTPPostsPageShowsIncomesPositiveAndBalanceAsIncomesMinusExpenses(t *te
 		`summary-expense"><div class="summary-label">Expenses</div><p class="summary-value">25.00 RSD`,
 		`<tr class="income-row">`,
 		`>1000.00</td>`,
-		`<td data-label="Type">alice income</td>`,
-		`<td data-label="Type">alice expense</td>`,
+		`<td class="cell-type" data-label="Type">alice income</td>`,
+		`<td class="cell-type" data-label="Type">alice expense</td>`,
 	} {
 		if !strings.Contains(page, want) {
 			t.Errorf("posts page does not contain %q", want)
@@ -531,7 +531,7 @@ func TestHTTPPostsFilterSearchesSavesAndResets(t *testing.T) {
 	}
 	page := client.get("/posts").body
 	for _, want := range []string{
-		`<td data-label="Description">Salary 100%</td>`,
+		`<td class="cell-title" data-label="Description">Salary 100%</td>`,
 		`alice income · „100%”`,
 		`summary-income"><div class="summary-label">Incomes</div><p class="summary-value">1000.00 RSD`,
 		`summary-expense"><div class="summary-label">Expenses</div><p class="summary-value">0.00 RSD`,
