@@ -1,3 +1,12 @@
+// The service worker URL carries the build version, so every deploy installs
+// a fresh worker that drops the previous build's cached static files.
+if ('serviceWorker' in navigator) {
+  const assetVersion = new URL(document.currentScript.src).searchParams.get('v') || '';
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register(`/sw.js?v=${encodeURIComponent(assetVersion)}`).catch(() => {});
+  });
+}
+
 document.addEventListener('DOMContentLoaded', () => {
   document.querySelectorAll('.alert-dismissible').forEach((alertElement) => {
     window.setTimeout(() => {

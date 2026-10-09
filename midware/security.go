@@ -36,7 +36,7 @@ func SecurityHeaders(next echo.HandlerFunc) echo.HandlerFunc {
 
 		headers := c.Response().Header()
 		headers.Set("Content-Security-Policy", fmt.Sprintf(
-			"object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'; script-src 'nonce-%s' 'unsafe-inline' 'unsafe-eval' 'strict-dynamic' https: http:",
+			"object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'; worker-src 'self'; manifest-src 'self'; script-src 'nonce-%s' 'unsafe-inline' 'unsafe-eval' 'strict-dynamic' https: http:",
 			nonce,
 		))
 		headers.Set("X-Content-Type-Options", "nosniff")

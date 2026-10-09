@@ -9,7 +9,7 @@ The server-rendered UI uses locally bundled Bootstrap 5.3.8 assets. Custom
 colors, spacing, responsive layouts, and light/dark themes are defined in
 `static/css/main.css`; no frontend build step is required.
 
-Requires Go 1.27.1 or newer.
+Requires Go 1.27.2 or newer.
 
 Build and installation
 
@@ -168,6 +168,13 @@ the amount and builds the description from the payee and payment purpose. It
 uses the camera (Chrome on Android uses its built-in barcode detector, other
 browsers the bundled jsQR library), or an image chosen from a file or pasted
 with Ctrl+V. The image is decoded in the browser and never sent to the server.
+
+The app can be installed on a phone or desktop as a Progressive Web App (in
+Chrome: menu → *Add to Home screen* / *Install app*); it then opens in its own
+window without the address bar. Installation requires HTTPS. The service worker
+(`/sw.js`) caches only static files, which are refreshed on every deploy; pages
+with financial data are always loaded from the server, and without a connection
+a short offline page is shown.
 
 Working example:
 https://goexpenses.kezic.net/

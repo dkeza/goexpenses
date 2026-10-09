@@ -33,8 +33,10 @@ func TestStaticFilesSkipSessionAndCSRFMiddleware(t *testing.T) {
 	routes.E.GET("/static/*", serveOK)
 	routes.E.GET("/favicon.ico", serveOK)
 	routes.E.GET("/ads.txt", serveOK)
+	routes.E.GET("/sw.js", serveOK)
+	routes.E.GET("/manifest.webmanifest", serveOK)
 
-	for _, path := range []string{"/static/css/main.css", "/favicon.ico", "/ads.txt"} {
+	for _, path := range []string{"/static/css/main.css", "/favicon.ico", "/ads.txt", "/sw.js", "/manifest.webmanifest"} {
 		recorder := httptest.NewRecorder()
 		routes.E.ServeHTTP(recorder, httptest.NewRequest(http.MethodGet, path, nil))
 
@@ -52,15 +54,17 @@ func TestStaticFilesSkipSessionAndCSRFMiddleware(t *testing.T) {
 
 func TestSkipsSession(t *testing.T) {
 	tests := map[string]bool{
-		routes.HealthPath:     true,
-		"/static/js/app.js":   true,
-		"/favicon.ico":        true,
-		"/ads.txt":            true,
-		"/":                   false,
-		"/posts":              false,
-		"/static":             false,
-		"/staticfiles/app.js": false,
-		"/favicon.ico/extra":  false,
+		routes.HealthPath:       true,
+		"/static/js/app.js":     true,
+		"/favicon.ico":          true,
+		"/ads.txt":              true,
+		"/sw.js":                true,
+		"/manifest.webmanifest": true,
+		"/":                     false,
+		"/posts":                false,
+		"/static":               false,
+		"/staticfiles/app.js":   false,
+		"/favicon.ico/extra":    false,
 	}
 	for path, want := range tests {
 		if got := skipsSession(path); got != want {

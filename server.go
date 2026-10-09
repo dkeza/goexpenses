@@ -200,9 +200,7 @@ func runApplication(ctx context.Context) error {
 	if err != nil {
 		panic(fmt.Errorf("open embedded static files: %w", err))
 	}
-	e.StaticFS("/static", staticFiles)
-	e.FileFS("/favicon.ico", "favicon.ico", staticFiles)
-	e.FileFS("/ads.txt", "ads.txt", staticFiles)
+	registerStaticRoutes(e, staticFiles)
 
 	routes.DefineRoutes()
 
@@ -220,6 +218,25 @@ func runApplication(ctx context.Context) error {
 		e.Logger.Info("Shutdown complete")
 	}
 	return nil
+}
+
+func registerStaticRoutes(e *echo.Echo, staticFiles fs.FS) {
+	e.StaticFS("/static", staticFiles)
+	e.FileFS("/favicon.ico", "favicon.ico", staticFiles)
+	e.FileFS("/ads.txt", "ads.txt", staticFiles)
+	// The service worker must be served from the root to control every page.
+	e.FileFS("/sw.js", "sw.js", staticFiles, withHeader("Cache-Control", "no-cache"))
+	e.FileFS("/manifest.webmanifest", "manifest.webmanifest", staticFiles, withHeader(echo.HeaderContentType, "application/manifest+json"))
+}
+
+// withHeader sets a response header before the route handler runs.
+func withHeader(name, value string) echo.MiddlewareFunc {
+	return func(next echo.HandlerFunc) echo.HandlerFunc {
+		return func(c echo.Context) error {
+			c.Response().Header().Set(name, value)
+			return next(c)
+		}
+	}
 }
 
 func main() {

@@ -1,6 +1,6 @@
 module goexpenses
 
-go 1.27.1
+go 1.27.2
 
 require (
 	github.com/DATA-DOG/go-sqlmock v1.5.2
@@ -18,7 +18,7 @@ require (
 	github.com/mattn/go-isatty v0.0.22 // indirect
 	github.com/valyala/bytebufferpool v1.0.0 // indirect
 	github.com/valyala/fasttemplate v1.2.2 // indirect
-	golang.org/x/net v0.59.0 // indirect
+	golang.org/x/net v0.60.0 // indirect
 	golang.org/x/sys v0.48.0 // indirect
 	golang.org/x/text v0.42.0 // indirect
 	golang.org/x/time v0.16.0 // indirect

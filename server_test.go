@@ -5,7 +5,9 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"io/fs"
 	"net/http"
+	"net/http/httptest"
 	"strings"
 	"sync"
 	"testing"
@@ -13,6 +15,8 @@ import (
 
 	"goexpenses/util"
 	"goexpenses/version"
+
+	"github.com/labstack/echo/v4"
 )
 
 type fakeApplicationServer struct {
@@ -412,4 +416,60 @@ func TestHeaderOmitsThirdPartyScriptsWhenHidden(t *testing.T) {
 			t.Errorf("HideThirdPartyScripts=%v: third-party scripts present = %v", hide, hasThirdParty)
 		}
 	}
+}
+
+func TestProgressiveWebAppFilesAreServedFromRoot(t *testing.T) {
+	staticFiles, err := fs.Sub(embeddedFiles, "static")
+	if err != nil {
+		t.Fatalf("open embedded static files: %v", err)
+	}
+	e := echo.New()
+	registerStaticRoutes(e, staticFiles)
+
+	serve := func(path string) *httptest.ResponseRecorder {
+		recorder := httptest.NewRecorder()
+		e.ServeHTTP(recorder, httptest.NewRequest(http.MethodGet, path, nil))
+		if recorder.Code != http.StatusOK {
+			t.Fatalf("%s status = %d, want 200", path, recorder.Code)
+		}
+		return recorder
+	}
+
+	worker := serve("/sw.js?v=123")
+	if got := worker.Header().Get(echo.HeaderContentType); !strings.HasPrefix(got, "text/javascript") {
+		t.Errorf("service worker Content-Type = %q", got)
+	}
+	if got := worker.Header().Get("Cache-Control"); got != "no-cache" {
+		t.Errorf("service worker Cache-Control = %q, want no-cache", got)
+	}
+
+	manifestResponse := serve("/manifest.webmanifest")
+	if got := manifestResponse.Header().Get(echo.HeaderContentType); got != "application/manifest+json" {
+		t.Errorf("manifest Content-Type = %q", got)
+	}
+	var manifest struct {
+		StartURL string `json:"start_url"`
+		Display  string `json:"display"`
+		Icons    []struct {
+			Src     string `json:"src"`
+			Purpose string `json:"purpose"`
+		} `json:"icons"`
+	}
+	if err := json.Unmarshal(manifestResponse.Body.Bytes(), &manifest); err != nil {
+		t.Fatalf("decode manifest: %v", err)
+	}
+	if manifest.StartURL != "/" || manifest.Display != "standalone" {
+		t.Errorf("manifest start_url = %q, display = %q", manifest.StartURL, manifest.Display)
+	}
+	purposes := map[string]bool{}
+	for _, icon := range manifest.Icons {
+		purposes[icon.Purpose] = true
+		serve(icon.Src)
+	}
+	if !purposes["any"] || !purposes["maskable"] {
+		t.Errorf("manifest icon purposes = %v, want any and maskable", purposes)
+	}
+
+	serve("/static/offline.html")
+	serve("/static/icons/apple-touch-icon.png")
 }
