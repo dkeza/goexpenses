@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"embed"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"html/template"
@@ -226,7 +227,62 @@ func registerStaticRoutes(e *echo.Echo, staticFiles fs.FS) {
 	e.FileFS("/ads.txt", "ads.txt", staticFiles)
 	// The service worker must be served from the root to control every page.
 	e.FileFS("/sw.js", "sw.js", staticFiles, withHeader("Cache-Control", "no-cache"))
-	e.FileFS("/manifest.webmanifest", "manifest.webmanifest", staticFiles, withHeader(echo.HeaderContentType, "application/manifest+json"))
+	e.GET("/manifest.webmanifest", serveManifest)
+}
+
+type manifestIcon struct {
+	Src     string `json:"src"`
+	Sizes   string `json:"sizes"`
+	Type    string `json:"type"`
+	Purpose string `json:"purpose"`
+}
+
+type webAppManifest struct {
+	ID              string         `json:"id"`
+	Lang            string         `json:"lang"`
+	Name            string         `json:"name"`
+	ShortName       string         `json:"short_name"`
+	Description     string         `json:"description"`
+	StartURL        string         `json:"start_url"`
+	Scope           string         `json:"scope"`
+	Display         string         `json:"display"`
+	Orientation     string         `json:"orientation"`
+	BackgroundColor string         `json:"background_color"`
+	ThemeColor      string         `json:"theme_color"`
+	Icons           []manifestIcon `json:"icons"`
+}
+
+// manifestLanguages maps the app's language codes to BCP 47 tags.
+var manifestLanguages = map[string]string{"EN": "en", "DE": "de", "RS": "sr-Latn", "SR": "sr-Cyrl"}
+
+// serveManifest names the installed app in the language chosen when it was
+// installed; the header links the manifest with the page's language. The id
+// stays the same, so a later language change renames the same installed app.
+func serveManifest(c echo.Context) error {
+	lang := c.QueryParam("lang")
+	if _, ok := manifestLanguages[lang]; !ok {
+		lang = "EN"
+	}
+	c.Response().Header().Set("Cache-Control", "no-cache")
+	c.Response().Header().Set(echo.HeaderContentType, "application/manifest+json")
+	return json.NewEncoder(c.Response()).Encode(webAppManifest{
+		ID:              "/",
+		Lang:            manifestLanguages[lang],
+		Name:            util.GetLangText("Expenses App", lang),
+		ShortName:       util.GetLangText("Expenses", lang),
+		Description:     util.GetLangText("Track Your incomes and expenses.", lang),
+		StartURL:        "/",
+		Scope:           "/",
+		Display:         "standalone",
+		Orientation:     "portrait",
+		BackgroundColor: "#f5f7fb",
+		ThemeColor:      "#ffffff",
+		Icons: []manifestIcon{
+			{Src: "/static/icons/icon-192.png", Sizes: "192x192", Type: "image/png", Purpose: "any"},
+			{Src: "/static/icons/icon-512.png", Sizes: "512x512", Type: "image/png", Purpose: "any"},
+			{Src: "/static/icons/icon-maskable-512.png", Sizes: "512x512", Type: "image/png", Purpose: "maskable"},
+		},
+	})
 }
 
 // withHeader sets a response header before the route handler runs.
