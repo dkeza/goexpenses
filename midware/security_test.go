@@ -54,6 +54,8 @@ func TestSecurityHeadersUsesUniqueCSPNonce(t *testing.T) {
 			"base-uri 'none'",
 			"frame-ancestors 'none'",
 			"form-action 'self'",
+			"worker-src 'self'",
+			"manifest-src 'self'",
 		} {
 			if !strings.Contains(policy, expected) {
 				t.Errorf("CSP %q does not contain %q", policy, expected)

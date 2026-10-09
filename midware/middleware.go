@@ -59,7 +59,7 @@ func databaseReadError(c echo.Context, operation, message string, err error) err
 // CSRF token. Static assets and health checks must not touch the database.
 func skipsSession(path string) bool {
 	switch path {
-	case routes.HealthPath, "/favicon.ico", "/ads.txt":
+	case routes.HealthPath, "/favicon.ico", "/ads.txt", "/sw.js", "/manifest.webmanifest":
 		return true
 	}
 	return strings.HasPrefix(path, "/static/")
