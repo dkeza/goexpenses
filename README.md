@@ -9,7 +9,7 @@ The server-rendered UI uses locally bundled Bootstrap 5.3.8 assets. Custom
 colors, spacing, responsive layouts, and light/dark themes are defined in
 `static/css/main.css`; no frontend build step is required.
 
-Requires Go 1.27.1 or newer.
+Requires Go 1.27.2 or newer.
 
 Build and installation
 
