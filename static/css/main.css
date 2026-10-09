@@ -358,6 +358,67 @@ body {
     flex-wrap: wrap;
     white-space: normal;
   }
+
+  /* Lists of posts, expenses and incomes show each row as a compact card:
+     the description with the key amount or the actions on the first line,
+     muted details on the second. */
+  .table-card .compact-list tbody tr {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.25rem 0.5rem;
+    padding: 0.65rem 0.75rem;
+  }
+  /* An empty full-width item ends the first line. */
+  .table-card .compact-list tbody tr::after {
+    content: "";
+    order: 3;
+    flex-basis: 100%;
+  }
+  .table-card .incomes-list tbody tr::after { content: none; }
+  .table-card .compact-list tbody td {
+    display: block;
+    min-width: 0;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    box-shadow: none;
+  }
+  .table-card .compact-list tbody td::before,
+  .table-card .compact-list tbody td:empty::after { content: none; }
+  .table-card .compact-list .cell-id,
+  .table-card .compact-list .cell-created,
+  .table-card .compact-list td:empty { display: none; }
+  .table-card .compact-list .cell-title {
+    order: 1;
+    flex: 1 1 0;
+    font-weight: 600;
+  }
+  .table-card .compact-list .cell-type,
+  .table-card .compact-list .cell-date,
+  .table-card .compact-list .cell-eur,
+  .table-card .compact-list .cell-fee,
+  .table-card .expenses-list .cell-rsd {
+    order: 4;
+    color: var(--app-muted);
+    font-size: 0.875rem;
+  }
+  .table-card .compact-list .cell-rsd::after { content: " RSD"; }
+  .table-card .compact-list .cell-eur::after { content: " EUR"; }
+  .table-card .compact-list .cell-date::before,
+  .table-card .compact-list .cell-eur::before,
+  .table-card .compact-list .cell-fee::before { content: "· "; }
+  .table-card .compact-list .cell-actions { order: 2; margin-left: auto; }
+  .table-card .compact-list .table-actions { flex-wrap: nowrap; }
+  .table-card .compact-list .table-actions .btn { white-space: nowrap; }
+
+  /* Posts: the amount sits beside the description, actions end the details. */
+  .table-card .posts-list .cell-rsd {
+    order: 2;
+    font-weight: 700;
+    white-space: nowrap;
+  }
+  .table-card .posts-list .cell-actions { order: 5; }
 }
 
 /* Same-origin page loads cross-fade instead of flashing a blank page. */

@@ -533,3 +533,31 @@ func TestHeaderLinksLocalizedManifestAndThemeColor(t *testing.T) {
 		t.Error("theme-color meta tag is rendered after the theme script")
 	}
 }
+
+func TestListTemplatesMarkCellsForCompactCards(t *testing.T) {
+	templates, err := parseTemplates()
+	if err != nil {
+		t.Fatalf("parse templates: %v", err)
+	}
+	data := &util.Data{
+		Posts:    []util.Post{{Pid: "a1b2c3d4e5f6", Description: "Post", Expense: "Type"}},
+		Expenses: []util.Expense{{Pid: "b1b2c3d4e5f6", Description: "Expense"}},
+		Incomes:  []util.Income{{Pid: "c1b2c3d4e5f6", Description: "Income"}},
+	}
+	tests := map[string][]string{
+		"posts":    {"compact-list posts-list", "cell-id", "cell-title", "cell-type", "cell-date", "cell-created", "cell-rsd", "cell-eur", "cell-actions"},
+		"expenses": {"compact-list expenses-list", "cell-id", "cell-title", "cell-rsd", "cell-eur", "cell-fee", "cell-actions"},
+		"incomes":  {"compact-list incomes-list", "cell-id", "cell-title", "cell-actions"},
+	}
+	for name, classes := range tests {
+		var rendered bytes.Buffer
+		if err := templates.ExecuteTemplate(&rendered, name, data); err != nil {
+			t.Fatalf("render %s: %v", name, err)
+		}
+		for _, class := range classes {
+			if !strings.Contains(rendered.String(), class) {
+				t.Errorf("%s template does not use class %q", name, class)
+			}
+		}
+	}
+}
