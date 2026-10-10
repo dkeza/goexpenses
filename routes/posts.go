@@ -218,7 +218,7 @@ func DefinePosts() {
 		accountID := data.User.Default_accounts_id
 
 		if c.QueryParam("reset") != "" {
-			if err := savePostFilter(accountID, postFilter{}); err != nil {
+			if err := savePostFilter(accountID, data.User.Id, postFilter{}); err != nil {
 				return databaseWriteError(c, "reset post filter", err)
 			}
 			return c.Redirect(http.StatusSeeOther, "/posts")
@@ -230,12 +230,12 @@ func DefinePosts() {
 				util.Flash(postFilterErrorMessage(err), data, 0, "", 0)
 				return c.Redirect(http.StatusSeeOther, "/posts")
 			}
-			if err := savePostFilter(accountID, filter); err != nil {
+			if err := savePostFilter(accountID, data.User.Id, filter); err != nil {
 				return databaseWriteError(c, "save post filter", err)
 			}
 			return c.Redirect(http.StatusSeeOther, "/posts")
 		}
-		filter, filterQuery, err := loadPostFilter(accountID)
+		filter, filterQuery, err := loadPostFilter(accountID, data.User.Id)
 		if err != nil {
 			return databaseRecordReadError(c, "load post filter", err)
 		}
@@ -416,7 +416,7 @@ func DefinePosts() {
 
 		util.Flash(`Saved`, data, 1, description, expenses_idnum)
 		return c.Redirect(http.StatusSeeOther, "/posts")
-	}, auth)
+	}, auth, requireAccountEditor)
 
 	e.POST("/posts/delete", func(c echo.Context) error {
 		data := c.Get("data").(*util.Data)
@@ -428,7 +428,7 @@ func DefinePosts() {
 		}
 
 		return c.Redirect(http.StatusSeeOther, "/posts")
-	}, auth)
+	}, auth, requireAccountEditor)
 
 	e.GET("/posts/show", func(c echo.Context) error {
 		data := c.Get("data").(*util.Data)
@@ -527,7 +527,7 @@ func DefinePosts() {
 		}
 
 		return c.Redirect(http.StatusSeeOther, "/posts")
-	}, auth)
+	}, auth, requireAccountEditor)
 
 	e.GET("/posts/newincomepost", func(c echo.Context) error {
 		data := c.Get("data").(*util.Data)
@@ -547,5 +547,5 @@ func DefinePosts() {
 		data.Date = time.Now().Format("2006-01-02")
 
 		return c.Render(http.StatusOK, "newincomepostshow", data)
-	}, auth)
+	}, auth, requireAccountEditor)
 }

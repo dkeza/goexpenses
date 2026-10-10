@@ -115,6 +115,7 @@ func init() {
 	AppLang["Track Your incomes and expenses."] = LangText{"Pratite vaše prihode i rashode.", "Пратите ваше приходе и расходе.", "Verfolgen Sie Ihre Einnahmen und Ausgaben."}
 	AppLang["Account"] = LangText{"Račun", "Рачун", "Konto"}
 	AppLang["New account"] = LangText{"Novi račun", "Нови рачун", "Neues Konto"}
+	AppLang["View only"] = LangText{"Samo pregled", "Само преглед", "Nur Ansicht"}
 	AppLang["Description"] = LangText{"Opis", "Опис", "Beschreibung"}
 	AppLang["Save"] = LangText{"Snimi", "Сними", "Speichern"}
 	AppLang["Delete"] = LangText{"Obriši", "Обриши", "Löschen"}

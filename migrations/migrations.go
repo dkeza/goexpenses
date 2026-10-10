@@ -17,7 +17,7 @@ const advisoryLockID int64 = 6754112174613617249
 // SchemaVersion is the database schema version: the number of the latest
 // migration. Change it only together with a new migration that alters the
 // schema; the application version is assigned by CI at build time.
-const SchemaVersion = 27
+const SchemaVersion = 28
 
 //go:embed sql/*.sql
 var migrationFiles embed.FS
@@ -42,6 +42,7 @@ var migrationPaths = map[int]string{
 	25: "sql/025_current_version.sql",
 	26: "sql/026_posts_history.sql",
 	27: "sql/027_post_filter.sql",
+	28: "sql/028_account_members.sql",
 }
 
 func Apply(ctx context.Context, db *sqlx.DB, initialSchema []byte, targetVersion int) error {

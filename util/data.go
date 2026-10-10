@@ -34,12 +34,16 @@ type Data struct {
 	RateLimitBackURL      string
 	Date                  string
 	Accounts              []Account
-	Posts                 []Post
-	PostHistory           []PostVersion
-	Pagination            Pagination
-	Expenses              []Expense
-	ExpensesAdd           []Expense
-	Incomes               []Income
+	// AccountRole is the user's role on the selected account; CanEdit
+	// reports whether that role may change the account's records.
+	AccountRole string
+	CanEdit     bool
+	Posts       []Post
+	PostHistory []PostVersion
+	Pagination  Pagination
+	Expenses    []Expense
+	ExpensesAdd []Expense
+	Incomes     []Income
 }
 
 // PostFilterView is the posts list filter as the filter form and the filter
@@ -70,6 +74,20 @@ type Account struct {
 	Deleted     int    `db:"deleted"`
 	Fromdate    string `db:"fromdate"`
 	Todate      string `db:"todate"`
+	Role        string `db:"role"`
+}
+
+// Roles of account members. Owners and editors change the account's
+// records; viewers only read them.
+const (
+	RoleOwner  = "owner"
+	RoleEditor = "editor"
+	RoleViewer = "viewer"
+)
+
+// RoleCanEdit reports whether a member with the role may change records.
+func RoleCanEdit(role string) bool {
+	return role == RoleOwner || role == RoleEditor
 }
 
 // Expense

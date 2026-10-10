@@ -12,6 +12,7 @@
       </select>
       <noscript><button type="submit" class="btn btn-outline-secondary mt-2">OK</button></noscript>
     </form>
+    {{ if eq .AccountRole "viewer" }}<span class="badge text-bg-secondary account-role">{{ GetLangText "View only" .Lang }}</span>{{ end }}
     <a class="btn btn-outline-primary" href="/accounts/show">{{ GetLangText "New account" .Lang }}</a>
   </div>
   <span class="exchange-rate">1 € = {{ .Eur }} RSD · {{ FormatDateTime .Eurdate }}</span>

@@ -18,6 +18,7 @@ func TestPostsHistoryMigrationUpgradesExistingSchema(t *testing.T) {
 		DROP TRIGGER posts_history_trigger ON posts;
 		DROP FUNCTION posts_history_record();
 		ALTER TABLE accounts DROP COLUMN post_filter;
+		ALTER TABLE accountsusers DROP COLUMN role, DROP COLUMN created_at, DROP COLUMN post_filter;
 		UPDATE params SET build = 25 WHERE id = 1;
 		INSERT INTO accounts (description) VALUES ('Account');
 		INSERT INTO posts (description, amount, accounts_id, p_id)
@@ -63,6 +64,7 @@ func TestPostFilterMigrationCarriesOverDateFilter(t *testing.T) {
 	db := integration.DB
 	if _, err := db.Exec(`
 		ALTER TABLE accounts DROP COLUMN post_filter;
+		ALTER TABLE accountsusers DROP COLUMN role, DROP COLUMN created_at, DROP COLUMN post_filter;
 		UPDATE params SET build = 26 WHERE id = 1;
 		INSERT INTO accounts (description, fromdate, todate) VALUES ('Filtered', '2026-09-01', '2026-09-30');
 		INSERT INTO accounts (description) VALUES ('Unfiltered');`); err != nil {
@@ -80,5 +82,47 @@ func TestPostFilterMigrationCarriesOverDateFilter(t *testing.T) {
 	want := []string{`{"from" : "2026-09-01", "to" : "2026-09-30"}`, ""}
 	if len(filters) != 2 || filters[0] != want[0] || filters[1] != want[1] {
 		t.Fatalf("post filters = %q, want %q", filters, want)
+	}
+}
+
+// TestAccountMembersMigrationMakesMembersOwners rolls a fresh schema back to
+// version 27 and checks that migration 28 makes existing members owners and
+// gives each of them the account's saved filter.
+func TestAccountMembersMigrationMakesMembersOwners(t *testing.T) {
+	integration := testdb.Open(t)
+	db := integration.DB
+	if _, err := db.Exec(`
+		ALTER TABLE accountsusers DROP COLUMN role, DROP COLUMN created_at, DROP COLUMN post_filter;
+		UPDATE params SET build = 27 WHERE id = 1;
+		INSERT INTO accounts (description, post_filter) VALUES ('Shared', '{"text":"rent"}');
+		INSERT INTO users (name, email, username, default_accounts_id)
+			SELECT name, name || '@example.com', name, a.id
+			FROM (VALUES ('alice'), ('bob')) AS u(name), accounts a;
+		INSERT INTO accountsusers (accounts_id, users_id) SELECT default_accounts_id, id FROM users;`); err != nil {
+		t.Fatalf("prepare schema version 27: %v", err)
+	}
+
+	if err := migrations.Apply(context.Background(), db, integration.InitialSchema, migrations.SchemaVersion); err != nil {
+		t.Fatalf("apply migrations: %v", err)
+	}
+
+	type member struct {
+		Role       string `db:"role"`
+		PostFilter string `db:"post_filter"`
+	}
+	members := []member{}
+	if err := db.Select(&members, `SELECT role, post_filter FROM accountsusers ORDER BY users_id`); err != nil {
+		t.Fatalf("load members: %v", err)
+	}
+	if len(members) != 2 {
+		t.Fatalf("%d members, want 2", len(members))
+	}
+	for _, m := range members {
+		if m.Role != "owner" || m.PostFilter != `{"text":"rent"}` {
+			t.Errorf("member = %+v, want owner with the account's filter", m)
+		}
+	}
+	if _, err := db.Exec(`UPDATE accountsusers SET role = 'admin'`); err == nil {
+		t.Error("an unknown member role was accepted")
 	}
 }

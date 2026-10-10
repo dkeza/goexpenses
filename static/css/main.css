@@ -449,3 +449,8 @@ body {
   border-radius: var(--app-radius);
   background: #000;
 }
+
+/* Shown next to the account selector when the account is read-only. */
+.account-role {
+  margin-bottom: 0.6rem;
+}

@@ -151,6 +151,10 @@ CREATE TABLE public.accountsusers
   id SERIAL PRIMARY KEY,
   accounts_id integer NOT NULL DEFAULT 0,
   users_id integer NOT NULL DEFAULT 0,
+  role character varying(10) NOT NULL DEFAULT 'owner'
+    CONSTRAINT accountsusers_role_check CHECK (role IN ('owner', 'editor', 'viewer')),
+  created_at timestamp with time zone NOT NULL DEFAULT NOW(),
+  post_filter character varying NOT NULL DEFAULT '',
   CONSTRAINT accountsusers_account_fk FOREIGN KEY (accounts_id) REFERENCES public.accounts(id),
   CONSTRAINT accountsusers_user_fk FOREIGN KEY (users_id) REFERENCES public.users(id)
 );

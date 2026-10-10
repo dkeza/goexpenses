@@ -134,11 +134,14 @@ func CheckCookie(next echo.HandlerFunc) echo.HandlerFunc {
 				data.User.IsAdmin = user.IsAdmin
 				data.Lang = user.Lang
 				accounts := []util.Account{}
-				sql = `SELECT a.id, a.description FROM accountsusers au INNER JOIN accounts a ON au.accounts_id = a.id WHERE au.users_id = $1 ORDER BY description ASC`
+				sql = `SELECT a.id, a.description, au.role FROM accountsusers au INNER JOIN accounts a ON au.accounts_id = a.id WHERE au.users_id = $1 AND a.deleted = 0 ORDER BY description ASC, a.id ASC`
 				if err := database.Db.Select(&accounts, sql, data.User.Id); err != nil {
 					return databaseReadError(c, "load user accounts", "could not load accounts", err)
 				}
 				data.Accounts = accounts
+				if err := selectCurrentAccount(data); err != nil {
+					return databaseReadError(c, "select current account", "could not select account", err)
+				}
 			}
 		}
 		if session.User_id == 0 {
@@ -201,4 +204,32 @@ func getOrCreateSession(c echo.Context) (util.Session, string, error) {
 	c.SetCookie(util.NewSessionCookie(token))
 
 	return util.Session{}, tokenHash, nil
+}
+
+// selectCurrentAccount sets the user's role on the selected account. A user
+// who is no longer a member of the selected account, or whose account was
+// deleted, is moved to the first account they still belong to.
+func selectCurrentAccount(data *util.Data) error {
+	for _, account := range data.Accounts {
+		if account.Id == data.User.Default_accounts_id {
+			data.AccountRole = account.Role
+			data.CanEdit = util.RoleCanEdit(account.Role)
+			return nil
+		}
+	}
+	data.AccountRole = ""
+	data.CanEdit = false
+	if len(data.Accounts) == 0 {
+		data.User.Default_accounts_id = 0
+		return nil
+	}
+	account := data.Accounts[0]
+	sql := `UPDATE users SET default_accounts_id = $1 WHERE id = $2`
+	if _, err := database.Db.Exec(sql, account.Id, data.User.Id); err != nil {
+		return err
+	}
+	data.User.Default_accounts_id = account.Id
+	data.AccountRole = account.Role
+	data.CanEdit = util.RoleCanEdit(account.Role)
+	return nil
 }

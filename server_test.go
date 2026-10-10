@@ -352,14 +352,14 @@ func TestExpenseTemplatesOfferEmptyRelatedExpense(t *testing.T) {
 		return rendered.String()
 	}
 
-	page := render("expenses", &util.Data{Eurdate: eurDate, ExpensesAdd: related, Expenses_id: "pid-b"})
+	page := render("expenses", &util.Data{Eurdate: eurDate, CanEdit: true, ExpensesAdd: related, Expenses_id: "pid-b"})
 	if !strings.Contains(page, `class="form-select"><option value="" ></option>`) {
 		t.Error("expenses form does not start with an unselected empty related expense")
 	}
 	if !strings.Contains(page, `<option value="pid-b" selected>Rent</option>`) {
 		t.Error("expenses form does not keep the last related expense selected")
 	}
-	page = render("expenses", &util.Data{Eurdate: eurDate, ExpensesAdd: related})
+	page = render("expenses", &util.Data{Eurdate: eurDate, CanEdit: true, ExpensesAdd: related})
 	if !strings.Contains(page, `<option value="" selected></option>`) {
 		t.Error("expenses form does not select the empty related expense by default")
 	}
@@ -540,6 +540,7 @@ func TestListTemplatesMarkCellsForCompactCards(t *testing.T) {
 		t.Fatalf("parse templates: %v", err)
 	}
 	data := &util.Data{
+		CanEdit:  true,
 		Posts:    []util.Post{{Pid: "a1b2c3d4e5f6", Description: "Post", Expense: "Type"}},
 		Expenses: []util.Expense{{Pid: "b1b2c3d4e5f6", Description: "Expense"}},
 		Incomes:  []util.Income{{Pid: "c1b2c3d4e5f6", Description: "Income"}},
