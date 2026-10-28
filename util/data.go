@@ -38,12 +38,14 @@ type Data struct {
 	// reports whether that role may change the account's records.
 	AccountRole string
 	CanEdit     bool
-	Posts       []Post
-	PostHistory []PostVersion
-	Pagination  Pagination
-	Expenses    []Expense
-	ExpensesAdd []Expense
-	Incomes     []Income
+	// PendingInvitations counts open invitations to other accounts.
+	PendingInvitations int
+	Posts              []Post
+	PostHistory        []PostVersion
+	Pagination         Pagination
+	Expenses           []Expense
+	ExpensesAdd        []Expense
+	Incomes            []Income
 }
 
 // PostFilterView is the posts list filter as the filter form and the filter

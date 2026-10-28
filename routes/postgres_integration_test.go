@@ -38,6 +38,7 @@ func TestPostgresRegistrationLoginAndPost(t *testing.T) {
 		DROP INDEX sessions_created_at_idx;
 		DROP INDEX passwordresets_active_email_created_idx;
 		DROP INDEX accountsusers_user_idx;
+		DROP TABLE account_invitations;
 		DROP TABLE admin_events;
 		DROP TABLE posts_history;
 		DROP TRIGGER posts_history_trigger ON posts;

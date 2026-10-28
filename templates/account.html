@@ -13,6 +13,8 @@
       <noscript><button type="submit" class="btn btn-outline-secondary mt-2">OK</button></noscript>
     </form>
     {{ if eq .AccountRole "viewer" }}<span class="badge text-bg-secondary account-role">{{ GetLangText "View only" .Lang }}</span>{{ end }}
+    {{ if .PendingInvitations }}<a class="btn btn-warning" href="/accounts/invitations">{{ GetLangText "Invitations" .Lang }} <span class="badge text-bg-light">{{ .PendingInvitations }}</span></a>{{ end }}
+    {{ if ne .User.Default_accounts_id 0 }}<a class="btn btn-outline-secondary" href="/accounts/members">{{ GetLangText "Members" .Lang }}</a>{{ end }}
     <a class="btn btn-outline-primary" href="/accounts/show">{{ GetLangText "New account" .Lang }}</a>
   </div>
   <span class="exchange-rate">1 € = {{ .Eur }} RSD · {{ FormatDateTime .Eurdate }}</span>

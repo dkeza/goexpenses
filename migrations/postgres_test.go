@@ -18,6 +18,7 @@ func TestPostsHistoryMigrationUpgradesExistingSchema(t *testing.T) {
 		DROP TRIGGER posts_history_trigger ON posts;
 		DROP FUNCTION posts_history_record();
 		ALTER TABLE accounts DROP COLUMN post_filter;
+		DROP TABLE account_invitations;
 		ALTER TABLE accountsusers DROP COLUMN role, DROP COLUMN created_at, DROP COLUMN post_filter;
 		UPDATE params SET build = 25 WHERE id = 1;
 		INSERT INTO accounts (description) VALUES ('Account');
@@ -64,6 +65,7 @@ func TestPostFilterMigrationCarriesOverDateFilter(t *testing.T) {
 	db := integration.DB
 	if _, err := db.Exec(`
 		ALTER TABLE accounts DROP COLUMN post_filter;
+		DROP TABLE account_invitations;
 		ALTER TABLE accountsusers DROP COLUMN role, DROP COLUMN created_at, DROP COLUMN post_filter;
 		UPDATE params SET build = 26 WHERE id = 1;
 		INSERT INTO accounts (description, fromdate, todate) VALUES ('Filtered', '2026-09-01', '2026-09-30');
@@ -92,6 +94,7 @@ func TestAccountMembersMigrationMakesMembersOwners(t *testing.T) {
 	integration := testdb.Open(t)
 	db := integration.DB
 	if _, err := db.Exec(`
+		DROP TABLE account_invitations;
 		ALTER TABLE accountsusers DROP COLUMN role, DROP COLUMN created_at, DROP COLUMN post_filter;
 		UPDATE params SET build = 27 WHERE id = 1;
 		INSERT INTO accounts (description, post_filter) VALUES ('Shared', '{"text":"rent"}');

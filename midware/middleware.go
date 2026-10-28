@@ -142,6 +142,11 @@ func CheckCookie(next echo.HandlerFunc) echo.HandlerFunc {
 				if err := selectCurrentAccount(data); err != nil {
 					return databaseReadError(c, "select current account", "could not select account", err)
 				}
+				sql = `SELECT COUNT(*) FROM account_invitations i INNER JOIN accounts a ON a.id = i.accounts_id AND a.deleted = 0
+					WHERE i.email = lower(btrim($1)) AND i.created_at > NOW() - INTERVAL '30 days'`
+				if err := database.Db.Get(&data.PendingInvitations, sql, data.User.Email); err != nil {
+					return databaseReadError(c, "count invitations", "could not load invitations", err)
+				}
 			}
 		}
 		if session.User_id == 0 {

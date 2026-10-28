@@ -454,3 +454,22 @@ body {
 .account-role {
   margin-bottom: 0.6rem;
 }
+
+/* Account members: name on the left, role and remove controls on the right. */
+.member-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.member-actions,
+.member-role-form {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.member-role-form .form-select { width: auto; }

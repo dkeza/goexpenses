@@ -229,3 +229,19 @@ CREATE TRIGGER posts_history_trigger
   FOR EACH ROW
   WHEN (OLD.* IS DISTINCT FROM NEW.*)
   EXECUTE FUNCTION public.posts_history_record();
+
+-- Table: public.account_invitations (pending invitations to shared accounts)
+
+CREATE TABLE public.account_invitations
+(
+  id SERIAL PRIMARY KEY,
+  accounts_id integer NOT NULL REFERENCES public.accounts(id) ON DELETE CASCADE,
+  email character varying NOT NULL,
+  role character varying(10) NOT NULL
+    CONSTRAINT account_invitations_role_check CHECK (role IN ('owner', 'editor', 'viewer')),
+  invited_by integer REFERENCES public.users(id) ON DELETE SET NULL,
+  created_at timestamp with time zone NOT NULL DEFAULT NOW()
+);
+
+CREATE UNIQUE INDEX account_invitations_account_email_uidx ON public.account_invitations (accounts_id, email);
+CREATE INDEX account_invitations_email_idx ON public.account_invitations (email);

@@ -1,11 +1,15 @@
 package main
 
 import (
+	"context"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
+
+	"goexpenses/routes"
 
 	"github.com/jmoiron/sqlx"
 )
@@ -176,5 +180,156 @@ func TestHTTPMembersKeepTheirOwnPostsFilter(t *testing.T) {
 	bobClient.login(bob)
 	if page := bobClient.get("/posts").body; strings.Contains(page, "filter-chip") || !strings.Contains(page, "alice post") {
 		t.Error("another member's filter was applied")
+	}
+}
+
+func memberRole(t *testing.T, db *sqlx.DB, accountID int, user testUser) string {
+	t.Helper()
+	role := ""
+	if err := db.Get(&role, `SELECT COALESCE((SELECT role FROM accountsusers WHERE accounts_id = $1 AND users_id = $2), '')`, accountID, user.id); err != nil {
+		t.Fatalf("load member role: %v", err)
+	}
+	return role
+}
+
+func TestHTTPOwnerManagesAccountMembers(t *testing.T) {
+	server, db := startTestApp(t)
+	alice := createTestUser(t, db, "alice")
+	bob := createTestUser(t, db, "bob")
+	owner := newTestClient(t, server)
+	owner.login(alice)
+
+	if page := owner.get("/posts").body; !strings.Contains(page, `href="/accounts/members"`) {
+		t.Fatal("account bar does not link to the members page")
+	}
+	// Registered or not, the owner gets the same answer.
+	for _, email := range []string{"BOB@example.com", "nobody@example.com"} {
+		response := owner.post("/accounts/members/invite", url.Values{"email": {email}, "role": {"viewer"}})
+		if response.status != http.StatusSeeOther || response.location != "/accounts/members" {
+			t.Fatalf("invite %s = %d to %q", email, response.status, response.location)
+		}
+		if page := owner.get("/accounts/members").body; !strings.Contains(page, "Invitation sent.") {
+			t.Errorf("invite %s does not report the invitation", email)
+		}
+	}
+	if role := memberRole(t, db, alice.accountID, bob); role != "" {
+		t.Fatal("invited user became a member before accepting")
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	if err := routes.WaitForEmails(ctx); err != nil {
+		t.Fatalf("wait for emails: %v", err)
+	}
+	if got := countRows(t, db, `SELECT COUNT(*) FROM admin_events WHERE kind = 'email' AND detail = 'account_invitation' AND subject = 'bob@example.com'`); got != 1 {
+		t.Errorf("registered user got %d invitation e-mails, want 1", got)
+	}
+	if got := countRows(t, db, `SELECT COUNT(*) FROM admin_events WHERE kind = 'email' AND subject = 'nobody@example.com'`); got != 0 {
+		t.Error("an unregistered address was e-mailed")
+	}
+
+	// Only the invited user sees and accepts the invitation.
+	viewer := newTestClient(t, server)
+	viewer.login(bob)
+	page := viewer.get("/posts").body
+	if !strings.Contains(page, `href="/accounts/invitations"`) {
+		t.Fatal("invited user is not shown the invitation")
+	}
+	invitationID := strconv.Itoa(countRows(t, db, `SELECT id FROM account_invitations WHERE email = 'bob@example.com'`))
+	if response := owner.post("/accounts/invitations/accept", url.Values{"id": {invitationID}}); response.status != http.StatusNotFound {
+		t.Errorf("accepting someone else's invitation = %d, want 404", response.status)
+	}
+	if page := viewer.get("/accounts/invitations").body; !strings.Contains(page, "alice account") {
+		t.Fatal("invitations page does not name the account")
+	}
+	if response := viewer.post("/accounts/invitations/accept", url.Values{"id": {invitationID}}); response.status != http.StatusSeeOther || response.location != "/posts" {
+		t.Fatalf("accept invitation = %d to %q", response.status, response.location)
+	}
+	if role := memberRole(t, db, alice.accountID, bob); role != "viewer" {
+		t.Fatalf("bob's role = %q, want viewer", role)
+	}
+	if !strings.Contains(viewer.get("/posts").body, "View only") {
+		t.Error("accepted account is not selected")
+	}
+
+	// A pending invitation can be cancelled by the owner.
+	nobodyID := strconv.Itoa(countRows(t, db, `SELECT id FROM account_invitations WHERE email = 'nobody@example.com'`))
+	if response := owner.post("/accounts/members/invitations/cancel", url.Values{"id": {nobodyID}}); response.status != http.StatusSeeOther {
+		t.Fatalf("cancel invitation = %d", response.status)
+	}
+	if got := countRows(t, db, `SELECT COUNT(*) FROM account_invitations`); got != 0 {
+		t.Fatalf("%d invitations remain, want 0", got)
+	}
+
+	// A viewer sees the members but cannot manage them.
+	page = viewer.get("/accounts/members").body
+	if !strings.Contains(page, "alice") || strings.Contains(page, `action="/accounts/members/invite"`) || strings.Contains(page, `action="/accounts/members/role"`) {
+		t.Error("viewer's members page does not list members read-only")
+	}
+	forbidden := []struct {
+		path string
+		form url.Values
+	}{
+		{"/accounts/members/invite", url.Values{"email": {"carol@example.com"}, "role": {"owner"}}},
+		{"/accounts/members/invitations/cancel", url.Values{"id": {"1"}}},
+		{"/accounts/members/role", url.Values{"users_id": {strconv.Itoa(bob.id)}, "role": {"owner"}}},
+		{"/accounts/members/remove", url.Values{"users_id": {strconv.Itoa(alice.id)}}},
+	}
+	for _, attempt := range forbidden {
+		if response := viewer.post(attempt.path, attempt.form); response.status != http.StatusForbidden {
+			t.Errorf("POST %s by a viewer = %d, want 403", attempt.path, response.status)
+		}
+	}
+
+	// The only owner can neither step down nor leave.
+	owner.post("/accounts/members/role", url.Values{"users_id": {strconv.Itoa(alice.id)}, "role": {"editor"}})
+	owner.post("/accounts/members/remove", url.Values{"users_id": {strconv.Itoa(alice.id)}})
+	if role := memberRole(t, db, alice.accountID, alice); role != "owner" {
+		t.Fatalf("only owner was demoted or removed: role %q", role)
+	}
+	if page := owner.get("/accounts/members").body; !strings.Contains(page, "An account needs at least one owner.") {
+		t.Error("last owner change is not explained")
+	}
+
+	if response := owner.post("/accounts/members/role", url.Values{"users_id": {strconv.Itoa(bob.id)}, "role": {"editor"}}); response.status != http.StatusSeeOther {
+		t.Fatalf("change role = %d", response.status)
+	}
+	if role := memberRole(t, db, alice.accountID, bob); role != "editor" {
+		t.Fatalf("bob's role = %q, want editor", role)
+	}
+	if response := owner.post("/accounts/members/remove", url.Values{"users_id": {strconv.Itoa(bob.id)}}); response.status != http.StatusSeeOther {
+		t.Fatalf("remove member = %d", response.status)
+	}
+	if role := memberRole(t, db, alice.accountID, bob); role != "" {
+		t.Fatal("removed member is still in the account")
+	}
+
+	// Any member can leave the account themselves.
+	shareAccount(t, db, alice.accountID, bob, "viewer")
+	if response := viewer.post("/accounts/members/remove", url.Values{"users_id": {strconv.Itoa(bob.id)}}); response.status != http.StatusSeeOther || response.location != "/posts" {
+		t.Fatalf("leave account = %d to %q", response.status, response.location)
+	}
+	if role := memberRole(t, db, alice.accountID, bob); role != "" {
+		t.Fatal("member who left is still in the account")
+	}
+}
+
+func TestHTTPDeletingOnlyOwnerKeepsSharedAccountOwned(t *testing.T) {
+	server, db := startTestApp(t)
+	admin := createTestUser(t, db, "admin")
+	alice := createTestUser(t, db, "alice")
+	bob := createTestUser(t, db, "bob")
+	if _, err := db.Exec(`UPDATE users SET is_admin = true WHERE id = $1`, admin.id); err != nil {
+		t.Fatalf("make admin: %v", err)
+	}
+	shareAccount(t, db, alice.accountID, bob, "viewer")
+	client := newTestClient(t, server)
+	client.login(admin)
+
+	path := "/admin/users/" + strconv.Itoa(alice.id) + "/delete"
+	if response := client.post(path, url.Values{"confirm_username": {"alice"}}); response.status != http.StatusSeeOther {
+		t.Fatalf("delete owner = %d, body %q", response.status, response.body)
+	}
+	if role := memberRole(t, db, alice.accountID, bob); role != "owner" {
+		t.Fatalf("remaining member's role = %q, want owner", role)
 	}
 }

@@ -1,0 +1,73 @@
+{{ define "accountmembers" }}
+{{ template "header" . }}
+{{ template "navbar" . }}
+{{ template "account" .Data }}
+
+<header class="page-heading"><h1>{{ GetLangText "Account members" .Lang }}</h1></header>
+<p class="text-body-secondary">{{ .Account }} · {{ GetLangText "Owners and editors can change records; viewers can only read them." .Lang }}</p>
+
+{{ if .IsOwner }}
+<section class="form-card surface-card">
+  <h2 class="h5 mb-3">{{ GetLangText "Invite member" .Lang }}</h2>
+  <form action="/accounts/members/invite" method="post">
+    <input type="hidden" name="_CSRF" value="{{ .Csrf }}">
+    <div class="row g-3 align-items-end">
+      <div class="col-md-6"><label class="form-label" for="member-email">{{ GetLangText "E-Mail" .Lang }}</label><input type="email" class="form-control" id="member-email" name="email" maxlength="254" autocomplete="off" required></div>
+      <div class="col-md-3"><label class="form-label" for="member-role">{{ GetLangText "Role" .Lang }}</label><select class="form-select" id="member-role" name="role"><option value="owner">{{ GetLangText "Owner" .Lang }}</option><option value="editor">{{ GetLangText "Editor" .Lang }}</option><option value="viewer" selected>{{ GetLangText "Viewer" .Lang }}</option></select></div>
+      <div class="col-md-3"><button type="submit" class="btn btn-primary w-100">{{ GetLangText "Send invitation" .Lang }}</button></div>
+    </div>
+    <p class="form-text mb-0">{{ GetLangText "The user joins the account after accepting the invitation. Invitations are valid for 30 days." .Lang }}</p>
+  </form>
+  {{ with .Invitations }}
+  <h3 class="h6 mt-4">{{ GetLangText "Pending invitations" $.Lang }}</h3>
+  <ul class="list-group list-group-flush">
+    {{ range . }}
+    <li class="list-group-item member-row">
+      <div class="member-name">{{ .Email }}<div class="small text-body-secondary">{{ if eq .Role "owner" }}{{ GetLangText "Owner" $.Lang }}{{ else if eq .Role "editor" }}{{ GetLangText "Editor" $.Lang }}{{ else }}{{ GetLangText "Viewer" $.Lang }}{{ end }} · {{ FormatAdminTime .CreatedAt }}</div></div>
+      <form action="/accounts/members/invitations/cancel" method="post">
+        <input type="hidden" name="_CSRF" value="{{ $.Csrf }}">
+        <input type="hidden" name="id" value="{{ .ID }}">
+        <button type="submit" class="btn btn-outline-secondary btn-sm">{{ GetLangText "Cancel invitation" $.Lang }}</button>
+      </form>
+    </li>
+    {{ end }}
+  </ul>
+  {{ end }}
+</section>
+{{ end }}
+
+<section class="surface-card members-card">
+  <ul class="list-group list-group-flush">
+    {{ range .Members }}
+    <li class="list-group-item member-row">
+      <div class="member-name">
+        <strong>{{ .Name }}</strong>{{ if eq .UserID $.User.Id }} <span class="text-body-secondary">({{ GetLangText "you" $.Lang }})</span>{{ end }}
+        <div class="small text-body-secondary">{{ .Username }}</div>
+      </div>
+      <div class="member-actions">
+        {{ if $.IsOwner }}
+        <form action="/accounts/members/role" method="post" class="member-role-form">
+          <input type="hidden" name="_CSRF" value="{{ $.Csrf }}">
+          <input type="hidden" name="users_id" value="{{ .UserID }}">
+          <label class="visually-hidden" for="role-{{ .UserID }}">{{ GetLangText "Role" $.Lang }}</label>
+          <select class="form-select form-select-sm" id="role-{{ .UserID }}" name="role"><option value="owner"{{ if eq .Role "owner" }} selected{{ end }}>{{ GetLangText "Owner" $.Lang }}</option><option value="editor"{{ if eq .Role "editor" }} selected{{ end }}>{{ GetLangText "Editor" $.Lang }}</option><option value="viewer"{{ if eq .Role "viewer" }} selected{{ end }}>{{ GetLangText "Viewer" $.Lang }}</option></select>
+          <button type="submit" class="btn btn-outline-primary btn-sm">{{ GetLangText "Save" $.Lang }}</button>
+        </form>
+        {{ else }}
+        <span class="badge text-bg-secondary">{{ if eq .Role "owner" }}{{ GetLangText "Owner" $.Lang }}{{ else if eq .Role "editor" }}{{ GetLangText "Editor" $.Lang }}{{ else }}{{ GetLangText "Viewer" $.Lang }}{{ end }}</span>
+        {{ end }}
+        {{ if or $.IsOwner (eq .UserID $.User.Id) }}
+        <form action="/accounts/members/remove" method="post" class="js-confirm-admin" data-confirm-title="{{ if eq .UserID $.User.Id }}{{ GetLangText "Leave account" $.Lang }}{{ else }}{{ GetLangText "Remove member" $.Lang }}{{ end }}" data-confirm-message="{{ if eq .UserID $.User.Id }}{{ GetLangText "You will no longer see this account." $.Lang }}{{ else }}{{ GetLangText "The member will no longer see this account." $.Lang }}{{ end }}" data-confirm-detail="{{ .Name }}">
+          <input type="hidden" name="_CSRF" value="{{ $.Csrf }}">
+          <input type="hidden" name="users_id" value="{{ .UserID }}">
+          <button type="submit" class="btn btn-outline-danger btn-sm">{{ if eq .UserID $.User.Id }}{{ GetLangText "Leave account" $.Lang }}{{ else }}{{ GetLangText "Remove member" $.Lang }}{{ end }}</button>
+        </form>
+        {{ end }}
+      </div>
+    </li>
+    {{ end }}
+  </ul>
+</section>
+{{ template "footer" . }}
+{{ end }}
+
