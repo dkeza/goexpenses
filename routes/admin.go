@@ -408,6 +408,13 @@ func deleteUser(c echo.Context) error {
 			return databaseReadError(c, "check account membership", err)
 		}
 		if !exclusive {
+			// A shared account whose only owner was deleted passes to its
+			// longest-standing member, so someone can still manage it.
+			if _, err := tx.Exec(`UPDATE accountsusers SET role = 'owner'
+				WHERE id = (SELECT id FROM accountsusers WHERE accounts_id = $1 ORDER BY created_at, id LIMIT 1)
+				  AND NOT EXISTS (SELECT 1 FROM accountsusers WHERE accounts_id = $1 AND role = 'owner')`, accountID); err != nil {
+				return databaseWriteError(c, "keep an owner on shared account", err)
+			}
 			continue
 		}
 		for _, table := range []string{"posts", "expenses", "incomes"} {

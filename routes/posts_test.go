@@ -71,7 +71,7 @@ func servePostsPage(t *testing.T, target string) *httptest.ResponseRecorder {
 }
 
 func expectPostsPageReads(mock sqlmock.Sqlmock, savedFilter string) {
-	mock.ExpectQuery(regexp.QuoteMeta("SELECT post_filter FROM accounts WHERE id = $1")).WithArgs(7).
+	mock.ExpectQuery(regexp.QuoteMeta("SELECT post_filter FROM accountsusers WHERE accounts_id = $1 AND users_id = $2")).WithArgs(7, 3).
 		WillReturnRows(sqlmock.NewRows([]string{"post_filter"}).AddRow(savedFilter))
 	totals := sqlmock.NewRows([]string{"saldo", "saldoe", "income_saldo", "income_saldoe", "expense_saldo", "expense_saldoe"}).
 		AddRow(0, 0, 0, 0, 0, 0)
@@ -98,8 +98,8 @@ func TestPostsPageAppliesSavedFilterWithoutWriting(t *testing.T) {
 
 func TestPostsPageSavesSubmittedFilter(t *testing.T) {
 	mock, _ := useMockRouteDatabase(t)
-	mock.ExpectExec(regexp.QuoteMeta("UPDATE accounts SET post_filter = $1, fromdate = $2, todate = $3 WHERE id = $4")).
-		WithArgs(`{"from":"2026-09-01","to":"2026-09-30","text":"rent","type":"expense:fuel"}`, "2026-09-01", "2026-09-30", 7).
+	mock.ExpectExec(regexp.QuoteMeta("UPDATE accountsusers SET post_filter = $1 WHERE accounts_id = $2 AND users_id = $3")).
+		WithArgs(`{"from":"2026-09-01","to":"2026-09-30","text":"rent","type":"expense:fuel"}`, 7, 3).
 		WillReturnResult(sqlmock.NewResult(0, 1))
 
 	recorder := servePostsPage(t, "/posts?from=2026-09-01&to=2026-09-30&q=+rent+&type=expense:fuel")
@@ -113,8 +113,8 @@ func TestPostsPageSavesSubmittedFilter(t *testing.T) {
 
 func TestPostsPageClearsFilterFromEmptyForm(t *testing.T) {
 	mock, _ := useMockRouteDatabase(t)
-	mock.ExpectExec(regexp.QuoteMeta("UPDATE accounts SET post_filter = $1, fromdate = $2, todate = $3 WHERE id = $4")).
-		WithArgs("", "", "", 7).
+	mock.ExpectExec(regexp.QuoteMeta("UPDATE accountsusers SET post_filter = $1 WHERE accounts_id = $2 AND users_id = $3")).
+		WithArgs("", 7, 3).
 		WillReturnResult(sqlmock.NewResult(0, 1))
 
 	if recorder := servePostsPage(t, "/posts?from=&to=&q=&type="); recorder.Code != http.StatusSeeOther {

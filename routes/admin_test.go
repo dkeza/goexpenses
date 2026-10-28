@@ -105,6 +105,7 @@ func TestDeleteUserRemovesExclusiveAccountsAndPreservesSharedAccounts(t *testing
 	}
 	mock.ExpectExec(`DELETE FROM accounts WHERE`).WithArgs(21).WillReturnResult(sqlmock.NewResult(0, 1))
 	mock.ExpectQuery(`SELECT NOT EXISTS`).WithArgs(22).WillReturnRows(sqlmock.NewRows([]string{"exclusive"}).AddRow(false))
+	mock.ExpectExec(`UPDATE accountsusers SET role = 'owner'`).WithArgs(22).WillReturnResult(sqlmock.NewResult(0, 1))
 	mock.ExpectExec(`UPDATE admin_events SET subject`).WithArgs(12, "target@example.com").WillReturnResult(sqlmock.NewResult(0, 3))
 	mock.ExpectExec(`INSERT INTO admin_events`).WithArgs(12, 7, 1).WillReturnResult(sqlmock.NewResult(0, 1))
 	mock.ExpectCommit()

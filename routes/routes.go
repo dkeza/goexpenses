@@ -110,6 +110,7 @@ func DefineRoutes() {
 	DefineAuthRoutes()
 	DefinePasswordRoutes()
 	DefineAccountRoutes()
+	DefineAccountMemberRoutes()
 	DefinePosts()
 	DefineExpenses()
 	DefineIncomes()

@@ -1,0 +1,36 @@
+{{ define "accountinvitations" }}
+{{ template "header" . }}
+{{ template "navbar" . }}
+{{ template "account" .Data }}
+
+<header class="page-heading"><h1>{{ GetLangText "Invitations" .Lang }}</h1></header>
+<section class="surface-card members-card">
+  {{ with .Invitations }}
+  <ul class="list-group list-group-flush">
+    {{ range . }}
+    <li class="list-group-item member-row">
+      <div class="member-name">
+        <strong>{{ .Account }}</strong>
+        <div class="small text-body-secondary">{{ if .InvitedBy }}{{ .InvitedBy }} · {{ end }}{{ if eq .Role "owner" }}{{ GetLangText "Owner" $.Lang }}{{ else if eq .Role "editor" }}{{ GetLangText "Editor" $.Lang }}{{ else }}{{ GetLangText "Viewer" $.Lang }}{{ end }} · {{ FormatAdminTime .CreatedAt }}</div>
+      </div>
+      <div class="member-actions">
+        <form action="/accounts/invitations/accept" method="post">
+          <input type="hidden" name="_CSRF" value="{{ $.Csrf }}">
+          <input type="hidden" name="id" value="{{ .ID }}">
+          <button type="submit" class="btn btn-primary btn-sm">{{ GetLangText "Accept" $.Lang }}</button>
+        </form>
+        <form action="/accounts/invitations/decline" method="post">
+          <input type="hidden" name="_CSRF" value="{{ $.Csrf }}">
+          <input type="hidden" name="id" value="{{ .ID }}">
+          <button type="submit" class="btn btn-outline-secondary btn-sm">{{ GetLangText "Decline" $.Lang }}</button>
+        </form>
+      </div>
+    </li>
+    {{ end }}
+  </ul>
+  {{ else }}
+  <p class="p-3 mb-0 text-body-secondary">{{ GetLangText "You have no invitations." .Lang }}</p>
+  {{ end }}
+</section>
+{{ template "footer" . }}
+{{ end }}

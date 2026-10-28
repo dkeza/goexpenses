@@ -51,6 +51,18 @@ func selectAccount(c echo.Context) error {
 	return c.Redirect(http.StatusSeeOther, "/posts")
 }
 
+// requireAccountEditor lets only owners and editors of the selected account
+// change its records; viewers can only read them.
+func requireAccountEditor(next echo.HandlerFunc) echo.HandlerFunc {
+	return func(c echo.Context) error {
+		data, ok := c.Get("data").(*util.Data)
+		if !ok || !data.CanEdit {
+			return echo.NewHTTPError(http.StatusForbidden, "account is read-only for this user")
+		}
+		return next(c)
+	}
+}
+
 func DefineAccountRoutes() {
 	e := E
 	auth := Auth

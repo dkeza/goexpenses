@@ -10,7 +10,7 @@
   </div>
   <div class="d-flex gap-2">
     <button type="button" class="btn btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#filter-modal">{{ GetLangText "Filter" .Lang }}</button>
-    <a class="btn btn-outline-primary" href="/posts/newincomepost">{{ GetLangText "New income" .Lang }}</a>
+    {{ if .CanEdit }}<a class="btn btn-outline-primary" href="/posts/newincomepost">{{ GetLangText "New income" .Lang }}</a>{{ end }}
   </div>
 </div>
 
@@ -20,6 +20,7 @@
   <div class="col-6 col-md-4"><div class="summary-card surface-card summary-expense"><div class="summary-label">{{ GetLangText "Expenses" .Lang }}</div><p class="summary-value">{{ .Expensesum }} RSD</p><span class="text-body-secondary">{{ .Expensesume }} EUR</span></div></div>
 </section>
 
+{{ if .CanEdit }}
 <section class="form-card surface-card">
   <form action="/posts/save" method="post">
     <input type="hidden" name="_CSRF" value="{{ .Csrf }}"><input type="hidden" name="income_id" value="">
@@ -33,6 +34,7 @@
     </div>
   </form>
 </section>
+{{ end }}
 
 <section class="table-card surface-card">
   <div class="table-responsive">
@@ -43,8 +45,8 @@
         <tr class="{{ if .Income }}income-row{{ else }}expense-row{{ end }}">
           <td class="cell-id" data-label="#">{{ FormatVisibleId .Pid }}</td><td class="cell-title" data-label="{{ GetLangText "Description" $.Lang }}">{{ .Description }}</td><td class="cell-type" data-label="{{ GetLangText "Type" $.Lang }}">{{ if .Income }}{{ .Income }}{{ else }}{{ .Expense }}{{ end }}</td><td class="cell-date" data-label="{{ GetLangText "Date" $.Lang }}">{{ FormatDate .Date }}</td><td class="cell-created" data-label="{{ GetLangText "Timestamp" $.Lang }}">{{ FormatDateTime .Timestamp }}</td><td class="amount cell-rsd" data-label="{{ GetLangText "Amount" $.Lang }} RSD">{{ printf "%.2f" .Amount }}</td><td class="amount cell-eur" data-label="{{ GetLangText "Amount" $.Lang }} EUR">{{ printf "%.2f" .Amounte }}</td>
           <td class="cell-actions" data-label="{{ GetLangText "Actions" $.Lang }}"><div class="table-actions">
-            <form action="/posts/show" method="get"><input type="hidden" name="id" value="{{ .Pid }}"><button type="submit" class="btn btn-outline-primary btn-sm">{{ GetLangText "Edit" $.Lang }}</button></form>
-            <form class="js-confirm-delete" action="/posts/delete" method="post" data-confirm-detail="{{ .Description }} · ID {{ FormatVisibleId .Pid }}"><input type="hidden" name="_CSRF" value="{{ $.Csrf }}"><input type="hidden" name="id" value="{{ .Pid }}"><button type="submit" class="btn btn-outline-danger btn-sm">{{ GetLangText "Delete" $.Lang }}</button></form>
+            <form action="/posts/show" method="get"><input type="hidden" name="id" value="{{ .Pid }}"><button type="submit" class="btn btn-outline-primary btn-sm">{{ if $.CanEdit }}{{ GetLangText "Edit" $.Lang }}{{ else }}{{ GetLangText "Details" $.Lang }}{{ end }}</button></form>
+            {{ if $.CanEdit }}<form class="js-confirm-delete" action="/posts/delete" method="post" data-confirm-detail="{{ .Description }} · ID {{ FormatVisibleId .Pid }}"><input type="hidden" name="_CSRF" value="{{ $.Csrf }}"><input type="hidden" name="id" value="{{ .Pid }}"><button type="submit" class="btn btn-outline-danger btn-sm">{{ GetLangText "Delete" $.Lang }}</button></form>{{ end }}
           </div></td>
         </tr>
         {{ end }}{{ end }}

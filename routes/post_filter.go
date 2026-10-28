@@ -135,11 +135,13 @@ func submittedPostFilter(c echo.Context) (postFilter, bool) {
 	}, submitted
 }
 
-// loadPostFilter returns the account's saved filter. A filter that can no
-// longer be read is ignored.
-func loadPostFilter(accountID int) (postFilter, postFilterQuery, error) {
+// loadPostFilter returns the filter the user saved for the account. Members
+// of a shared account each keep their own filter. A filter that can no longer
+// be read is ignored.
+func loadPostFilter(accountID, userID int) (postFilter, postFilterQuery, error) {
 	var saved string
-	if err := database.Db.Get(&saved, `SELECT post_filter FROM accounts WHERE id = $1`, accountID); err != nil {
+	sql := `SELECT post_filter FROM accountsusers WHERE accounts_id = $1 AND users_id = $2`
+	if err := database.Db.Get(&saved, sql, accountID, userID); err != nil {
 		return postFilter{}, postFilterQuery{}, err
 	}
 	filter := postFilter{}
@@ -153,9 +155,8 @@ func loadPostFilter(accountID int) (postFilter, postFilterQuery, error) {
 	return filter, query, nil
 }
 
-// savePostFilter stores the filter on the account. The date range is also
-// kept in fromdate and todate for an older application version.
-func savePostFilter(accountID int, filter postFilter) error {
+// savePostFilter stores the user's filter for the account.
+func savePostFilter(accountID, userID int, filter postFilter) error {
 	saved := ""
 	if filter != (postFilter{}) {
 		encoded, err := json.Marshal(filter)
@@ -164,12 +165,8 @@ func savePostFilter(accountID int, filter postFilter) error {
 		}
 		saved = string(encoded)
 	}
-	fromDate, toDate := "", ""
-	if filter.From != "" && filter.To != "" {
-		fromDate, toDate = filter.From, filter.To
-	}
-	sql := `UPDATE accounts SET post_filter = $1, fromdate = $2, todate = $3 WHERE id = $4`
-	return executeExactlyOne(database.Db, sql, saved, fromDate, toDate, accountID)
+	sql := `UPDATE accountsusers SET post_filter = $1 WHERE accounts_id = $2 AND users_id = $3`
+	return executeExactlyOne(database.Db, sql, saved, accountID, userID)
 }
 
 func postFilterErrorMessage(err error) string {

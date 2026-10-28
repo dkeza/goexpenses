@@ -191,6 +191,8 @@ func rateLimitBackURL(path string) string {
 		return "/resend-verification"
 	case "/reset":
 		return "/reset"
+	case "/accounts/members/invite":
+		return "/accounts/members"
 	default:
 		return "/login"
 	}

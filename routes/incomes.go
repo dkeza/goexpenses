@@ -49,7 +49,7 @@ func DefineIncomes() {
 		}
 
 		return c.Redirect(http.StatusSeeOther, "/incomes")
-	}, auth)
+	}, auth, requireAccountEditor)
 
 	e.POST("/incomes/update", func(c echo.Context) error {
 		data := c.Get("data").(*util.Data)
@@ -70,7 +70,7 @@ func DefineIncomes() {
 		}
 
 		return c.Redirect(http.StatusSeeOther, "/incomes")
-	}, auth)
+	}, auth, requireAccountEditor)
 
 	e.POST("/incomes/delete", func(c echo.Context) error {
 		data := c.Get("data").(*util.Data)
@@ -82,7 +82,7 @@ func DefineIncomes() {
 		}
 
 		return c.Redirect(http.StatusSeeOther, "/incomes")
-	}, auth)
+	}, auth, requireAccountEditor)
 
 	e.GET("/incomes/show", func(c echo.Context) error {
 		data := c.Get("data").(*util.Data)
@@ -99,5 +99,5 @@ func DefineIncomes() {
 		}
 		data.Incomes = incomes
 		return c.Render(http.StatusOK, "incomesshow", data)
-	}, auth)
+	}, auth, requireAccountEditor)
 }

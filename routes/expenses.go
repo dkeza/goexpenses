@@ -99,7 +99,7 @@ func DefineExpenses() {
 		data.ExpensesAdd = expensesadd
 
 		return c.Render(http.StatusOK, "expensesshow", data)
-	}, auth)
+	}, auth, requireAccountEditor)
 
 	e.POST("/expenses/save", func(c echo.Context) error {
 		data := c.Get("data").(*util.Data)
@@ -152,7 +152,7 @@ func DefineExpenses() {
 			return databaseWriteError(c, "create expense", err)
 		}
 		return c.Redirect(http.StatusSeeOther, "/expenses")
-	}, auth)
+	}, auth, requireAccountEditor)
 
 	e.POST("/expenses/update", func(c echo.Context) error {
 		data := c.Get("data").(*util.Data)
@@ -200,7 +200,7 @@ func DefineExpenses() {
 		}
 
 		return c.Redirect(http.StatusSeeOther, "/expenses")
-	}, auth)
+	}, auth, requireAccountEditor)
 
 	e.POST("/expenses/delete", func(c echo.Context) error {
 		data := c.Get("data").(*util.Data)
@@ -212,6 +212,6 @@ func DefineExpenses() {
 		}
 
 		return c.Redirect(http.StatusSeeOther, "/expenses")
-	}, auth)
+	}, auth, requireAccountEditor)
 
 }

@@ -163,6 +163,29 @@ once every 15 minutes per unconfirmed account. Existing accounts remain verified
 when upgrading to schema version 20. Configure working SMTP delivery and a public
 `HOST` so new users can receive and open their confirmation links.
 
+### Accounts and members
+
+An account can have several members, each with a role: an `owner` or `editor`
+can add, change and delete the account's posts, expenses and incomes, while a
+`viewer` only reads them. A viewer sees the account marked as view only, can
+open a post with its change history, and gets `403 Forbidden` from every
+route that changes records. Every member keeps their own posts list filter.
+The Members page next to the account selector lists the account's members.
+An owner invites people by e-mail, changes roles and removes members; any
+member can leave the account. An invitation shows the same confirmation
+whether or not the address is registered, so it does not reveal who uses the
+application. A registered, verified user with that address gets an e-mail that
+only asks them to sign in, and becomes a member after accepting the
+invitation in the application within 30 days. Members are not invited again,
+and removing a member withdraws the invitations sent to or by them. Invitations are limited to 20
+per owner and 3 per address an hour. An account always keeps at
+least one owner, and when an administrator deletes the only owner of a shared
+account, its longest-standing member becomes the owner.
+Membership is checked on every request: a user who is no longer a member of
+their selected account, or whose account was deleted, is moved to the first
+account they still belong to. Schema version 28 makes all existing members
+owners.
+
 New posts can be filled from the NBS IPS QR code on a bill: the scanner reads
 the amount and builds the description from the payee and payment purpose. It
 uses the camera (Chrome on Android uses its built-in barcode detector, other
