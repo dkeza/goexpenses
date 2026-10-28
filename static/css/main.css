@@ -169,6 +169,7 @@ body {
 
 .account-controls {
   display: flex;
+  flex-wrap: wrap;
   align-items: end;
   gap: 0.75rem;
 }
@@ -307,7 +308,8 @@ body {
   .app-main { padding-top: 1.25rem; }
   .account-bar { align-items: stretch; flex-direction: column; }
   .account-controls { width: 100%; }
-  .account-controls form { flex: 1; }
+  .account-controls form { flex: 1 1 100%; }
+  .account-controls .btn { flex: 1 1 auto; }
   .account-controls .form-select { width: 100%; }
   .exchange-rate { white-space: normal; }
   .table-card { border-radius: 0.75rem; }
@@ -473,3 +475,8 @@ body {
 }
 
 .member-role-form .form-select { width: auto; }
+
+/* Lists inside cards take the card's background and corners. */
+.members-card { overflow: hidden; }
+.surface-card .list-group { --bs-list-group-bg: transparent; }
+.form-card .list-group-item { padding-inline: 0; }

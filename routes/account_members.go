@@ -56,6 +56,9 @@ type membersPage struct {
 	Members     []accountMember
 	Invitations []accountInvitation
 	IsOwner     bool
+	// Owners counts the account's owners; the last one cannot step down
+	// or leave, so the page does not offer it.
+	Owners int
 }
 
 // requireAccountOwner lets only owners of the selected account manage its
@@ -111,6 +114,11 @@ func showMembers(c echo.Context) error {
 		ORDER BY CASE au.role WHEN 'owner' THEN 0 WHEN 'editor' THEN 1 ELSE 2 END, lower(u.name), u.id`
 	if err := database.Db.Select(&view.Members, query, data.User.Default_accounts_id); err != nil {
 		return databaseReadError(c, "load account members", err)
+	}
+	for _, member := range view.Members {
+		if member.Role == util.RoleOwner {
+			view.Owners++
+		}
 	}
 	if view.IsOwner {
 		query = `SELECT i.id, i.email, '' AS account, '' AS invited_by, i.role, i.created_at

@@ -44,8 +44,9 @@
         <strong>{{ .Name }}</strong>{{ if eq .UserID $.User.Id }} <span class="text-body-secondary">({{ GetLangText "you" $.Lang }})</span>{{ end }}
         <div class="small text-body-secondary">{{ .Username }}</div>
       </div>
+      {{ $lastOwner := and (eq .Role "owner") (eq $.Owners 1) }}
       <div class="member-actions">
-        {{ if $.IsOwner }}
+        {{ if and $.IsOwner (not $lastOwner) }}
         <form action="/accounts/members/role" method="post" class="member-role-form">
           <input type="hidden" name="_CSRF" value="{{ $.Csrf }}">
           <input type="hidden" name="users_id" value="{{ .UserID }}">
@@ -56,7 +57,7 @@
         {{ else }}
         <span class="badge text-bg-secondary">{{ if eq .Role "owner" }}{{ GetLangText "Owner" $.Lang }}{{ else if eq .Role "editor" }}{{ GetLangText "Editor" $.Lang }}{{ else }}{{ GetLangText "Viewer" $.Lang }}{{ end }}</span>
         {{ end }}
-        {{ if or $.IsOwner (eq .UserID $.User.Id) }}
+        {{ if and (or $.IsOwner (eq .UserID $.User.Id)) (not $lastOwner) }}
         <form action="/accounts/members/remove" method="post" class="js-confirm-admin" data-confirm-title="{{ if eq .UserID $.User.Id }}{{ GetLangText "Leave account" $.Lang }}{{ else }}{{ GetLangText "Remove member" $.Lang }}{{ end }}" data-confirm-message="{{ if eq .UserID $.User.Id }}{{ GetLangText "You will no longer see this account." $.Lang }}{{ else }}{{ GetLangText "The member will no longer see this account." $.Lang }}{{ end }}" data-confirm-detail="{{ .Name }}">
           <input type="hidden" name="_CSRF" value="{{ $.Csrf }}">
           <input type="hidden" name="users_id" value="{{ .UserID }}">
