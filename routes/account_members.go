@@ -27,12 +27,16 @@ const (
 	invitationRecipientRateLimit = 3
 )
 
-var errLastOwner = errors.New("account needs at least one owner")
+var (
+	errLastOwner = errors.New("account needs at least one owner")
+	errNotOwner  = errors.New("only account owners can manage members")
+)
 
 type accountMember struct {
 	UserID    int       `db:"users_id"`
 	Name      string    `db:"name"`
 	Username  string    `db:"username"`
+	Email     string    `db:"email"`
 	Role      string    `db:"role"`
 	CreatedAt time.Time `db:"created_at"`
 }
@@ -68,6 +72,28 @@ func requireAccountOwner(next echo.HandlerFunc) echo.HandlerFunc {
 
 func validRole(role string) bool {
 	return role == util.RoleOwner || role == util.RoleEditor || role == util.RoleViewer
+}
+
+// lockMembers locks the account's members until the transaction ends, so
+// changes to one account's members and invitations run one at a time and are
+// checked against the roles as they are now, not as they were when the
+// request was authorized.
+func lockMembers(tx *sqlx.Tx, accountID int) ([]accountMember, error) {
+	members := []accountMember{}
+	err := tx.Select(&members, `SELECT au.users_id, au.role, lower(btrim(u.email)) AS email
+		FROM accountsusers au INNER JOIN users u ON u.id = au.users_id
+		WHERE au.accounts_id = $1 ORDER BY au.id FOR UPDATE OF au`, accountID)
+	return members, err
+}
+
+// memberRole returns the user's role among members, or "" for a non-member.
+func memberRole(members []accountMember, userID int) string {
+	for _, member := range members {
+		if member.UserID == userID {
+			return member.Role
+		}
+	}
+	return ""
 }
 
 func showMembers(c echo.Context) error {
@@ -113,22 +139,42 @@ func inviteMember(c echo.Context) error {
 		return c.Redirect(http.StatusSeeOther, "/accounts/members")
 	}
 
-	query := `INSERT INTO account_invitations (accounts_id, email, role, invited_by) VALUES ($1, $2, $3, $4)
-		ON CONFLICT (accounts_id, email) DO UPDATE
-		SET role = EXCLUDED.role, invited_by = EXCLUDED.invited_by, created_at = NOW()`
-	if _, err := database.Db.Exec(query, data.User.Default_accounts_id, email, role, data.User.Id); err != nil {
-		return databaseWriteError(c, "invite account member", err)
+	invited := false
+	err := runTransaction(database.Db, func(tx *sqlx.Tx) error {
+		members, err := lockMembers(tx, data.User.Default_accounts_id)
+		if err != nil {
+			return err
+		}
+		if memberRole(members, data.User.Id) != util.RoleOwner {
+			return errNotOwner
+		}
+		// Members are not invited again: an invitation left waiting for a
+		// member would let them rejoin after being removed.
+		for _, member := range members {
+			if member.Email == email {
+				return nil
+			}
+		}
+		invited = true
+		_, err = tx.Exec(`INSERT INTO account_invitations (accounts_id, email, role, invited_by) VALUES ($1, $2, $3, $4)
+			ON CONFLICT (accounts_id, email) DO UPDATE
+			SET role = EXCLUDED.role, invited_by = EXCLUDED.invited_by, created_at = NOW()`,
+			data.User.Default_accounts_id, email, role, data.User.Id)
+		return err
+	})
+	if err != nil {
+		return memberWriteError(c, data, "invite account member", err)
 	}
 
-	recipients := []string{}
-	query = `SELECT u.lang FROM users u
-		WHERE lower(btrim(u.email)) = $1 AND u.email_verified AND u.blocked_at IS NULL
-		  AND NOT EXISTS (SELECT 1 FROM accountsusers au WHERE au.accounts_id = $2 AND au.users_id = u.id)`
-	if err := database.Db.Select(&recipients, query, email, data.User.Default_accounts_id); err != nil {
-		c.Logger().Errorf("find invited user: %v", err)
-	}
-	if len(recipients) == 1 {
-		sendInvitationEmail(email, recipients[0])
+	if invited {
+		recipients := []string{}
+		query := `SELECT lang FROM users WHERE lower(btrim(email)) = $1 AND email_verified AND blocked_at IS NULL`
+		if err := database.Db.Select(&recipients, query, email); err != nil {
+			c.Logger().Errorf("find invited user: %v", err)
+		}
+		if len(recipients) == 1 {
+			sendInvitationEmail(email, recipients[0])
+		}
 	}
 
 	util.Flash("Invitation sent.", data, 1, "", 0)
@@ -164,9 +210,18 @@ func cancelInvitation(c echo.Context) error {
 	if err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest, "invalid invitation")
 	}
-	query := `DELETE FROM account_invitations WHERE id = $1 AND accounts_id = $2`
-	if err := executeExactlyOne(database.Db, query, id, data.User.Default_accounts_id); err != nil {
-		return databaseWriteError(c, "cancel invitation", err)
+	err = runTransaction(database.Db, func(tx *sqlx.Tx) error {
+		members, err := lockMembers(tx, data.User.Default_accounts_id)
+		if err != nil {
+			return err
+		}
+		if memberRole(members, data.User.Id) != util.RoleOwner {
+			return errNotOwner
+		}
+		return executeExactlyOne(tx, `DELETE FROM account_invitations WHERE id = $1 AND accounts_id = $2`, id, data.User.Default_accounts_id)
+	})
+	if err != nil {
+		return memberWriteError(c, data, "cancel invitation", err)
 	}
 	return c.Redirect(http.StatusSeeOther, "/accounts/members")
 }
@@ -245,7 +300,7 @@ func changeMemberRole(c echo.Context) error {
 	if err != nil || !validRole(role) {
 		return echo.NewHTTPError(http.StatusBadRequest, "invalid member or role")
 	}
-	if err := updateMember(data.User.Default_accounts_id, userID, role); err != nil {
+	if err := updateMember(data.User.Default_accounts_id, data.User.Id, userID, role); err != nil {
 		return memberWriteError(c, data, "change member role", err)
 	}
 	return c.Redirect(http.StatusSeeOther, "/accounts/members")
@@ -262,7 +317,7 @@ func removeMember(c echo.Context) error {
 	if userID != data.User.Id && data.AccountRole != util.RoleOwner {
 		return echo.NewHTTPError(http.StatusForbidden, "only account owners can remove other members")
 	}
-	if err := updateMember(data.User.Default_accounts_id, userID, ""); err != nil {
+	if err := updateMember(data.User.Default_accounts_id, data.User.Id, userID, ""); err != nil {
 		return memberWriteError(c, data, "remove account member", err)
 	}
 	if userID == data.User.Id {
@@ -272,38 +327,55 @@ func removeMember(c echo.Context) error {
 }
 
 // updateMember gives the member a new role, or removes them when role is
-// empty, unless that would leave the account without an owner.
-func updateMember(accountID, userID int, role string) error {
+// empty, unless that would leave the account without an owner. Only an owner
+// may do this, except that any member may remove themselves. Invitations the
+// member can no longer stand behind are withdrawn: a removed member's own
+// invitation and those they sent, and those sent by an owner who steps down.
+func updateMember(accountID, actorID, userID int, role string) error {
 	return runTransaction(database.Db, func(tx *sqlx.Tx) error {
-		// Lock the account's members so two owners cannot demote each other
-		// at the same time.
-		members := []accountMember{}
-		if err := tx.Select(&members, `SELECT users_id, role FROM accountsusers WHERE accounts_id = $1 ORDER BY id FOR UPDATE`, accountID); err != nil {
+		members, err := lockMembers(tx, accountID)
+		if err != nil {
 			return err
 		}
-		owners, current := 0, ""
+		current := memberRole(members, userID)
+		leaving := role == "" && actorID == userID
+		if memberRole(members, actorID) != util.RoleOwner && !leaving {
+			return errNotOwner
+		}
+		if current == "" {
+			return errRecordNotFound
+		}
+		owners, email := 0, ""
 		for _, member := range members {
 			if member.Role == util.RoleOwner {
 				owners++
 			}
 			if member.UserID == userID {
-				current = member.Role
+				email = member.Email
 			}
-		}
-		if current == "" {
-			return errRecordNotFound
 		}
 		if current == util.RoleOwner && role != util.RoleOwner && owners == 1 {
 			return errLastOwner
 		}
 		if role == "" {
+			if _, err := tx.Exec(`DELETE FROM account_invitations WHERE accounts_id = $1 AND (email = $2 OR invited_by = $3)`, accountID, email, userID); err != nil {
+				return err
+			}
 			return executeExactlyOne(tx, `DELETE FROM accountsusers WHERE accounts_id = $1 AND users_id = $2`, accountID, userID)
+		}
+		if current == util.RoleOwner && role != util.RoleOwner {
+			if _, err := tx.Exec(`DELETE FROM account_invitations WHERE accounts_id = $1 AND invited_by = $2`, accountID, userID); err != nil {
+				return err
+			}
 		}
 		return executeExactlyOne(tx, `UPDATE accountsusers SET role = $1 WHERE accounts_id = $2 AND users_id = $3`, role, accountID, userID)
 	})
 }
 
 func memberWriteError(c echo.Context, data *util.Data, operation string, err error) error {
+	if errors.Is(err, errNotOwner) {
+		return echo.NewHTTPError(http.StatusForbidden, "only account owners can manage members")
+	}
 	if errors.Is(err, errLastOwner) {
 		util.Flash(lastOwnerMessage, data, 0, "", 0)
 		return c.Redirect(http.StatusSeeOther, "/accounts/members")

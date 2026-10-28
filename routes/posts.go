@@ -216,6 +216,10 @@ func DefinePosts() {
 			return echo.NewHTTPError(http.StatusBadRequest, "invalid paging cursor").SetInternal(err)
 		}
 		accountID := data.User.Default_accounts_id
+		// A user who no longer belongs to any account starts a new one.
+		if accountID == 0 {
+			return c.Redirect(http.StatusSeeOther, "/accounts/show")
+		}
 
 		if c.QueryParam("reset") != "" {
 			if err := savePostFilter(accountID, data.User.Id, postFilter{}); err != nil {

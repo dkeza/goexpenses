@@ -176,7 +176,8 @@ member can leave the account. An invitation shows the same confirmation
 whether or not the address is registered, so it does not reveal who uses the
 application. A registered, verified user with that address gets an e-mail that
 only asks them to sign in, and becomes a member after accepting the
-invitation in the application within 30 days. Invitations are limited to 20
+invitation in the application within 30 days. Members are not invited again,
+and removing a member withdraws the invitations sent to or by them. Invitations are limited to 20
 per owner and 3 per address an hour. An account always keeps at
 least one owner, and when an administrator deletes the only owner of a shared
 account, its longest-standing member becomes the owner.

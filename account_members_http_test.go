@@ -333,3 +333,75 @@ func TestHTTPDeletingOnlyOwnerKeepsSharedAccountOwned(t *testing.T) {
 		t.Fatalf("remaining member's role = %q, want owner", role)
 	}
 }
+
+func TestHTTPRemovedOwnerCannotRejoinWithOldInvitation(t *testing.T) {
+	server, db := startTestApp(t)
+	alice := createTestUser(t, db, "alice")
+	bob := createTestUser(t, db, "bob")
+	shareAccount(t, db, alice.accountID, bob, "owner")
+	if _, err := db.Exec(`UPDATE users SET default_accounts_id = $1 WHERE id = $2`, bob.accountID, bob.id); err != nil {
+		t.Fatalf("select bob's own account: %v", err)
+	}
+	aliceClient := newTestClient(t, server)
+	aliceClient.login(alice)
+	aliceClient.post("/accounts/members/invite", url.Values{"email": {"alice@example.com"}, "role": {"owner"}})
+	// An owner can also invite an address of their own that is not a member.
+	aliceClient.post("/accounts/members/invite", url.Values{"email": {"alias@example.com"}, "role": {"owner"}})
+	if got := len(invitationIDs(t, db, "alice@example.com")); got != 0 {
+		t.Errorf("a member was invited to their own account: %d invitations", got)
+	}
+
+	bobClient := newTestClient(t, server)
+	bobClient.login(bob)
+	bobClient.post("/accounts/select", url.Values{"accounts_id": {strconv.Itoa(alice.accountID)}})
+	if response := bobClient.post("/accounts/members/remove", url.Values{"users_id": {strconv.Itoa(alice.id)}}); response.status != http.StatusSeeOther {
+		t.Fatalf("remove alice = %d", response.status)
+	}
+
+	if got := countRows(t, db, `SELECT COUNT(*) FROM account_invitations WHERE accounts_id = $1`, alice.accountID); got != 0 {
+		t.Errorf("%d invitations sent by the removed owner remain", got)
+	}
+	for _, id := range invitationIDs(t, db, "alice@example.com") {
+		aliceClient.post("/accounts/invitations/accept", url.Values{"id": {strconv.Itoa(id)}})
+	}
+	if role := memberRole(t, db, alice.accountID, alice); role != "" {
+		t.Fatalf("removed owner rejoined as %q", role)
+	}
+}
+
+func TestHTTPMemberWithoutAccountsIsSentToCreateOne(t *testing.T) {
+	server, db := startTestApp(t)
+	alice := createTestUser(t, db, "alice")
+	bob := createTestUser(t, db, "bob")
+	shareAccount(t, db, bob.accountID, alice, "owner")
+	if _, err := db.Exec(`UPDATE users SET default_accounts_id = $1 WHERE id = $2`, alice.accountID, alice.id); err != nil {
+		t.Fatalf("select alice's own account: %v", err)
+	}
+	// Alice shares her own account with bob as owner and leaves it.
+	shareAccount(t, db, alice.accountID, bob, "owner")
+	if _, err := db.Exec(`DELETE FROM accountsusers WHERE accounts_id = $1 AND users_id = $2`, bob.accountID, alice.id); err != nil {
+		t.Fatalf("remove alice from bob's account: %v", err)
+	}
+	client := newTestClient(t, server)
+	client.login(alice)
+	response := client.post("/accounts/members/remove", url.Values{"users_id": {strconv.Itoa(alice.id)}})
+	if response.status != http.StatusSeeOther {
+		t.Fatalf("leave last account = %d", response.status)
+	}
+	posts := client.get("/posts")
+	if posts.status != http.StatusSeeOther || posts.location != "/accounts/show" {
+		t.Fatalf("GET /posts without accounts = %d to %q, want redirect to /accounts/show", posts.status, posts.location)
+	}
+	if page := client.get("/accounts/show"); page.status != http.StatusOK {
+		t.Fatalf("GET /accounts/show without accounts = %d", page.status)
+	}
+}
+
+func invitationIDs(t *testing.T, db *sqlx.DB, email string) []int {
+	t.Helper()
+	ids := []int{}
+	if err := db.Select(&ids, `SELECT id FROM account_invitations WHERE email = $1`, email); err != nil {
+		t.Fatalf("load invitations: %v", err)
+	}
+	return ids
+}
