@@ -202,6 +202,10 @@ func TestHTTPOwnerManagesAccountMembers(t *testing.T) {
 	if page := owner.get("/posts").body; !strings.Contains(page, `href="/accounts/members"`) {
 		t.Fatal("account bar does not link to the members page")
 	}
+	// The only owner is offered neither a role change nor leaving.
+	if page := owner.get("/accounts/members").body; strings.Contains(page, `name="users_id" value="`+strconv.Itoa(alice.id)+`"`) {
+		t.Error("members page offers the last owner a role change or leaving")
+	}
 	// Registered or not, the owner gets the same answer.
 	for _, email := range []string{"BOB@example.com", "nobody@example.com"} {
 		response := owner.post("/accounts/members/invite", url.Values{"email": {email}, "role": {"viewer"}})
