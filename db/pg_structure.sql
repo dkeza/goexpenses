@@ -239,7 +239,8 @@ CREATE TABLE public.account_invitations
   email character varying NOT NULL,
   role character varying(10) NOT NULL
     CONSTRAINT account_invitations_role_check CHECK (role IN ('owner', 'editor', 'viewer')),
-  invited_by integer REFERENCES public.users(id) ON DELETE SET NULL,
+  -- Deleting the inviter withdraws the invitation, as removing them does.
+  invited_by integer REFERENCES public.users(id) ON DELETE CASCADE,
   created_at timestamp with time zone NOT NULL DEFAULT NOW()
 );
 

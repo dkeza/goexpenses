@@ -405,3 +405,30 @@ func invitationIDs(t *testing.T, db *sqlx.DB, email string) []int {
 	}
 	return ids
 }
+
+func TestHTTPDeletingOwnerWithdrawsTheirInvitations(t *testing.T) {
+	server, db := startTestApp(t)
+	admin := createTestUser(t, db, "admin")
+	alice := createTestUser(t, db, "alice")
+	bob := createTestUser(t, db, "bob")
+	if _, err := db.Exec(`UPDATE users SET is_admin = true WHERE id = $1`, admin.id); err != nil {
+		t.Fatalf("make admin: %v", err)
+	}
+	shareAccount(t, db, alice.accountID, bob, "owner")
+	aliceClient := newTestClient(t, server)
+	aliceClient.login(alice)
+	aliceClient.post("/accounts/members/invite", url.Values{"email": {"alias@example.com"}, "role": {"owner"}})
+	if got := len(invitationIDs(t, db, "alias@example.com")); got != 1 {
+		t.Fatalf("%d invitations to the alias, want 1", got)
+	}
+
+	client := newTestClient(t, server)
+	client.login(admin)
+	path := "/admin/users/" + strconv.Itoa(alice.id) + "/delete"
+	if response := client.post(path, url.Values{"confirm_username": {"alice"}}); response.status != http.StatusSeeOther {
+		t.Fatalf("delete owner = %d, body %q", response.status, response.body)
+	}
+	if got := len(invitationIDs(t, db, "alias@example.com")); got != 0 {
+		t.Fatalf("%d invitations sent by the deleted owner remain", got)
+	}
+}
