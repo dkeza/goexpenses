@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"testing"
 	"time"
 )
@@ -72,4 +73,86 @@ func TestBackgroundSchedulerCancelsAndWaitsForRunningJob(t *testing.T) {
 	}
 	// Stop must be idempotent.
 	scheduler.Stop()
+}
+
+func TestBackgroundSchedulerRetriesFailedJob(t *testing.T) {
+	attempts := 0
+	done := make(chan struct{})
+	job := backgroundJob{
+		name:        "flaky test job",
+		hour:        23,
+		retryDelays: []time.Duration{time.Millisecond, time.Millisecond, time.Millisecond},
+		run: func(context.Context) error {
+			attempts++
+			if attempts < 3 {
+				return errors.New("temporary failure")
+			}
+			close(done)
+			return nil
+		},
+	}
+
+	scheduler := startBackgroundScheduler(context.Background(), time.UTC, []backgroundJob{job})
+	defer scheduler.Stop()
+
+	select {
+	case <-done:
+	case <-time.After(5 * time.Second):
+		t.Fatal("job was not retried until it succeeded")
+	}
+}
+
+func TestBackgroundSchedulerStopsRetryingAfterLastDelay(t *testing.T) {
+	attempts := make(chan struct{}, 10)
+	job := backgroundJob{
+		name:        "failing test job",
+		hour:        23,
+		retryDelays: []time.Duration{time.Millisecond, time.Millisecond},
+		run: func(context.Context) error {
+			attempts <- struct{}{}
+			return errors.New("permanent failure")
+		},
+	}
+
+	scheduler := startBackgroundScheduler(context.Background(), time.UTC, []backgroundJob{job})
+	for i := 0; i < 3; i++ {
+		select {
+		case <-attempts:
+		case <-time.After(5 * time.Second):
+			t.Fatalf("attempt %d did not run", i+1)
+		}
+	}
+	select {
+	case <-attempts:
+		t.Fatal("job ran more often than its retry delays allow")
+	case <-time.After(50 * time.Millisecond):
+	}
+	scheduler.Stop()
+}
+
+func TestBackgroundSchedulerStopInterruptsRetryWait(t *testing.T) {
+	failed := make(chan struct{})
+	job := backgroundJob{
+		name:        "waiting test job",
+		hour:        23,
+		retryDelays: []time.Duration{time.Hour},
+		run: func(context.Context) error {
+			close(failed)
+			return errors.New("temporary failure")
+		},
+	}
+
+	scheduler := startBackgroundScheduler(context.Background(), time.UTC, []backgroundJob{job})
+	<-failed
+
+	stopped := make(chan struct{})
+	go func() {
+		scheduler.Stop()
+		close(stopped)
+	}()
+	select {
+	case <-stopped:
+	case <-time.After(5 * time.Second):
+		t.Fatal("Stop did not interrupt the retry wait")
+	}
 }

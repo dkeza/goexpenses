@@ -31,7 +31,8 @@ const (
 
 var (
 	exchangeRateHTTPClient = &http.Client{
-		Timeout: exchangeRateTimeout,
+		Transport: newExchangeRateTransport(),
+		Timeout:   exchangeRateTimeout,
 		CheckRedirect: func(*http.Request, []*http.Request) error {
 			return http.ErrUseLastResponse
 		},
@@ -82,6 +83,15 @@ func InvalidateEURRateCache() {
 	eurRateCache.mu.Lock()
 	eurRateCache.loadedAt = time.Time{}
 	eurRateCache.mu.Unlock()
+}
+
+// newExchangeRateTransport opens a new connection for every request. Rates are
+// fetched rarely, and a pooled connection that silently died made every
+// refresh time out until the process restarted.
+func newExchangeRateTransport() *http.Transport {
+	transport := http.DefaultTransport.(*http.Transport).Clone()
+	transport.DisableKeepAlives = true
+	return transport
 }
 
 type exchangeRatesResponse struct {

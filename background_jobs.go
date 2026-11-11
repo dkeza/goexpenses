@@ -16,6 +16,8 @@ type backgroundJob struct {
 	hour   int
 	minute int
 	run    func(context.Context) error
+	// retryDelays lists the waits before each retry after a failed run.
+	retryDelays []time.Duration
 }
 
 type backgroundScheduler struct {
@@ -73,8 +75,25 @@ func (scheduler *backgroundScheduler) run(job backgroundJob) {
 }
 
 func (scheduler *backgroundScheduler) execute(job backgroundJob) {
-	if err := job.run(scheduler.ctx); err != nil && scheduler.ctx.Err() == nil && !errors.Is(err, context.Canceled) {
-		log.Printf("Background job %q failed: %v", job.name, err)
+	for attempt := 0; ; attempt++ {
+		err := job.run(scheduler.ctx)
+		if err == nil || scheduler.ctx.Err() != nil || errors.Is(err, context.Canceled) {
+			return
+		}
+		if attempt >= len(job.retryDelays) {
+			log.Printf("Background job %q failed: %v", job.name, err)
+			return
+		}
+		delay := job.retryDelays[attempt]
+		log.Printf("Background job %q failed, retrying in %v: %v", job.name, delay, err)
+
+		timer := time.NewTimer(delay)
+		select {
+		case <-timer.C:
+		case <-scheduler.ctx.Done():
+			timer.Stop()
+			return
+		}
 	}
 }
 
