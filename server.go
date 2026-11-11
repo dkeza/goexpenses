@@ -182,7 +182,12 @@ func runApplication(ctx context.Context) error {
 	}
 	jobScheduler := startBackgroundScheduler(ctx, jobLocation, []backgroundJob{
 		{name: "delete old sessions", hour: 5, run: util.DeleteOldSessions},
-		{name: "refresh exchange rates", hour: 7, run: util.RefreshExchangeRates},
+		{
+			name:        "refresh exchange rates",
+			hour:        7,
+			run:         util.RefreshExchangeRates,
+			retryDelays: []time.Duration{5 * time.Minute, 15 * time.Minute, 30 * time.Minute, time.Hour, 2 * time.Hour},
+		},
 	})
 	defer jobScheduler.Stop()
 
