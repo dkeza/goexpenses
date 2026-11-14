@@ -70,7 +70,10 @@ func TestHTTPTwoFactorSignIn(t *testing.T) {
 		t.Fatalf("enabling with a wrong password = %d to %q", refused.status, refused.location)
 	}
 
-	enabled := client.post("/account/2fa/enable", url.Values{"password": {integrationPassword}, "code": {totpCodeAt(t, secret, -1)}})
+	// Kept to send again later: computing "the previous step" a second time
+	// would give a newer, still unused code once the clock passes a step.
+	enablingCode := totpCodeAt(t, secret, -1)
+	enabled := client.post("/account/2fa/enable", url.Values{"password": {integrationPassword}, "code": {enablingCode}})
 	assertNoThirdPartyScripts(t, "recovery codes page", enabled)
 	codes := recoveryCodePattern.FindAllStringSubmatch(enabled.body, -1)
 	if len(codes) != 10 {
@@ -103,7 +106,7 @@ func TestHTTPTwoFactorSignIn(t *testing.T) {
 	assertNoThirdPartyScripts(t, "recovery code page", client.get("/login/2fa?recovery=1"))
 
 	// The code that enabled two-factor authentication is not accepted again.
-	for _, wrong := range []string{totpCodeAt(t, secret, -1), "12345"} {
+	for _, wrong := range []string{enablingCode, "12345"} {
 		if response := client.post("/login/2fa", url.Values{"code": {wrong}}); response.location != "/login/2fa" {
 			t.Fatalf("code %q = %d to %q, want back to /login/2fa", wrong, response.status, response.location)
 		}
