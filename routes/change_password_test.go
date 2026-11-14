@@ -38,7 +38,7 @@ func TestChangeOwnPasswordRevokesOtherSessions(t *testing.T) {
 	mock.ExpectExec(regexp.QuoteMeta("UPDATE users SET password = $1 WHERE id = $2 AND password = $3")).
 		WithArgs(changePasswordNewHash, changePasswordUserID, storedHash).
 		WillReturnResult(sqlmock.NewResult(0, 1))
-	mock.ExpectExec(regexp.QuoteMeta("DELETE FROM sessions WHERE user_id = $1 AND uuid <> $2")).
+	mock.ExpectExec(regexp.QuoteMeta(deleteOtherUserSessionsQuery)).
 		WithArgs(changePasswordUserID, changePasswordSessionHash).
 		WillReturnResult(sqlmock.NewResult(0, 2))
 	mock.ExpectCommit()

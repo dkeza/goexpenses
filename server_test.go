@@ -106,6 +106,7 @@ func TestAdminTemplatesRender(t *testing.T) {
 			IsAdmin       bool
 			BlockedAt     *time.Time
 			BlockedReason *string
+			TOTPEnabled   bool
 		}
 		UserCounts struct {
 			Accounts        int

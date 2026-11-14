@@ -1,0 +1,27 @@
+{{ define "login-2fa" }}
+{{ template "header" . }}
+{{ template "navbar" . }}
+<section class="auth-card surface-card">
+  <div class="page-heading"><h1>{{ GetLangText "Two-factor authentication" .Lang }}</h1></div>
+  {{ if .KeyUnavailable }}<div class="alert alert-warning" role="alert">{{ GetLangText "Signing in with a code is currently not possible. Use a recovery code." .Lang }}</div>{{ end }}
+  <form action="/login/2fa" method="post" class="vstack gap-3">
+    <input type="hidden" name="_CSRF" value="{{ .Csrf }}">
+    {{ if .LoginNext }}<input type="hidden" name="next" value="{{ .LoginNext }}">{{ end }}
+    {{ if .Recovery }}
+    <div><label class="form-label" for="recovery_code">{{ GetLangText "Recovery code" .Lang }}</label><input type="text" class="form-control font-monospace" id="recovery_code" name="recovery_code" maxlength="20" placeholder="XXXXX-XXXXX" required autofocus autocomplete="off" autocapitalize="characters" spellcheck="false"></div>
+    {{ else }}
+    <div><label class="form-label" for="code">{{ GetLangText "Code from the authenticator app" .Lang }}</label><input type="text" class="form-control font-monospace" id="code" name="code" inputmode="numeric" pattern="[0-9 ]*" maxlength="7" required autofocus autocomplete="one-time-code"></div>
+    {{ end }}
+    <button type="submit" class="btn btn-primary">{{ GetLangText "Login me in" .Lang }}</button>
+  </form>
+  <div class="d-flex flex-wrap justify-content-between gap-2 mt-4">
+    {{ if .Recovery }}
+    <a href="/login/2fa{{ if .LoginNext }}?next=/admin{{ end }}">{{ GetLangText "Use a code from the app" .Lang }}</a>
+    {{ else }}
+    <a href="/login/2fa?recovery=1{{ if .LoginNext }}&amp;next=/admin{{ end }}">{{ GetLangText "Use a recovery code" .Lang }}</a>
+    {{ end }}
+    <a href="/login">{{ GetLangText "Login" .Lang }}</a>
+  </div>
+</section>
+{{ template "footer" . }}
+{{ end }}

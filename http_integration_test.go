@@ -46,6 +46,7 @@ func startTestApp(t *testing.T) (*httptest.Server, *sqlx.DB) {
 		t.Fatalf("store exchange rate: %v", err)
 	}
 
+	routes.ResetRateLimits()
 	routes.E = echo.New()
 	routes.E.Renderer = &Template{templates: template.Must(parseTemplates())}
 	midware.SetMiddleware()

@@ -25,8 +25,7 @@ func TestRotateSession(t *testing.T) {
 	util.Settings.DatabaseType = "postgres"
 	util.Settings.CookieSecure = true
 	const currentHash = "old-session-hash"
-	query := "UPDATE sessions SET uuid = $1, user_id = $2, created_at = $3 WHERE uuid = $4"
-	mock.ExpectExec(regexp.QuoteMeta(query)).
+	mock.ExpectExec(regexp.QuoteMeta(rotateSessionQuery)).
 		WithArgs(sqlmock.AnyArg(), 12, sqlmock.AnyArg(), currentHash).
 		WillReturnResult(sqlmock.NewResult(0, 1))
 
@@ -54,33 +53,6 @@ func TestRotateSession(t *testing.T) {
 	}
 	if err := mock.ExpectationsWereMet(); err != nil {
 		t.Fatalf("database expectations: %v", err)
-	}
-}
-
-func TestRotateLoginSessionRecordsEventBeforeCookie(t *testing.T) {
-	db, mock, err := sqlmock.New()
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer db.Close()
-	database.Db = sqlx.NewDb(db, "sqlmock")
-	util.Settings.DatabaseType = "postgres"
-	mock.ExpectBegin()
-	mock.ExpectExec(regexp.QuoteMeta("UPDATE sessions SET uuid = $1, user_id = $2, created_at = $3 WHERE uuid = $4")).
-		WithArgs(sqlmock.AnyArg(), 12, sqlmock.AnyArg(), "old-hash").WillReturnResult(sqlmock.NewResult(0, 1))
-	mock.ExpectExec(regexp.QuoteMeta(`INSERT INTO admin_events (kind, status, user_id) VALUES ('auth_login', 'success', $1)`)).
-		WithArgs(12).WillReturnResult(sqlmock.NewResult(1, 1))
-	mock.ExpectCommit()
-	c := echo.New().NewContext(httptest.NewRequest(http.MethodPost, "/auth", nil), httptest.NewRecorder())
-	c.Set("_id", "old-hash")
-	if err := rotateSession(c, 12, true); err != nil {
-		t.Fatal(err)
-	}
-	if len(c.Response().Header().Values(echo.HeaderSetCookie)) != 1 {
-		t.Fatal("login did not issue a rotated session cookie")
-	}
-	if err := mock.ExpectationsWereMet(); err != nil {
-		t.Fatal(err)
 	}
 }
 

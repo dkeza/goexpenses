@@ -154,6 +154,37 @@ func TestLoadSettingsRejectsInvalidEnvironmentValuesWithoutExposingSecrets(t *te
 	}
 }
 
+func TestLoadSettingsReadsOptionalTOTPKey(t *testing.T) {
+	configPath := writeSettingsFile(t, `[settings]
+host=https://app.example.com
+mailhost=smtp.example.com
+mailhostport=587
+mailfrom=app@example.com
+openexchangeratesid=exchange-id
+DATABASE_URL=postgres://user:database-secret@db.example.com/app
+totpkey= ini-key
+`)
+	settings, err := loadSettings(configPath, mapEnvironment(nil))
+	if err != nil || settings.TOTPKey != "ini-key" {
+		t.Fatalf("totpkey from INI = %q, %v", settings.TOTPKey, err)
+	}
+	for _, name := range []string{"totpkey", "TOTPKEY"} {
+		settings, err = loadSettings(configPath, mapEnvironment(map[string]string{name: "environment-key"}))
+		if err != nil || settings.TOTPKey != "environment-key" {
+			t.Fatalf("%s from the environment = %q, %v", name, settings.TOTPKey, err)
+		}
+	}
+	// The key is optional: two-factor authentication is then unavailable.
+	settings, err = loadSettings(filepath.Join(t.TempDir(), "missing.ini"), mapEnvironment(map[string]string{
+		"HOST": "https://app.example.com", "MAIL_HOST": "smtp.example.com", "MAIL_PORT": "587",
+		"MAIL_FROM": "app@example.com", "EXCHANGE_ID": "exchange-id",
+		"DATABASE_URL": "postgres://user:database-secret@db.example.com/app",
+	}))
+	if err != nil || settings.TOTPKey != "" {
+		t.Fatalf("settings without totpkey = %q, %v", settings.TOTPKey, err)
+	}
+}
+
 func writeSettingsFile(t *testing.T, contents string) string {
 	t.Helper()
 

@@ -1,0 +1,49 @@
+{{ define "two-factor" }}
+{{ template "header" . }}
+{{ template "navbar" . }}
+<section class="auth-card surface-card">
+  <div class="page-heading"><h1>{{ GetLangText "Two-factor authentication" .Lang }}</h1></div>
+  {{ if .RecoveryCodes }}
+  <div class="alert alert-warning" id="recovery-codes" role="status">
+    <h2 class="h5">{{ GetLangText "Recovery codes" .Lang }}</h2>
+    <p>{{ GetLangText "Save these codes in a safe place. They are shown only once, and each code works once." .Lang }}</p>
+    <ul class="list-unstyled font-monospace fs-5 mb-0">{{ range .RecoveryCodes }}<li>{{ . }}</li>{{ end }}</ul>
+  </div>
+  {{ end }}
+  {{ if .Enabled }}
+  <p><span class="badge text-bg-success">{{ GetLangText "Turned on" .Lang }}</span></p>
+  <p>{{ GetLangText "Unused recovery codes" .Lang }}: <strong id="recovery-codes-left">{{ .RemainingCodeCount }}</strong></p>
+
+  <form action="/account/2fa/recovery-codes" method="post" class="vstack gap-3 mt-4">
+    <input type="hidden" name="_CSRF" value="{{ .Csrf }}">
+    <h2 class="h5 mb-0">{{ GetLangText "New recovery codes" .Lang }}</h2>
+    <p class="text-body-secondary small mb-0">{{ GetLangText "Creating new codes makes the old ones invalid." .Lang }}</p>
+    <div><label class="form-label" for="codes-password">{{ GetLangText "Current password" .Lang }}</label><input type="password" class="form-control" id="codes-password" name="password" maxlength="72" required autocomplete="current-password"></div>
+    <div><label class="form-label" for="codes-code">{{ GetLangText "Code from the authenticator app" .Lang }}</label><input type="text" class="form-control font-monospace" id="codes-code" name="code" inputmode="numeric" pattern="[0-9 ]*" maxlength="7" required autocomplete="one-time-code"></div>
+    <button type="submit" class="btn btn-outline-primary">{{ GetLangText "Create new codes" .Lang }}</button>
+  </form>
+
+  <form action="/account/2fa/disable" method="post" class="vstack gap-3 mt-5">
+    <input type="hidden" name="_CSRF" value="{{ .Csrf }}">
+    <h2 class="h5 mb-0">{{ GetLangText "Turn off two-factor authentication" .Lang }}</h2>
+    <div><label class="form-label" for="disable-password">{{ GetLangText "Current password" .Lang }}</label><input type="password" class="form-control" id="disable-password" name="password" maxlength="72" required autocomplete="current-password"></div>
+    <div><label class="form-label" for="disable-code">{{ GetLangText "Code from the authenticator app" .Lang }}</label><input type="text" class="form-control font-monospace" id="disable-code" name="code" inputmode="numeric" pattern="[0-9 ]*" maxlength="7" autocomplete="one-time-code"></div>
+    <div><label class="form-label" for="disable-recovery-code">{{ GetLangText "or a recovery code" .Lang }}</label><input type="text" class="form-control font-monospace" id="disable-recovery-code" name="recovery_code" maxlength="20" placeholder="XXXXX-XXXXX" autocomplete="off" autocapitalize="characters" spellcheck="false"></div>
+    <button type="submit" class="btn btn-danger">{{ GetLangText "Turn off" .Lang }}</button>
+  </form>
+  {{ else if .KeyUnavailable }}
+  <div class="alert alert-warning mb-0" role="alert">{{ GetLangText "Two-factor authentication is not available at the moment." .Lang }}</div>
+  {{ else }}
+  <p>{{ GetLangText "Scan the QR code with an authenticator app or enter the key by hand. Then confirm with your password and the code the app shows." .Lang }}</p>
+  <div class="text-center mb-3"><img src="{{ .QRCode }}" width="220" height="220" alt="{{ GetLangText "QR code for the authenticator app" .Lang }}" class="bg-white p-1 rounded"></div>
+  <p class="text-center">{{ GetLangText "Key" .Lang }}: <code id="totp-secret" class="user-select-all">{{ .Secret }}</code></p>
+  <form action="/account/2fa/enable" method="post" class="vstack gap-3">
+    <input type="hidden" name="_CSRF" value="{{ .Csrf }}">
+    <div><label class="form-label" for="enable-password">{{ GetLangText "Current password" .Lang }}</label><input type="password" class="form-control" id="enable-password" name="password" maxlength="72" required autocomplete="current-password"></div>
+    <div><label class="form-label" for="enable-code">{{ GetLangText "Code from the authenticator app" .Lang }}</label><input type="text" class="form-control font-monospace" id="enable-code" name="code" inputmode="numeric" pattern="[0-9 ]*" maxlength="7" required autocomplete="one-time-code"></div>
+    <button type="submit" class="btn btn-primary">{{ GetLangText "Turn on" .Lang }}</button>
+  </form>
+  {{ end }}
+</section>
+{{ template "footer" . }}
+{{ end }}

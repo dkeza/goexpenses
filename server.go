@@ -134,7 +134,26 @@ func initializeApplication() error {
 		database.Db.Close()
 		return err
 	}
+	warnIfTOTPKeyUnusable()
 	return nil
+}
+
+// warnIfTOTPKeyUnusable reports at startup that users with two-factor
+// authentication cannot sign in with a code. Sign-in then fails closed: the
+// second factor is never skipped, only recovery codes work.
+func warnIfTOTPKeyUnusable() {
+	keyErr := util.TOTPKeyError()
+	if keyErr == nil {
+		return
+	}
+	users := 0
+	if err := database.Db.Get(&users, `SELECT COUNT(*) FROM users WHERE totp_enabled_at IS NOT NULL`); err != nil {
+		log.Printf("could not count users with two-factor authentication: %v", err)
+		return
+	}
+	if users > 0 {
+		log.Printf("WARNING: %v, but %d user(s) have two-factor authentication: they can sign in with recovery codes only", keyErr, users)
+	}
 }
 
 func serveUntilShutdown(ctx context.Context, server applicationServer, address string) error {

@@ -25,12 +25,30 @@ type Database struct {
 	InitialSchema []byte
 }
 
+type openSettings struct {
+	maxOpenConns int
+}
+
+// Option changes how Open connects.
+type Option func(*openSettings)
+
+// WithMaxOpenConns allows several connections to the test schema. The
+// default of one runs transactions one after another, which hides locking
+// problems; tests of concurrent requests need more.
+func WithMaxOpenConns(n int) Option {
+	return func(settings *openSettings) { settings.maxOpenConns = n }
+}
+
 // Open creates a uniquely named schema with the current database structure
 // and drops it when the test ends. The database URL comes from
 // TEST_DATABASE_URL or the Git-ignored .test-db-url file in the repository
 // root; without either the test is skipped.
-func Open(t testing.TB) *Database {
+func Open(t testing.TB, options ...Option) *Database {
 	t.Helper()
+	settings := openSettings{maxOpenConns: 1}
+	for _, option := range options {
+		option(&settings)
+	}
 	root := repositoryRoot(t)
 	databaseURL := os.Getenv("TEST_DATABASE_URL")
 	if databaseURL == "" {
@@ -79,7 +97,7 @@ func Open(t testing.TB) *Database {
 	if err != nil {
 		t.Fatalf("connect to isolated test schema: %v", err)
 	}
-	testDB.SetMaxOpenConns(1)
+	testDB.SetMaxOpenConns(settings.maxOpenConns)
 	// Registered after the schema cleanup, so it runs first and releases the
 	// connection before the schema is dropped.
 	t.Cleanup(func() { testDB.Close() })

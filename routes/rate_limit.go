@@ -9,6 +9,7 @@ import (
 	"sync"
 	"time"
 
+	"goexpenses/database"
 	"goexpenses/util"
 
 	"github.com/labstack/echo/v4"
@@ -24,6 +25,9 @@ const (
 	registrationRateLimitWindow   = time.Hour
 	registrationIPRateLimit       = 5
 	registrationAccountRateLimit  = 3
+	twoFactorRateLimitWindow      = 15 * time.Minute
+	twoFactorIPRateLimit          = 30
+	twoFactorUserRateLimit        = 10
 	rateLimitCleanupInterval      = 10 * time.Minute
 )
 
@@ -164,6 +168,33 @@ func verificationRateLimitRules(c echo.Context) []rateLimitRule {
 	}
 }
 
+// twoFactorLoginRateLimitRules limits second-factor attempts per client
+// address and per user. The user comes from the server-side pending state of
+// the session, not from the form or the address, so the limit also holds
+// across new sessions and repeated password sign-ins.
+func twoFactorLoginRateLimitRules(c echo.Context) []rateLimitRule {
+	rules := []rateLimitRule{
+		{key: rateLimitIPKey("2fa", c), limit: twoFactorIPRateLimit, window: twoFactorRateLimitWindow},
+	}
+	sessionHash, _ := c.Get("_id").(string)
+	if pending, err := loadPendingLogin(database.Db, pendingLoginQuery, sessionHash); err == nil && pending.UserID != nil {
+		rules = append(rules, rateLimitRule{key: "2fa:user:" + strconv.Itoa(*pending.UserID), limit: twoFactorUserRateLimit, window: twoFactorRateLimitWindow})
+	}
+	return rules
+}
+
+// twoFactorManageRateLimitRules limits password and code guesses on the
+// pages that change a signed-in user's second factor.
+func twoFactorManageRateLimitRules(c echo.Context) []rateLimitRule {
+	userID := 0
+	if data, ok := c.Get("data").(*util.Data); ok {
+		userID = data.User.Id
+	}
+	return []rateLimitRule{
+		{key: "2fa-manage:user:" + strconv.Itoa(userID), limit: twoFactorUserRateLimit, window: twoFactorRateLimitWindow},
+	}
+}
+
 func rateLimitMiddleware(limiter *requestLimiter, rules func(echo.Context) []rateLimitRule) echo.MiddlewareFunc {
 	return func(next echo.HandlerFunc) echo.HandlerFunc {
 		return func(c echo.Context) error {
@@ -193,9 +224,23 @@ func rateLimitBackURL(path string) string {
 		return "/reset"
 	case "/accounts/members/invite":
 		return "/accounts/members"
+	case "/login/2fa":
+		return "/login/2fa"
+	case "/account/2fa/enable", "/account/2fa/disable", "/account/2fa/recovery-codes":
+		return "/account/2fa"
+	case "/admin/users/:id/2fa/reset":
+		return "/admin"
 	default:
 		return "/login"
 	}
 }
 
 var publicRequestLimiter = newRequestLimiter()
+
+// ResetRateLimits forgets all counted requests. Tests that drive the whole
+// application use it, because users of separate test databases share IDs.
+func ResetRateLimits() {
+	publicRequestLimiter.mu.Lock()
+	defer publicRequestLimiter.mu.Unlock()
+	clear(publicRequestLimiter.attempts)
+}

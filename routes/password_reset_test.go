@@ -164,7 +164,7 @@ func TestResetPasswordConsumesTokenAndDeletesSessions(t *testing.T) {
 	mock.ExpectExec(regexp.QuoteMeta("UPDATE users SET password = $1 WHERE id = $2")).
 		WithArgs(passwordHash, userID).
 		WillReturnResult(sqlmock.NewResult(0, 1))
-	mock.ExpectExec(regexp.QuoteMeta("DELETE FROM sessions WHERE user_id = $1")).
+	mock.ExpectExec(regexp.QuoteMeta(deleteUserSessionsQuery)).
 		WithArgs(userID).
 		WillReturnResult(sqlmock.NewResult(0, 3))
 	mock.ExpectCommit()
