@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"math"
 	"net/http"
+	"net/url"
 	"slices"
 	"strings"
 	"time"
@@ -204,6 +205,24 @@ func linkedPostWrite(primary postWrite, expenseID int, amount float64, publicID 
 	}
 }
 
+// postFormDate returns the date the new post form starts with: the date of
+// the post saved just before, when it is valid, otherwise today.
+func postFormDate(value string, now time.Time) string {
+	if date, err := time.Parse(dateInputLayout, strings.TrimSpace(value)); err == nil {
+		return date.Format(dateInputLayout)
+	}
+	return now.Format(dateInputLayout)
+}
+
+// redirectToPosts returns to the posts page and keeps the date entered in the
+// new post form, so several posts for the same day are quicker to enter.
+func redirectToPosts(c echo.Context, date string) error {
+	if _, err := time.Parse(dateInputLayout, strings.TrimSpace(date)); err != nil {
+		return c.Redirect(http.StatusSeeOther, "/posts")
+	}
+	return c.Redirect(http.StatusSeeOther, "/posts?date="+url.QueryEscape(strings.TrimSpace(date)))
+}
+
 func DefinePosts() {
 	e := E
 	auth := Auth
@@ -290,7 +309,7 @@ func DefinePosts() {
 			posts[i].Amounte = math.Abs(posts[i].Amounte)
 		}
 		data.Posts = posts
-		data.Date = time.Now().Format("2006-01-02")
+		data.Date = postFormDate(c.QueryParam("date"), time.Now())
 
 		return c.Render(http.StatusOK, "posts", data)
 	}, auth)
@@ -306,22 +325,22 @@ func DefinePosts() {
 		date := c.FormValue("date")
 		if descriptionTooLongFor(description) {
 			util.Flash(descriptionTooLong, data, 0, "", 0)
-			return c.Redirect(http.StatusSeeOther, "/posts")
+			return redirectToPosts(c, date)
 		}
 		amountnum, err := parseAmountInputs(amount, amounte, data.Eur)
 		if err != nil {
 			util.Flash(`Changes not saved, because of invalid input data!`, data, 0, "", 0)
-			return c.Redirect(http.StatusSeeOther, "/posts")
+			return redirectToPosts(c, date)
 		}
 
 		createdAt, err := dateWithTime(date, time.Now())
 		if err != nil {
 			util.Flash(`Invalid date!`, data, 0, description, 0)
-			return c.Redirect(http.StatusSeeOther, "/posts")
+			return redirectToPosts(c, date)
 		}
 		if amountnum == 0 {
 			util.Flash(`Invalid amount!`, data, 0, description, 0)
-			return c.Redirect(http.StatusSeeOther, "/posts")
+			return redirectToPosts(c, date)
 		}
 
 		expenses_pid := expenses_id
@@ -332,7 +351,7 @@ func DefinePosts() {
 		if expenses_pid == "" {
 			if incomes_pid == "" {
 				util.Flash(`Invalid expense!`, data, 0, "", 0)
-				return c.Redirect(http.StatusSeeOther, "/posts")
+				return redirectToPosts(c, date)
 			}
 		} else {
 			// Check if valid expense is selected
@@ -348,7 +367,7 @@ func DefinePosts() {
 			}
 			if len(expenses) == 0 {
 				util.Flash(`Changes not saved, because of invalid input data!`, data, 0, "", 0)
-				return c.Redirect(http.StatusSeeOther, "/posts")
+				return redirectToPosts(c, date)
 			}
 		}
 		expenses_idnum := 0
@@ -356,7 +375,7 @@ func DefinePosts() {
 			expenses_idnum = expenses[0].Id
 			if description == "" {
 				util.Flash(`Invalid description!`, data, 0, ``, expenses_idnum)
-				return c.Redirect(http.StatusSeeOther, "/posts")
+				return redirectToPosts(c, date)
 			}
 
 		}
@@ -372,7 +391,7 @@ func DefinePosts() {
 			}
 			if len(incomes) == 0 {
 				util.Flash(`Changes not saved, because of invalid input data!`, data, 0, "", 0)
-				return c.Redirect(http.StatusSeeOther, "/posts")
+				return redirectToPosts(c, date)
 			}
 			incomes_idnum = incomes[0].Id
 			amountnum = amountnum * -1
@@ -401,7 +420,7 @@ func DefinePosts() {
 			}
 			if len(expensesadd) == 0 {
 				util.Flash(`Changes not saved, because of invalid input data!`, data, 0, "", 0)
-				return c.Redirect(http.StatusSeeOther, "/posts")
+				return redirectToPosts(c, date)
 			}
 
 			addexp := expenses[0].ExpensesId
@@ -419,7 +438,7 @@ func DefinePosts() {
 		}
 
 		util.Flash(`Saved`, data, 1, description, expenses_idnum)
-		return c.Redirect(http.StatusSeeOther, "/posts")
+		return redirectToPosts(c, date)
 	}, auth, requireAccountEditor)
 
 	e.POST("/posts/delete", func(c echo.Context) error {

@@ -138,3 +138,19 @@ func TestPostsPageDoesNotSaveInvalidFilter(t *testing.T) {
 		t.Fatalf("database expectations: %v", err)
 	}
 }
+
+func TestPostFormDateKeepsValidSavedDate(t *testing.T) {
+	now := time.Date(2026, 11, 14, 10, 0, 0, 0, time.UTC)
+	cases := map[string]string{
+		"2026-11-01":  "2026-11-01",
+		" 2026-10-31": "2026-10-31",
+		"":            "2026-11-14",
+		"2026-02-30":  "2026-11-14",
+		"not-a-date":  "2026-11-14",
+	}
+	for value, want := range cases {
+		if got := postFormDate(value, now); got != want {
+			t.Errorf("postFormDate(%q) = %q, want %q", value, got, want)
+		}
+	}
+}
