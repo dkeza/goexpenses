@@ -41,6 +41,7 @@
             <ul class="dropdown-menu dropdown-menu-end">
 			  {{ if .User.IsAdmin }}<li><a class="dropdown-item" href="/admin">{{ GetLangText "Administration" .Lang }}</a></li><li><hr class="dropdown-divider"></li>{{ end }}
               <li><a class="dropdown-item" href="/changepassword">{{ GetLangText "Change password" .Lang }}</a></li>
+              <li><a class="dropdown-item" href="/account/2fa">{{ GetLangText "Two-factor authentication" .Lang }}</a></li>
               <li><hr class="dropdown-divider"></li>
               <li>
                 <form action="/logout" method="post">

@@ -53,6 +53,13 @@ services. `HOST`, `DATABASE_URL`, `MAIL_HOST`, `MAIL_PORT`, `MAIL_FROM`, and
 `DATABASE_URL` must be a PostgreSQL URL. `MAIL_PASSWORD` is optional for SMTP
 servers which do not require authentication.
 
+Two-factor authentication (TOTP) needs `TOTPKEY` (or `totpkey` in
+`goexpenses.ini`): a random 32-byte key encoded as base64, for example from
+`openssl rand -base64 32`. It encrypts the authenticator secrets in the
+database, so keep it stable and backed up. Without a valid key users cannot
+turn two-factor authentication on, and users who already have it can sign in
+with recovery codes only.
+
 PostgreSQL is currently the only enabled database driver. Invalid configuration
 is reported at startup without printing passwords, API keys, or database URLs.
 

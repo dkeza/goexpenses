@@ -52,7 +52,7 @@ func TestBlockUserRevokesSessionsAndRecordsReasonAtomically(t *testing.T) {
 		WithArgs(12).WillReturnRows(sqlmock.NewRows([]string{"id", "username", "is_admin", "blocked_at"}).AddRow(12, "target", false, nil))
 	mock.ExpectExec(regexp.QuoteMeta(`UPDATE users SET blocked_at = NOW(), blocked_reason = $1 WHERE id = $2`)).
 		WithArgs("Policy violation", 12).WillReturnResult(sqlmock.NewResult(0, 1))
-	mock.ExpectExec(regexp.QuoteMeta(`DELETE FROM sessions WHERE user_id = $1`)).
+	mock.ExpectExec(regexp.QuoteMeta(deleteUserSessionsQuery)).
 		WithArgs(12).WillReturnResult(sqlmock.NewResult(0, 2))
 	mock.ExpectExec(regexp.QuoteMeta(`INSERT INTO admin_events (kind, status, user_id, actor_user_id, subject, detail)
 		VALUES ($1, $2, $3, $4, $5, $6)`)).
@@ -95,7 +95,7 @@ func TestDeleteUserRemovesExclusiveAccountsAndPreservesSharedAccounts(t *testing
 		WithArgs(12).WillReturnRows(sqlmock.NewRows([]string{"username", "email", "is_admin"}).AddRow("target", "target@example.com", false))
 	mock.ExpectQuery(`SELECT id FROM accounts WHERE id IN`).WithArgs(12).
 		WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(21).AddRow(22))
-	mock.ExpectExec(`DELETE FROM sessions WHERE user_id`).WithArgs(12).WillReturnResult(sqlmock.NewResult(0, 2))
+	mock.ExpectExec(regexp.QuoteMeta(deleteUserSessionsQuery)).WithArgs(12).WillReturnResult(sqlmock.NewResult(0, 2))
 	mock.ExpectExec(`DELETE FROM passwordresets WHERE`).WithArgs("target@example.com").WillReturnResult(sqlmock.NewResult(0, 1))
 	mock.ExpectExec(`DELETE FROM accountsusers WHERE`).WithArgs(12).WillReturnResult(sqlmock.NewResult(0, 2))
 	mock.ExpectExec(`DELETE FROM users WHERE`).WithArgs(12).WillReturnResult(sqlmock.NewResult(0, 1))
@@ -169,7 +169,7 @@ func TestDeleteUserRollsBackWhenAccountDataCannotBeDeleted(t *testing.T) {
 		WillReturnRows(sqlmock.NewRows([]string{"username", "email", "is_admin"}).AddRow("target", "target@example.com", false))
 	mock.ExpectQuery(`SELECT id FROM accounts WHERE id IN`).WithArgs(12).
 		WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(21))
-	mock.ExpectExec(`DELETE FROM sessions WHERE user_id`).WithArgs(12).WillReturnResult(sqlmock.NewResult(0, 1))
+	mock.ExpectExec(regexp.QuoteMeta(deleteUserSessionsQuery)).WithArgs(12).WillReturnResult(sqlmock.NewResult(0, 1))
 	mock.ExpectExec(`DELETE FROM passwordresets WHERE`).WithArgs("target@example.com").WillReturnResult(sqlmock.NewResult(0, 1))
 	mock.ExpectExec(`DELETE FROM accountsusers WHERE`).WithArgs(12).WillReturnResult(sqlmock.NewResult(0, 1))
 	mock.ExpectExec(`DELETE FROM users WHERE`).WithArgs(12).WillReturnResult(sqlmock.NewResult(0, 1))

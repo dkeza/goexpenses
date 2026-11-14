@@ -67,52 +67,117 @@ func authenticateUser(username, password string) (util.User, error) {
 	return user, nil
 }
 
-func rotateSession(c echo.Context, userID int, recordLogin ...bool) error {
-	currentHash, ok := c.Get("_id").(string)
-	if !ok || currentHash == "" {
-		return errors.New("current session is missing")
-	}
+// Session rotation queries. Every rotation replaces the token; a rotation
+// that signs a user in or out also drops any pending second step and setup
+// secret, so nothing of a previous sign-in attempt survives in the session.
+const (
+	clearSessionPendingColumns = `pending_2fa_user_id = NULL, pending_2fa_at = NULL, pending_2fa_failures = 0, pending_totp_secret = NULL, pending_totp_created_at = NULL`
+	rotateSessionQuery         = `UPDATE sessions SET uuid = $1, user_id = $2, created_at = $3, ` + clearSessionPendingColumns + ` WHERE uuid = $4`
+	// A session waiting for the second factor is signed out (user_id = 0):
+	// the password alone never yields a signed-in session.
+	rotatePendingSessionQuery = `UPDATE sessions SET uuid = $1, user_id = 0, created_at = $2, pending_2fa_user_id = $3, pending_2fa_at = NOW(), pending_2fa_failures = 0, pending_totp_secret = NULL, pending_totp_created_at = NULL WHERE uuid = $4`
+	lockLoginUserQuery        = `SELECT password, totp_enabled_at FROM users WHERE id = $1 AND blocked_at IS NULL AND email_verified = true FOR UPDATE`
+	recordLoginQuery          = `INSERT INTO admin_events (kind, status, user_id) VALUES ('auth_login', 'success', $1)`
 
-	token, tokenHash, err := util.NewSessionToken()
-	if err != nil {
-		return err
-	}
-	query := `UPDATE sessions SET uuid = $1, user_id = $2, created_at = $3 WHERE uuid = $4`
-	updateSession := func(execer sqlExecer) error {
-		result, err := execer.Exec(query, tokenHash, userID, time.Now(), currentHash)
-		if err != nil {
-			return err
-		}
-		rowsAffected, err := result.RowsAffected()
-		if err != nil {
-			return err
-		}
-		if rowsAffected != 1 {
-			return errors.New("current session no longer exists")
-		}
-		return nil
-	}
-	if len(recordLogin) > 0 && recordLogin[0] {
-		err = runTransaction(database.Db, func(tx *sqlx.Tx) error {
-			if err := updateSession(tx); err != nil {
-				return err
-			}
-			_, err := tx.Exec(`INSERT INTO admin_events (kind, status, user_id) VALUES ('auth_login', 'success', $1)`, userID)
-			return err
-		})
-	} else {
-		err = updateSession(database.Db)
-	}
-	if err != nil {
-		return err
-	}
+	// Sessions waiting for the second factor have user_id = 0, so revoking a
+	// user's sessions has to match the pending user as well. The parentheses
+	// keep an added "AND uuid <> ..." from applying to the pending part only.
+	deleteUserSessionsQuery      = `DELETE FROM sessions WHERE (user_id = $1 OR pending_2fa_user_id = $1)`
+	deleteOtherUserSessionsQuery = deleteUserSessionsQuery + ` AND uuid <> $2`
+)
 
+// rotateSessionTx gives the session a new token and signs userID in (0 signs
+// out). The caller sets the cookie with setSessionCookie after its
+// transaction commits.
+func rotateSessionTx(execer sqlExecer, currentHash string, userID int) (token string, tokenHash string, err error) {
+	if currentHash == "" {
+		return "", "", errors.New("current session is missing")
+	}
+	token, tokenHash, err = util.NewSessionToken()
+	if err != nil {
+		return "", "", err
+	}
+	if err := executeExactlyOne(execer, rotateSessionQuery, tokenHash, userID, time.Now(), currentHash); err != nil {
+		return "", "", err
+	}
+	return token, tokenHash, nil
+}
+
+// setSessionCookie hands a rotated session token to the browser.
+func setSessionCookie(c echo.Context, token, tokenHash string) {
 	c.Set("_id", tokenHash)
 	if data, ok := c.Get("data").(*util.Data); ok {
 		data.CookieId = tokenHash
 	}
 	c.SetCookie(util.NewSessionCookie(token))
+}
+
+func rotateSession(c echo.Context, userID int) error {
+	currentHash, _ := c.Get("_id").(string)
+	token, tokenHash, err := rotateSessionTx(database.Db, currentHash, userID)
+	if errors.Is(err, errRecordNotFound) && userID == 0 {
+		// A password reset also revokes a session that was waiting for this
+		// user's second factor, which can be the current one.
+		if token, tokenHash, err = util.NewSessionToken(); err == nil {
+			_, err = database.Db.Exec(`INSERT INTO sessions (uuid) VALUES ($1)`, tokenHash)
+		}
+	}
+	if err != nil {
+		return err
+	}
+	setSessionCookie(c, token, tokenHash)
 	return nil
+}
+
+// loginStart is the rotated session after a correct password.
+type loginStart struct {
+	Token     string
+	TokenHash string
+	// Pending reports that the user still has to pass the second factor.
+	Pending bool
+}
+
+// beginLogin turns a verified password into a session. authenticateUser
+// checks the password without a lock, so the hash is compared again under a
+// row lock: a sign-in with a password that was reset in between is refused.
+// With two-factor authentication the session only becomes pending.
+func beginLogin(sessionHash string, user util.User) (loginStart, error) {
+	if sessionHash == "" {
+		return loginStart{}, errors.New("current session is missing")
+	}
+	token, tokenHash, err := util.NewSessionToken()
+	if err != nil {
+		return loginStart{}, err
+	}
+	start := loginStart{Token: token, TokenHash: tokenHash}
+	err = runTransaction(database.Db, func(tx *sqlx.Tx) error {
+		var locked struct {
+			Password      string     `db:"password"`
+			TOTPEnabledAt *time.Time `db:"totp_enabled_at"`
+		}
+		if err := tx.Get(&locked, lockLoginUserQuery, user.Id); err != nil {
+			if errors.Is(err, stdsql.ErrNoRows) {
+				return errInvalidCredentials
+			}
+			return err
+		}
+		if locked.Password != user.Password {
+			return errInvalidCredentials
+		}
+		if locked.TOTPEnabledAt != nil {
+			start.Pending = true
+			return executeExactlyOne(tx, rotatePendingSessionQuery, tokenHash, time.Now(), user.Id, sessionHash)
+		}
+		if err := executeExactlyOne(tx, rotateSessionQuery, tokenHash, user.Id, time.Now(), sessionHash); err != nil {
+			return err
+		}
+		_, err := tx.Exec(recordLoginQuery, user.Id)
+		return err
+	})
+	if err != nil {
+		return loginStart{}, err
+	}
+	return start, nil
 }
 
 func logout(c echo.Context) error {
@@ -249,29 +314,36 @@ func DefineAuthRoutes() {
 
 		username := c.FormValue("username")
 		password := c.FormValue("password")
+		toAdmin := c.FormValue("next") == "/admin"
 
 		user, err := authenticateUser(username, password)
+		start := loginStart{}
 		if err == nil {
-			publicRequestLimiter.reset(loginAccountKey(c, username))
-			if err := rotateSession(c, user.Id, true); err != nil {
-				return echo.NewHTTPError(http.StatusInternalServerError, "could not rotate session").SetInternal(err)
-			}
-			c.Set("id", user.Id)
-			c.Set("name", user.Name)
-			c.Set("username", user.Username)
-			c.Set("email", user.Email)
-
-		} else if errors.Is(err, errInvalidCredentials) {
+			sessionHash, _ := c.Get("_id").(string)
+			start, err = beginLogin(sessionHash, user)
+		}
+		if errors.Is(err, errInvalidCredentials) {
 			util.Flash(`Unknown user or invalid password!`, data, 0, "", 0)
-			if c.FormValue("next") == "/admin" {
+			if toAdmin {
 				return c.Redirect(http.StatusSeeOther, "/login?next=/admin")
 			}
 			return c.Redirect(http.StatusSeeOther, "/login")
-		} else {
-			return echo.NewHTTPError(http.StatusInternalServerError, "could not authenticate user").SetInternal(err)
+		}
+		if err != nil {
+			return echo.NewHTTPError(http.StatusInternalServerError, "could not sign in").SetInternal(err)
 		}
 
-		if c.FormValue("next") == "/admin" {
+		publicRequestLimiter.reset(loginAccountKey(c, username))
+		setSessionCookie(c, start.Token, start.TokenHash)
+		if start.Pending {
+			return c.Redirect(http.StatusSeeOther, twoFactorLoginURL(toAdmin, false))
+		}
+		c.Set("id", user.Id)
+		c.Set("name", user.Name)
+		c.Set("username", user.Username)
+		c.Set("email", user.Email)
+
+		if toAdmin {
 			return c.Redirect(http.StatusSeeOther, "/admin")
 		}
 		return c.Redirect(http.StatusSeeOther, "/posts")

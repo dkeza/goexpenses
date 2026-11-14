@@ -24,6 +24,7 @@ psql "$ADMIN_URL" -qc "DROP DATABASE IF EXISTS ${DB_NAME}" -c "CREATE DATABASE $
 (cd "$REPO" && DATABASE_TYPE=postgres DATABASE_URL="$DB_URL" PORT="$PORT" \
   HOST="http://localhost:$PORT" COOKIE_SECURE=false EXCHANGE_ID=dummy \
   MAIL_HOST=localhost MAIL_PORT=2525 MAIL_FROM=test@example.com \
+  TOTPKEY="${TOTPKEY:-$(openssl rand -base64 32)}" \
   nohup "$WORK/goexpenses" >"$WORK/server.log" 2>&1 &)
 timeout 60 bash -c "until curl -sf -o /dev/null http://localhost:$PORT/login; do sleep 1; done" \
   || { tail -20 "$WORK/server.log"; exit 1; }

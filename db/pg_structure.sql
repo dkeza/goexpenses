@@ -28,6 +28,9 @@ CREATE TABLE public.users
   blocked_reason text,
   verification_token character varying,
   verification_sent_at timestamp,
+  totp_secret text,
+  totp_enabled_at timestamp with time zone,
+  totp_last_step bigint NOT NULL DEFAULT 0,
   CONSTRAINT users_name_not_blank CHECK (btrim(name) <> ''),
   CONSTRAINT users_username_not_blank CHECK (btrim(username) <> ''),
   CONSTRAINT users_email_not_blank CHECK (btrim(email) <> ''),
@@ -47,7 +50,12 @@ CREATE TABLE public.sessions
   expenses_id integer NOT NULL DEFAULT 0,
   last_post_description character varying NOT NULL DEFAULT ''::character varying,
   message_success integer NOT NULL DEFAULT 0,
-  created_at timestamp NOT NULL DEFAULT NOW()
+  created_at timestamp NOT NULL DEFAULT NOW(),
+  pending_2fa_user_id integer,
+  pending_2fa_at timestamp with time zone,
+  pending_2fa_failures integer NOT NULL DEFAULT 0,
+  pending_totp_secret text,
+  pending_totp_created_at timestamp with time zone
 );
 
 CREATE TABLE public.admin_events
@@ -182,6 +190,7 @@ CREATE INDEX incomes_active_account_description_idx
   ON public.incomes (accounts_id, description)
   WHERE deleted = 0;
 CREATE INDEX sessions_created_at_idx ON public.sessions (created_at);
+CREATE INDEX sessions_pending_2fa_user_idx ON public.sessions (pending_2fa_user_id) WHERE pending_2fa_user_id IS NOT NULL;
 CREATE INDEX passwordresets_active_email_created_idx
   ON public.passwordresets (email, created_at DESC)
   WHERE done = 0;
@@ -246,3 +255,16 @@ CREATE TABLE public.account_invitations
 
 CREATE UNIQUE INDEX account_invitations_account_email_uidx ON public.account_invitations (accounts_id, email);
 CREATE INDEX account_invitations_email_idx ON public.account_invitations (email);
+
+-- Table: public.user_recovery_codes (bcrypt hashes of two-factor recovery codes)
+
+CREATE TABLE public.user_recovery_codes
+(
+  id SERIAL PRIMARY KEY,
+  user_id integer NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+  code_hash text NOT NULL,
+  used_at timestamp with time zone,
+  created_at timestamp with time zone NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX user_recovery_codes_user_idx ON public.user_recovery_codes (user_id) WHERE used_at IS NULL;

@@ -28,7 +28,9 @@ background, waits for `/login`, installs `playwright@1.49.1` once into
 the e-mail verified in the DB and inserts an EUR rate (117.4657).
 
 Config validation requires HOST, MAIL_HOST, MAIL_PORT, MAIL_FROM and
-EXCHANGE_ID, so the script passes dummy values. Expected noise in
+EXCHANGE_ID, so the script passes dummy values. It also sets a random `TOTPKEY`
+(unless one is already in the environment), so two-factor authentication can
+be turned on at `/account/2fa`; compute codes from the `#totp-secret` text. Expected noise in
 `server.log`: `refresh exchange rates failed ... HTTP 401`.
 
 ## Drive

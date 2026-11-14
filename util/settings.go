@@ -30,6 +30,9 @@ type AppSettings struct {
 	CookieSecure             bool
 	DatabaseType             string
 	DatabaseConnectionString string
+	// TOTPKey is the base64-encoded 32-byte AES key that encrypts two-factor
+	// secrets. It is optional: without it two-factor codes cannot be checked.
+	TOTPKey string
 }
 
 type environmentLookup func(string) (string, bool)
@@ -89,6 +92,7 @@ func applyINISettings(settings *AppSettings, file ini.File, lookupEnv environmen
 	setINIString(file, "mailpassword", &settings.MailPassword)
 	setINIString(file, "openexchangeratesid", &settings.OpenExchangeRatesId)
 	setINIString(file, "databasetype", &settings.DatabaseType)
+	setINIString(file, "totpkey", &settings.TOTPKey)
 	if value, ok := file.Get("settings", "databaseurl"); ok {
 		settings.DatabaseConnectionString = value
 	}
@@ -130,6 +134,8 @@ func applyEnvironmentSettings(settings *AppSettings, lookupEnv environmentLookup
 	setEnvironmentString(lookupEnv, "EXCHANGE_ID", &settings.OpenExchangeRatesId)
 	setEnvironmentString(lookupEnv, "DATABASE_TYPE", &settings.DatabaseType)
 	setEnvironmentString(lookupEnv, "DATABASE_URL", &settings.DatabaseConnectionString)
+	setEnvironmentString(lookupEnv, "totpkey", &settings.TOTPKey)
+	setEnvironmentString(lookupEnv, "TOTPKEY", &settings.TOTPKey)
 
 	if value, ok := lookupEnv("MAIL_PORT"); ok {
 		port, err := parsePort("MAIL_PORT", value)
@@ -162,6 +168,7 @@ func normalizeSettings(settings *AppSettings) {
 	settings.OpenExchangeRatesId = strings.TrimSpace(settings.OpenExchangeRatesId)
 	settings.DatabaseType = strings.ToLower(strings.TrimSpace(settings.DatabaseType))
 	settings.DatabaseConnectionString = strings.TrimSpace(settings.DatabaseConnectionString)
+	settings.TOTPKey = strings.TrimSpace(settings.TOTPKey)
 }
 
 func validateSettings(settings AppSettings) error {

@@ -18,6 +18,11 @@ func TestPostsHistoryMigrationUpgradesExistingSchema(t *testing.T) {
 		DROP TRIGGER posts_history_trigger ON posts;
 		DROP FUNCTION posts_history_record();
 		ALTER TABLE accounts DROP COLUMN post_filter;
+		DROP TABLE user_recovery_codes;
+		ALTER TABLE users DROP COLUMN totp_secret, DROP COLUMN totp_enabled_at, DROP COLUMN totp_last_step;
+		ALTER TABLE sessions
+			DROP COLUMN pending_2fa_user_id, DROP COLUMN pending_2fa_at, DROP COLUMN pending_2fa_failures,
+			DROP COLUMN pending_totp_secret, DROP COLUMN pending_totp_created_at;
 		DROP TABLE account_invitations;
 		ALTER TABLE accountsusers DROP COLUMN role, DROP COLUMN created_at, DROP COLUMN post_filter;
 		UPDATE params SET build = 25 WHERE id = 1;
@@ -65,6 +70,11 @@ func TestPostFilterMigrationCarriesOverDateFilter(t *testing.T) {
 	db := integration.DB
 	if _, err := db.Exec(`
 		ALTER TABLE accounts DROP COLUMN post_filter;
+		DROP TABLE user_recovery_codes;
+		ALTER TABLE users DROP COLUMN totp_secret, DROP COLUMN totp_enabled_at, DROP COLUMN totp_last_step;
+		ALTER TABLE sessions
+			DROP COLUMN pending_2fa_user_id, DROP COLUMN pending_2fa_at, DROP COLUMN pending_2fa_failures,
+			DROP COLUMN pending_totp_secret, DROP COLUMN pending_totp_created_at;
 		DROP TABLE account_invitations;
 		ALTER TABLE accountsusers DROP COLUMN role, DROP COLUMN created_at, DROP COLUMN post_filter;
 		UPDATE params SET build = 26 WHERE id = 1;
@@ -94,6 +104,11 @@ func TestAccountMembersMigrationMakesMembersOwners(t *testing.T) {
 	integration := testdb.Open(t)
 	db := integration.DB
 	if _, err := db.Exec(`
+		DROP TABLE user_recovery_codes;
+		ALTER TABLE users DROP COLUMN totp_secret, DROP COLUMN totp_enabled_at, DROP COLUMN totp_last_step;
+		ALTER TABLE sessions
+			DROP COLUMN pending_2fa_user_id, DROP COLUMN pending_2fa_at, DROP COLUMN pending_2fa_failures,
+			DROP COLUMN pending_totp_secret, DROP COLUMN pending_totp_created_at;
 		DROP TABLE account_invitations;
 		ALTER TABLE accountsusers DROP COLUMN role, DROP COLUMN created_at, DROP COLUMN post_filter;
 		UPDATE params SET build = 27 WHERE id = 1;
@@ -127,5 +142,58 @@ func TestAccountMembersMigrationMakesMembersOwners(t *testing.T) {
 	}
 	if _, err := db.Exec(`UPDATE accountsusers SET role = 'admin'`); err == nil {
 		t.Error("an unknown member role was accepted")
+	}
+}
+
+// TestTwoFactorMigrationUpgradesExistingSchema rolls a fresh schema back to
+// version 29 and applies migration 30 to it, as on an existing installation.
+func TestTwoFactorMigrationUpgradesExistingSchema(t *testing.T) {
+	if migrations.SchemaVersion != 30 {
+		t.Fatalf("SchemaVersion = %d, want 30", migrations.SchemaVersion)
+	}
+	integration := testdb.Open(t)
+	db := integration.DB
+	if _, err := db.Exec(`
+		DROP TABLE user_recovery_codes;
+		ALTER TABLE users DROP COLUMN totp_secret, DROP COLUMN totp_enabled_at, DROP COLUMN totp_last_step;
+		ALTER TABLE sessions
+			DROP COLUMN pending_2fa_user_id, DROP COLUMN pending_2fa_at, DROP COLUMN pending_2fa_failures,
+			DROP COLUMN pending_totp_secret, DROP COLUMN pending_totp_created_at;
+		UPDATE params SET build = 29 WHERE id = 1;
+		INSERT INTO accounts (description) VALUES ('Account');
+		INSERT INTO users (name, email, username, default_accounts_id)
+			SELECT 'alice', 'alice@example.com', 'alice', id FROM accounts;
+		INSERT INTO sessions (uuid, user_id) SELECT 'existing-session', id FROM users;`); err != nil {
+		t.Fatalf("prepare schema version 29: %v", err)
+	}
+
+	if err := migrations.Apply(context.Background(), db, integration.InitialSchema, migrations.SchemaVersion); err != nil {
+		t.Fatalf("apply migrations: %v", err)
+	}
+
+	var build, lastStep, failures, enabledUsers int
+	if err := db.Get(&build, `SELECT build FROM params WHERE id = 1`); err != nil || build != 30 {
+		t.Fatalf("schema version = %d, %v; want 30", build, err)
+	}
+	// Existing users and sessions start without a second factor.
+	if err := db.Get(&enabledUsers, `SELECT COUNT(*) FROM users WHERE totp_enabled_at IS NOT NULL OR totp_secret IS NOT NULL`); err != nil || enabledUsers != 0 {
+		t.Fatalf("users with a second factor = %d, %v; want 0", enabledUsers, err)
+	}
+	if err := db.Get(&lastStep, `SELECT totp_last_step FROM users WHERE username = 'alice'`); err != nil || lastStep != 0 {
+		t.Fatalf("totp_last_step = %d, %v; want 0", lastStep, err)
+	}
+	if err := db.Get(&failures, `SELECT pending_2fa_failures FROM sessions WHERE uuid = 'existing-session' AND pending_2fa_user_id IS NULL`); err != nil || failures != 0 {
+		t.Fatalf("pending failures = %d, %v; want 0", failures, err)
+	}
+	if _, err := db.Exec(`INSERT INTO user_recovery_codes (user_id, code_hash) SELECT id, 'hash' FROM users`); err != nil {
+		t.Fatalf("store recovery code: %v", err)
+	}
+	// Deleting a user removes their recovery codes.
+	if _, err := db.Exec(`DELETE FROM sessions; DELETE FROM users`); err != nil {
+		t.Fatalf("delete user: %v", err)
+	}
+	var codes int
+	if err := db.Get(&codes, `SELECT COUNT(*) FROM user_recovery_codes`); err != nil || codes != 0 {
+		t.Fatalf("recovery codes after deleting the user = %d, %v; want 0", codes, err)
 	}
 }

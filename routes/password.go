@@ -144,8 +144,7 @@ func resetPasswordWithToken(token, passwordHash string, now time.Time) (bool, er
 		return false, errors.New("password reset user no longer exists")
 	}
 
-	query = `DELETE FROM sessions WHERE user_id = $1`
-	if _, err = tx.Exec(query, user.Id); err != nil {
+	if _, err = tx.Exec(deleteUserSessionsQuery, user.Id); err != nil {
 		return false, err
 	}
 	if err = tx.Commit(); err != nil {
@@ -158,15 +157,9 @@ func resetPasswordWithToken(token, passwordHash string, now time.Time) (bool, er
 // changeOwnPassword replaces a signed-in user's password after verifying the
 // current one and revokes every other session of that user.
 func changeOwnPassword(userID int, currentPassword, newPasswordHash, currentSessionHash string) error {
-	storedHash := ""
-	if err := database.Db.Get(&storedHash, `SELECT password FROM users WHERE id = $1 AND blocked_at IS NULL`, userID); err != nil {
-		if errors.Is(err, stdsql.ErrNoRows) {
-			return errInvalidCredentials
-		}
+	storedHash, err := verifiedPasswordHash(userID, currentPassword)
+	if err != nil {
 		return err
-	}
-	if valid, _ := util.VerifyPassword(storedHash, currentPassword); !valid {
-		return errInvalidCredentials
 	}
 
 	return runTransaction(database.Db, func(tx *sqlx.Tx) error {
@@ -179,9 +172,27 @@ func changeOwnPassword(userID int, currentPassword, newPasswordHash, currentSess
 		if err != nil {
 			return err
 		}
-		_, err = tx.Exec(`DELETE FROM sessions WHERE user_id = $1 AND uuid <> $2`, userID, currentSessionHash)
+		_, err = tx.Exec(deleteOtherUserSessionsQuery, userID, currentSessionHash)
 		return err
 	})
+}
+
+// verifiedPasswordHash checks a signed-in user's current password and
+// returns the stored hash it was checked against. A caller that then locks
+// the user row compares the hash again, so a password changed in between is
+// noticed without running bcrypt while the row is locked.
+func verifiedPasswordHash(userID int, password string) (string, error) {
+	storedHash := ""
+	if err := database.Db.Get(&storedHash, `SELECT password FROM users WHERE id = $1 AND blocked_at IS NULL`, userID); err != nil {
+		if errors.Is(err, stdsql.ErrNoRows) {
+			return "", errInvalidCredentials
+		}
+		return "", err
+	}
+	if valid, _ := util.VerifyPassword(storedHash, password); !valid {
+		return "", errInvalidCredentials
+	}
+	return storedHash, nil
 }
 
 func sendPasswordResetEmail(recipient, token, lang string) {

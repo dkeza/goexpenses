@@ -26,6 +26,7 @@ type adminUser struct {
 	IsAdmin       bool       `db:"is_admin"`
 	BlockedAt     *time.Time `db:"blocked_at"`
 	BlockedReason *string    `db:"blocked_reason"`
+	TOTPEnabled   bool       `db:"totp_enabled"`
 }
 
 type adminEventRow struct {
@@ -160,7 +161,8 @@ func adminUserDetails(c echo.Context) error {
 	view := adminPage{Data: c.Get("data").(*util.Data)}
 	view.Active = "admin"
 	err = database.Db.Get(&view.SelectedUser, `
-		SELECT id, name, username, email, created_at, email_verified, is_admin, blocked_at, blocked_reason
+		SELECT id, name, username, email, created_at, email_verified, is_admin, blocked_at, blocked_reason,
+			totp_enabled_at IS NOT NULL AS totp_enabled
 		FROM users WHERE id = $1`, id)
 	if errors.Is(err, sql.ErrNoRows) {
 		return echo.NewHTTPError(http.StatusNotFound, "user not found")
@@ -220,7 +222,8 @@ func adminEvents(c echo.Context) error {
 	view.Active = "admin"
 	view.Kind = c.QueryParam("kind")
 	switch view.Kind {
-	case "exchange_rate", "session_cleanup", "email", "auth_login", "auth_logout", "user_block", "user_unblock", "user_delete":
+	case "exchange_rate", "session_cleanup", "email", "auth_login", "auth_logout", "user_block", "user_unblock", "user_delete",
+		"auth_2fa_failed", "auth_2fa_recovery_used", "auth_2fa_key_error", "2fa_enabled", "2fa_disabled", "2fa_recovery_regenerated", "admin_2fa_reset":
 	default:
 		view.Kind = ""
 	}
@@ -325,7 +328,7 @@ func changeUserBlock(c echo.Context, block bool) error {
 		if _, err := tx.Exec(`UPDATE users SET blocked_at = NOW(), blocked_reason = $1 WHERE id = $2`, reason, id); err != nil {
 			return databaseWriteError(c, "block user", err)
 		}
-		if _, err := tx.Exec(`DELETE FROM sessions WHERE user_id = $1`, id); err != nil {
+		if _, err := tx.Exec(deleteUserSessionsQuery, id); err != nil {
 			return databaseWriteError(c, "revoke user sessions", err)
 		}
 	} else {
@@ -387,7 +390,7 @@ func deleteUser(c echo.Context) error {
 	) ORDER BY id FOR UPDATE`, id); err != nil {
 		return databaseReadError(c, "load user accounts to delete", err)
 	}
-	if _, err := tx.Exec(`DELETE FROM sessions WHERE user_id = $1`, id); err != nil {
+	if _, err := tx.Exec(deleteUserSessionsQuery, id); err != nil {
 		return databaseWriteError(c, "revoke deleted user sessions", err)
 	}
 	if _, err := tx.Exec(`DELETE FROM passwordresets WHERE lower(btrim(email)) = lower(btrim($1))`, user.Email); err != nil {
@@ -450,5 +453,6 @@ func DefineAdminRoutes() {
 	E.POST("/admin/users/:id/block", func(c echo.Context) error { return changeUserBlock(c, true) }, adminOnly)
 	E.POST("/admin/users/:id/unblock", func(c echo.Context) error { return changeUserBlock(c, false) }, adminOnly)
 	E.POST("/admin/users/:id/delete", deleteUser, adminOnly)
+	E.POST("/admin/users/:id/2fa/reset", adminResetTwoFactor, adminOnly, rateLimitMiddleware(publicRequestLimiter, twoFactorManageRateLimitRules))
 	E.GET("/admin/events", adminEvents, adminOnly)
 }
